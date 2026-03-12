@@ -1,0 +1,198 @@
+{
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/signup",
+      "handler": "api.signup",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/change-password",
+      "handler": "api.changePassword",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/change-profile-image",
+      "handler": "api.changeProfileImage",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/generate-qr",
+      "handler": "api.generateQR",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/app-init",
+      "handler": "api.appInit",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/init",
+      "handler": "api.init",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/create-booking",
+      "handler": "api.createBooking",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/get-bookings",
+      "handler": "api.getBookings",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/cancel-booking",
+      "handler": "api.cancelBooking",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/count-bookings",
+      "handler": "api.countBookings",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/create-log",
+      "handler": "api.createLog",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/staff/signin",
+      "handler": "api.staffSignin",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/otp/request",
+      "handler": "api.requestOTP",
+      "config": {
+        "policies": [
+          "global::validateBasicAuthen"
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/otp/verify",
+      "handler": "api.verifyOTP",
+      "config": {
+        "policies": [
+          "global::validateBasicAuthen"
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/check-user",
+      "handler": "api.checkUser",
+      "config": {
+        "policies": [
+          "global::validateBasicAuthen"
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/forget-password",
+      "handler": "api.forgetPassword",
+      "config": {
+        "policies": [
+          "global::validateBasicAuthen"
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/otp-verify-forget-password",
+      "handler": "api.otpVerifyForgetPassword",
+      "config": {
+        "policies": [
+          "global::validateBasicAuthen"
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/point-reduction",
+      "handler": "api.pointReduction",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/confirm-vaccinated",
+      "handler": "api.confirmVaccinated",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/check-vaccinated/:id",
+      "handler": "api.checkVaccinatedSubmitted",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/export-csv",
+      "handler": "api.exportCSV",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/check-out",
+      "handler": "api.checkOut",
+      "config": {
+        "policies": ["global::validateProcessTransaction"]
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/user",
+      "handler": "api.deleteAccount",
+      "config": {
+        "policies": []
+      }
+    }
+  ]
+}
