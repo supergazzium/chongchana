@@ -27,6 +27,7 @@ class _ChongjaroenScaffoldState extends State<ChongjaroenScaffold> {
       if (index == 0) routeState.go('/home');
       if (index == 1) routeState.go('/booking');
       if (index == 2) routeState.go('/menu');
+      if (index == 3) routeState.go('/wallet');
     }
 
     return Scaffold(
@@ -51,6 +52,10 @@ class _ChongjaroenScaffoldState extends State<ChongjaroenScaffold> {
             BottomNavigationBarItem(
               icon: Icon(ChongjaroenIcons.book),
               label: Locales.Menu,
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance_wallet),
+              label: Locales.Wallet,
             ),
           ],
           currentIndex: selectedIndex,
@@ -77,6 +82,8 @@ class _ChongjaroenScaffoldState extends State<ChongjaroenScaffold> {
       return 1;
     } else if (pathTemplate == '/menu') {
       return 2;
+    } else if (pathTemplate.startsWith('/wallet')) {
+      return 3;
     } else {
       return 0;
     }

@@ -31,6 +31,35 @@ const { createLog } = require('./log')
 const { staffSignin, pointReduction } = require('./staff')
 const { confirmVaccinated, checkVaccinatedSubmitted } = require('./vaccinated')
 const { exportCSV } = require('./csv')
+const {
+  listWallets,
+  getWalletDetail,
+  adjustBalance,
+  freezeWallet,
+  getAllTransactions,
+  refundTransaction,
+  getReports,
+  createVoucher,
+  getAllTransfers,
+  getAllPointRedemptions,
+  cancelTransfer,
+  approvePointRedemption,
+  rejectPointRedemption,
+  getTransferSettings,
+  updateTransferSettings,
+} = require('./wallet-admin')
+const {
+  transferFunds,
+  redeemPoints,
+  getUserTransfers,
+  getUserPointRedemptions,
+  getWalletBalance,
+  getWalletTransactions,
+  createPaymentSource,
+  checkPaymentStatus,
+  handlePaymentWebhook,
+  getPaymentMethods,
+} = require('./wallet')
 
 const appInit = async (ctx) => {
   const branches = await strapi.services.branch
@@ -92,4 +121,31 @@ module.exports = {
   // Exports
   exportCSV,
   otpVerifyForgetPassword,
+  // Wallet User
+  transferFunds,
+  redeemPoints,
+  getUserTransfers,
+  getUserPointRedemptions,
+  getWalletBalance,
+  getWalletTransactions,
+  createPaymentSource,
+  checkPaymentStatus,
+  handlePaymentWebhook,
+  getPaymentMethods,
+  // Wallet Admin
+  listWallets,
+  getWalletDetail,
+  adjustBalance,
+  freezeWallet,
+  getAllTransactions,
+  refundTransaction,
+  getReports,
+  createVoucher,
+  getAllTransfers,
+  getAllPointRedemptions,
+  cancelTransfer,
+  approvePointRedemption,
+  rejectPointRedemption,
+  getTransferSettings,
+  updateTransferSettings,
 }

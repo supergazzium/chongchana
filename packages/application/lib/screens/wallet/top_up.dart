@@ -1,5 +1,4 @@
 import 'package:chongchana/constants/colors.dart';
-import 'package:chongchana/screens/wallet/top_up_payment_method.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -16,9 +15,13 @@ class _TopUpScreenState extends State<TopUpScreen> {
   double? selectedAmount;
   final double currentBalance = 1250.00;
   final double minAmount = 100.00;
-  final double maxAmount = 50000.00;
+  final double maxAmount = 20000.00;
 
-  final List<double> quickAmounts = [100, 500, 1000, 2000];
+  final String cardNumber = '4622';
+  final String userName = 'ChongJaroen User';
+  String? selectedPaymentMethod;
+
+  final List<double> quickAmounts = [300, 500, 1000, 3000, 5000, 10000];
 
   @override
   void dispose() {
@@ -57,7 +60,17 @@ class _TopUpScreenState extends State<TopUpScreen> {
     if (selectedAmount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter an amount'),
+          content: Text('Please select an amount'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (selectedPaymentMethod == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a payment method'),
           backgroundColor: Colors.red,
         ),
       );
@@ -84,10 +97,81 @@ class _TopUpScreenState extends State<TopUpScreen> {
       return;
     }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TopUpPaymentMethodScreen(amount: selectedAmount!),
+    // Show success confirmation
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle,
+                color: Colors.green,
+                size: 32,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Top-up Successful!',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Amount: ฿${_formatAmount(selectedAmount!)}',
+              style: const TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Payment Method: ${selectedPaymentMethod!.replaceAll('_', ' ').toUpperCase()}',
+              style: const TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Your wallet has been topped up successfully.',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Go back to wallet overview
+            },
+            child: const Text(
+              'Done',
+              style: TextStyle(
+                color: ChongjaroenColors.secondaryColor,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -97,55 +181,107 @@ class _TopUpScreenState extends State<TopUpScreen> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: const Text('Top-up Wallet'),
-        backgroundColor: ChongjaroenColors.primaryColors,
+        title: const Text('Add money'),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
       ),
-      backgroundColor: ChongjaroenColors.primaryColors.shade900,
+      backgroundColor: Colors.white,
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildCurrentBalance(),
-              const SizedBox(height: 32),
-              _buildQuickAmounts(),
-              const SizedBox(height: 32),
-              _buildCustomAmount(),
-              const SizedBox(height: 16),
-              _buildAmountLimits(),
-              const SizedBox(height: 32),
-              _buildContinueButton(),
-            ],
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            _buildCardSelector(),
+            const SizedBox(height: 24),
+            _buildAmountSection(),
+            const SizedBox(height: 24),
+            _buildPaymentMethodSection(),
+            const SizedBox(height: 32),
+            _buildContinueButton(),
+            const SizedBox(height: 32),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildCurrentBalance() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: ChongjaroenColors.primaryColors.shade800,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildCardSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Current Balance:',
+            'To',
             style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
             ),
           ),
-          Text(
-            '฿${_formatAmount(currentBalance)}',
-            style: const TextStyle(
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
               color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.grey.shade300,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 60,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        ChongjaroenColors.primaryColors.shade400,
+                        ChongjaroenColors.primaryColors.shade600,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.account_balance_wallet,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$userName ($cardNumber)',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      Text(
+                        '฿${_formatAmount(currentBalance)}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.keyboard_arrow_down,
+                  color: Colors.grey.shade600,
+                ),
+              ],
             ),
           ),
         ],
@@ -153,191 +289,331 @@ class _TopUpScreenState extends State<TopUpScreen> {
     );
   }
 
-  Widget _buildQuickAmounts() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Select amount to top-up:',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
+  Widget _buildAmountSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Amount',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 2.5,
-          children: [
-            ...quickAmounts.map((amount) => _buildQuickAmountButton(amount)).toList(),
-            _buildOtherAmountButton(),
-          ],
-        ),
-      ],
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selectedAmount != null
+                    ? ChongjaroenColors.secondaryColor
+                    : Colors.grey.shade300,
+                width: selectedAmount != null ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                const Text(
+                  '฿',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _amountController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    onChanged: _onCustomAmountChanged,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      hintText: '0',
+                      hintStyle: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 24,
+                      ),
+                    ),
+                  ),
+                ),
+                if (selectedAmount != null)
+                  Icon(
+                    Icons.keyboard_arrow_down,
+                    color: Colors.grey.shade600,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'The value of a card should not exceed ฿${_formatAmount(maxAmount)}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: quickAmounts.map((amount) => _buildQuickAmountButton(amount)).toList(),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildQuickAmountButton(double amount) {
-    final isSelected = selectedAmount == amount && _amountController.text == amount.toStringAsFixed(0);
+    final isSelected = selectedAmount == amount;
 
     return GestureDetector(
       onTap: () => _selectAmount(amount),
       child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? ChongjaroenColors.secondaryColor
-              : ChongjaroenColors.primaryColors.shade800,
-          borderRadius: BorderRadius.circular(12),
+              ? ChongjaroenColors.secondaryColor.withOpacity(0.1)
+              : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
                 ? ChongjaroenColors.secondaryColor
-                : ChongjaroenColors.primaryColors.shade600,
-            width: 2,
+                : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
           ),
         ),
-        child: Center(
-          child: Text(
-            '฿${amount.toStringAsFixed(0)}',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOtherAmountButton() {
-    final isOtherSelected = selectedAmount != null &&
-        !quickAmounts.contains(selectedAmount);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isOtherSelected
-            ? ChongjaroenColors.secondaryColor.withOpacity(0.2)
-            : ChongjaroenColors.primaryColors.shade800,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isOtherSelected
-              ? ChongjaroenColors.secondaryColor
-              : ChongjaroenColors.primaryColors.shade600,
-          width: 2,
-        ),
-      ),
-      child: const Center(
         child: Text(
-          'Other Amount',
+          amount.toStringAsFixed(0),
           style: TextStyle(
-            color: Colors.white,
-            fontSize: 14,
+            color: isSelected
+                ? ChongjaroenColors.secondaryColor
+                : Colors.black87,
+            fontSize: 16,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCustomAmount() {
+  Widget _buildPaymentMethodSection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Or enter custom amount:',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-          ),
+        const Divider(height: 1),
+        _buildPaymentMethodOption(
+          icon: Icons.credit_card,
+          title: 'Use other credit / debit cards',
+          value: 'credit_card',
         ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _amountController,
-          keyboardType: TextInputType.number,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-          ],
-          onChanged: _onCustomAmountChanged,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-          ),
-          decoration: InputDecoration(
-            prefixText: '฿ ',
-            prefixStyle: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-            ),
-            filled: true,
-            fillColor: ChongjaroenColors.primaryColors.shade800,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: ChongjaroenColors.primaryColors.shade600,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: ChongjaroenColors.primaryColors.shade600,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: ChongjaroenColors.secondaryColor,
-                width: 2,
-              ),
-            ),
-          ),
+        const Divider(height: 1),
+        _buildPaymentMethodOption(
+          icon: Icons.phone_android,
+          title: 'Mobile Banking',
+          value: 'mobile_banking',
+          hasSubOptions: true,
         ),
+        if (selectedPaymentMethod == 'mobile_banking') ...[
+          _buildBankOption('Bangkok Bank Mobile Banking', 'bbl'),
+          _buildBankOption('K PLUS', 'kplus'),
+          _buildBankOption('Krungsri Mobile App', 'krungsri'),
+          _buildBankOption('Krungthai NEXT', 'ktb'),
+        ],
+        const Divider(height: 1),
       ],
     );
   }
 
-  Widget _buildAmountLimits() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'Min: ฿${_formatAmount(minAmount)}',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 12,
-          ),
+  Widget _buildPaymentMethodOption({
+    required IconData icon,
+    required String title,
+    required String value,
+    bool hasSubOptions = false,
+  }) {
+    final isSelected = selectedPaymentMethod == value;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (selectedPaymentMethod == value && hasSubOptions) {
+            selectedPaymentMethod = null;
+          } else {
+            selectedPaymentMethod = value;
+          }
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected
+                      ? ChongjaroenColors.secondaryColor
+                      : Colors.grey.shade400,
+                  width: 2,
+                ),
+                color: isSelected
+                    ? ChongjaroenColors.secondaryColor
+                    : Colors.transparent,
+              ),
+              child: isSelected
+                  ? const Icon(
+                      Icons.circle,
+                      size: 12,
+                      color: Colors.white,
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 16),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: Colors.grey.shade700,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            if (hasSubOptions)
+              Icon(
+                isSelected ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                color: Colors.grey.shade600,
+              ),
+          ],
         ),
-        Text(
-          'Max: ฿${_formatAmount(maxAmount)}',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 12,
-          ),
+      ),
+    );
+  }
+
+  Widget _buildBankOption(String name, String value) {
+    final isSelected = selectedPaymentMethod == 'mobile_banking_$value';
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          selectedPaymentMethod = 'mobile_banking_$value';
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        margin: const EdgeInsets.only(left: 40),
+        child: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected
+                      ? ChongjaroenColors.secondaryColor
+                      : Colors.grey.shade400,
+                  width: 2,
+                ),
+                color: isSelected
+                    ? ChongjaroenColors.secondaryColor
+                    : Colors.transparent,
+              ),
+              child: isSelected
+                  ? const Icon(
+                      Icons.circle,
+                      size: 10,
+                      color: Colors.white,
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: ChongjaroenColors.primaryColors.shade100,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Center(
+                child: Text(
+                  name.substring(0, 1),
+                  style: TextStyle(
+                    color: ChongjaroenColors.primaryColors,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildContinueButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _continue,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: ChongjaroenColors.secondaryColor,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    final isEnabled = selectedAmount != null && selectedPaymentMethod != null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: isEnabled ? _continue : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: ChongjaroenColors.secondaryColor,
+            disabledBackgroundColor: Colors.grey.shade300,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+            elevation: 0,
           ),
-        ),
-        child: const Text(
-          'Continue',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+          child: Text(
+            'Continue',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isEnabled ? Colors.white : Colors.grey.shade500,
+            ),
           ),
         ),
       ),

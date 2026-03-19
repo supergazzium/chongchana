@@ -97,6 +97,52 @@ class QuickProfileWidgets extends StatelessWidget {
                             ),
                       )
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Wallet Balance Display
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.account_balance_wallet,
+                            size: 12,
+                            color: ChongjaroenColors.whiteColors,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '฿1,250.00',
+                            style: Theme.of(context).textTheme.bodyMedium!.merge(
+                                  const TextStyle(
+                                    fontSize: 14,
+                                    color: ChongjaroenColors.whiteColors,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   )
                 ],
               ),

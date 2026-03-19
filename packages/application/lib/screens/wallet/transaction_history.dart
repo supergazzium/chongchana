@@ -144,7 +144,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   void _showFilterDialog() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: ChongjaroenColors.primaryColors.shade900,
+      backgroundColor: Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -159,74 +159,48 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       appBar: AppBar(
         centerTitle: true,
         title: const Text('Transaction History'),
-        backgroundColor: ChongjaroenColors.primaryColors,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              // TODO: Implement search
-            },
+            icon: const Icon(Icons.filter_list),
+            onPressed: _showFilterDialog,
           ),
         ],
       ),
-      backgroundColor: ChongjaroenColors.primaryColors.shade900,
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(
-            child: _buildTransactionList(),
-          ),
-        ],
-      ),
+      backgroundColor: Colors.grey.shade50,
+      body: filteredTransactions.isEmpty
+          ? _buildEmptyState()
+          : _buildTransactionList(),
     );
   }
 
-  Widget _buildFilterBar() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: ChongjaroenColors.primaryColors.shade800,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _showFilterDialog,
-              icon: const Icon(Icons.filter_list, size: 18),
-              label: const Text('Filter'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ChongjaroenColors.primaryColors.shade700,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No transactions found',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () {
-                // TODO: Export functionality
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Export coming soon'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.download, size: 18),
-              label: const Text('Export'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.white54),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
+          const SizedBox(height: 8),
+          Text(
+            'Your transaction history will appear here',
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 14,
             ),
           ),
         ],
@@ -235,29 +209,6 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   }
 
   Widget _buildTransactionList() {
-    if (filteredTransactions.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.receipt_long,
-              size: 64,
-              color: Colors.white.withOpacity(0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No transactions found',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _getGroupedTransactions().length,
@@ -266,12 +217,13 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (index == 0) const SizedBox(height: 8),
             _buildDateHeader(group['date'] as DateTime),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             ...(group['transactions'] as List<WalletTransaction>)
                 .map((transaction) => _buildTransactionItem(transaction))
                 .toList(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
           ],
         );
       },
@@ -300,34 +252,30 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   }
 
   Widget _buildDateHeader(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final transactionDate = DateTime(date.year, date.month, date.day);
+
+    String dateLabel;
+    if (transactionDate == today) {
+      dateLabel = 'Today';
+    } else if (transactionDate == yesterday) {
+      dateLabel = 'Yesterday';
+    } else {
+      dateLabel = DateFormat('MMMM d, yyyy').format(date);
+    }
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: 1,
-              color: Colors.white.withOpacity(0.2),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              DateFormat('MMMM d, yyyy').format(date),
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Container(
-              height: 1,
-              color: Colors.white.withOpacity(0.2),
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(
+        dateLabel,
+        style: TextStyle(
+          color: Colors.grey.shade700,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.3,
+        ),
       ),
     );
   }
@@ -351,18 +299,22 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: ChongjaroenColors.primaryColors.shade800,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.grey.shade200,
+          ),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: isPositive
-                    ? Colors.green.withOpacity(0.2)
-                    : Colors.red.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
+                    ? Colors.green.shade50
+                    : Colors.red.shade50,
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 isPositive ? Icons.arrow_downward : Icons.arrow_upward,
@@ -381,9 +333,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                       Text(
                         transaction.getTypeLabel(),
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       Text(
@@ -398,38 +350,33 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   ),
                   const SizedBox(height: 4),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Text(
-                          '${DateFormat('HH:mm').format(transaction.createdAt)}  ${transaction.description ?? transaction.paymentMethod ?? ''}',
+                      Text(
+                        DateFormat('HH:mm').format(transaction.createdAt),
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (transaction.description != null || transaction.paymentMethod != null) ...[
+                        Text(
+                          '  •  ',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.6),
-                            fontSize: 12,
+                            color: Colors.grey.shade400,
+                            fontSize: 13,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        transaction.id,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
-                          fontSize: 11,
+                        Expanded(
+                          child: Text(
+                            transaction.description ?? transaction.paymentMethod ?? '',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Balance: ฿${_formatAmount(transaction.balanceAfter)}',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 11,
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ],
@@ -438,7 +385,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             const SizedBox(width: 8),
             Icon(
               Icons.chevron_right,
-              color: Colors.white.withOpacity(0.3),
+              color: Colors.grey.shade400,
               size: 20,
             ),
           ],
@@ -453,104 +400,117 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         return Padding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 24,
+            right: 24,
+            top: 24,
           ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Filter Transactions',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Filter Transactions',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Transaction Type:',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _buildFilterChip('All', 'all', setModalState),
-                    _buildFilterChip('Top-up', 'top_up', setModalState),
-                    _buildFilterChip('Payment', 'payment', setModalState),
-                    _buildFilterChip('Refund', 'refund', setModalState),
-                    _buildFilterChip('Bonus', 'bonus', setModalState),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Date Range:',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.black87),
+                    onPressed: () => Navigator.pop(context),
                   ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Transaction Type',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
-                const SizedBox(height: 8),
-                _buildDateRangeOptions(setModalState),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          setModalState(() {
-                            selectedTypes = {'all'};
-                            selectedDateRange = 'last_7';
-                            selectedStatuses = {'completed', 'pending'};
-                          });
-                          setState(() {
-                            _applyFilters();
-                          });
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white54),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildFilterChip('All', 'all', setModalState),
+                  _buildFilterChip('Top-up', 'top_up', setModalState),
+                  _buildFilterChip('Payment', 'payment', setModalState),
+                  _buildFilterChip('Refund', 'refund', setModalState),
+                  _buildFilterChip('Bonus', 'bonus', setModalState),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Date Range',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _buildDateRangeOptions(setModalState),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setModalState(() {
+                          selectedTypes = {'all'};
+                          selectedDateRange = 'last_7';
+                          selectedStatuses = {'completed', 'pending'};
+                        });
+                        setState(() {
+                          _applyFilters();
+                        });
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black87,
+                        side: BorderSide(color: Colors.grey.shade300),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
                         ),
-                        child: const Text('Reset'),
+                      ),
+                      child: const Text('Reset'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _applyFilters();
+                        });
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ChongjaroenColors.secondaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Apply Filters',
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _applyFilters();
-                          });
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ChongjaroenColors.secondaryColor,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: const Text('Apply Filters'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+            ],
           ),
         );
       },
@@ -580,10 +540,16 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           }
         });
       },
-      backgroundColor: ChongjaroenColors.primaryColors.shade800,
-      selectedColor: ChongjaroenColors.secondaryColor,
+      backgroundColor: Colors.grey.shade100,
+      selectedColor: ChongjaroenColors.secondaryColor.withOpacity(0.2),
+      checkmarkColor: ChongjaroenColors.secondaryColor,
+      side: BorderSide(
+        color: isSelected ? ChongjaroenColors.secondaryColor : Colors.grey.shade300,
+        width: isSelected ? 1.5 : 1,
+      ),
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.white70,
+        color: isSelected ? ChongjaroenColors.secondaryColor : Colors.black87,
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
       ),
     );
   }
@@ -603,7 +569,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     return RadioListTile<String>(
       title: Text(
         label,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: Colors.black87, fontSize: 15),
       ),
       value: value,
       groupValue: selectedDateRange,
@@ -613,6 +579,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         });
       },
       activeColor: ChongjaroenColors.secondaryColor,
+      contentPadding: EdgeInsets.zero,
     );
   }
 

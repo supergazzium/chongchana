@@ -4,13 +4,13 @@ module.exports = ({ env }) => ({
     default: {
       connector: 'bookshelf',
       settings: {
-        client: 'mysql',
+        client: 'mysql2',
         host: env('DATABASE_HOST'),
         port: env.int('DATABASE_PORT', 25060),
         database: env('DATABASE_NAME'),
         username: env('DATABASE_USERNAME'),
         password: env('DATABASE_PASSWORD'),
-        ssl: env.bool('DATABASE_SSL', true),
+        ssl: env.bool('DATABASE_SSL', true) ? { rejectUnauthorized: false } : false,
         charset: "utf8mb4",
       },
       options: {

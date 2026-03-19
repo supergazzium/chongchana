@@ -55,6 +55,7 @@ export default {
     { src: '~/plugins/client.js', mode: 'client' },
     '~/plugins/mixins.js',
     '~/plugins/ssr.js',
+    '~/plugins/wallet-service.js',
   ],
   /*
    ** Auto import components
@@ -86,7 +87,7 @@ export default {
    ** See https://axios.nuxtjs.org/options
    */
   axios: {
-    baseURL: process.env.BASE_URL || 'http://localhost:7000'
+    baseURL: process.env.BASE_URL || 'http://localhost:7001'
   },
   env: {
     baseURL: process.env.BASE_URL

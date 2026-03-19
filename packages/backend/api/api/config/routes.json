@@ -193,6 +193,206 @@
       "config": {
         "policies": []
       }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet-admin/wallets",
+      "handler": "api.listWallets",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/wallet/adjust",
+      "handler": "api.adjustBalance",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/wallet/freeze",
+      "handler": "api.freezeWallet",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/wallet/voucher/create",
+      "handler": "api.createVoucher",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet-admin/transactions",
+      "handler": "api.getAllTransactions",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/refund",
+      "handler": "api.refundTransaction",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet-admin/reports",
+      "handler": "api.getReports",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet-admin/wallet/:userId",
+      "handler": "api.getWalletDetail",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet/transfer",
+      "handler": "api.transferFunds",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet/redeem-points",
+      "handler": "api.redeemPoints",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet/transfers",
+      "handler": "api.getUserTransfers",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet/point-redemptions",
+      "handler": "api.getUserPointRedemptions",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet-admin/transfers",
+      "handler": "api.getAllTransfers",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet-admin/point-redemptions",
+      "handler": "api.getAllPointRedemptions",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/transfer/cancel",
+      "handler": "api.cancelTransfer",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/point-redemption/approve",
+      "handler": "api.approvePointRedemption",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/point-redemption/reject",
+      "handler": "api.rejectPointRedemption",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet-admin/transfer-settings",
+      "handler": "api.getTransferSettings",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/wallet-admin/transfer-settings",
+      "handler": "api.updateTransferSettings",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet/balance",
+      "handler": "api.getWalletBalance",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet/transactions",
+      "handler": "api.getWalletTransactions",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet/payment/create-source",
+      "handler": "api.createPaymentSource",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet/payment/status/:chargeId",
+      "handler": "api.checkPaymentStatus",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet/payment/webhook",
+      "handler": "api.handlePaymentWebhook",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet/payment/methods",
+      "handler": "api.getPaymentMethods",
+      "config": {
+        "policies": []
+      }
     }
   ]
 }

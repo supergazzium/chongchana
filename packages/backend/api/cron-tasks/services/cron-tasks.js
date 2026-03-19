@@ -8,11 +8,28 @@ const moment = require('moment');
 
 module.exports = {
   async wrapTask(callback, { cron, key }) {
-    const cronTask = await strapi.services['cron-tasks']
-      .create({
-        name: cron,
-        transaction_key: key,
-      });
+    // Check if task already exists to prevent duplicate key error
+    let cronTask = await strapi.services['cron-tasks']
+      .findOne({ transaction_key: key });
+
+    if (!cronTask) {
+      try {
+        cronTask = await strapi.services['cron-tasks']
+          .create({
+            name: cron,
+            transaction_key: key,
+          });
+      } catch (e) {
+        // If duplicate key error, find the existing one
+        if (e.message && e.message.includes('Duplicate entry')) {
+          cronTask = await strapi.services['cron-tasks']
+            .findOne({ transaction_key: key });
+        } else {
+          throw e;
+        }
+      }
+    }
+
     let taskStatus = "completed";
     let message = "";
     try {
@@ -22,8 +39,10 @@ module.exports = {
       message = e.message;
     }
 
-    await strapi.services['cron-tasks']
-      .update({ id: cronTask.id }, { status: taskStatus, message });
+    if (cronTask && cronTask.id) {
+      await strapi.services['cron-tasks']
+        .update({ id: cronTask.id }, { status: taskStatus, message });
+    }
   },
   async cleanHistory() {
     try {

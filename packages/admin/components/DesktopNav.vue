@@ -1,10 +1,12 @@
 <template>
-  <aside>
+  <aside :class="{ collapsed: isCollapsed }">
     <div class="content-area">
       <div class="branding">
-        <!-- <h1 v-html="`${_brandname} CMS`" class="_fs-5"></h1>
-        <p class="_fs-7 _fw-500 _mgt-4px">Powered by Anotter.</p> -->
-        <img src="~assets/images/logo-white.svg" alt="" />
+        <img v-if="!isCollapsed" src="~assets/images/logo-white.svg" alt="" />
+        <img v-else src="~assets/images/logo-white.svg" alt="" class="logo-small" />
+        <button class="collapse-toggle" @click="toggleCollapse" :title="isCollapsed ? 'Expand' : 'Collapse'">
+          <i class="fas" :class="isCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'"></i>
+        </button>
       </div>
 
       <div class="content">
@@ -13,25 +15,39 @@
             v-for="(val, i) in _navLinks"
             :key="`navLink-${i}`"
             :class="{
-              '-w-sub': val.submenu && $route.path.includes(val.keyword),
+              '-w-sub': val.submenu && val.keyword && $route.path.includes(val.keyword),
             }"
           >
-            <nuxt-link class="link-w-icon" :to="val.path" v-if="!val.submenu">
+            <nuxt-link
+              class="link-w-icon"
+              :to="val.path"
+              v-if="!val.submenu"
+              :title="isCollapsed ? val.label : ''"
+            >
               <div class="link-icon">
                 <i class="fas" :class="[`fa-${val.icon}`]"></i>
               </div>
-              <span v-html="val.label"></span>
+              <span v-if="!isCollapsed" v-html="val.label"></span>
             </nuxt-link>
 
             <div v-else>
-              <h5 class="_mgt-16px _mgbt-16px" v-html="val.label"></h5>
+              <h5
+                v-if="!isCollapsed"
+                class="_mgt-16px _mgbt-16px"
+                v-html="val.label"
+              ></h5>
+              <div v-else class="menu-divider"></div>
               <ul>
                 <li v-for="(sub, s) in val.submenu" :key="`submenu-${s}`">
-                  <nuxt-link class="link-w-icon" :to="sub.path">
+                  <nuxt-link
+                    class="link-w-icon"
+                    :to="sub.path"
+                    :title="isCollapsed ? sub.label : ''"
+                  >
                     <div class="link-icon">
                       <i class="fas" :class="[`fa-${sub.icon}`]"></i>
                     </div>
-                    <span v-html="sub.label"></span>
+                    <span v-if="!isCollapsed" v-html="sub.label"></span>
                   </nuxt-link>
                 </li>
               </ul>
@@ -42,11 +58,11 @@
     </div>
 
     <div class="footer">
-      <div class="link-w-icon" @click="signout">
+      <div class="link-w-icon" @click="signout" :title="isCollapsed ? 'ออกจากระบบ' : ''">
         <div class="link-icon">
           <i class="fas fa-door-open"></i>
         </div>
-        <span>ออกจากระบบ</span>
+        <span v-if="!isCollapsed">ออกจากระบบ</span>
       </div>
     </div>
   </aside>
@@ -54,6 +70,11 @@
 
 <script>
 export default {
+  data() {
+    return {
+      isCollapsed: false,
+    };
+  },
   computed: {
     _navLinks() {
       if (
@@ -68,7 +89,19 @@ export default {
       return this.$store.state.brandname;
     },
   },
+  mounted() {
+    // Load collapse state from localStorage
+    const savedState = localStorage.getItem('sideMenuCollapsed');
+    if (savedState !== null) {
+      this.isCollapsed = savedState === 'true';
+    }
+  },
   methods: {
+    toggleCollapse() {
+      this.isCollapsed = !this.isCollapsed;
+      // Save state to localStorage
+      localStorage.setItem('sideMenuCollapsed', this.isCollapsed.toString());
+    },
     async signout() {
       await this.$auth.logout();
       this.__showToast({
@@ -90,12 +123,33 @@ $border-color: #061b1e;
 aside {
   flex: 0 0 250px;
   background: $bg-color;
-  // border-right: 1px solid $card-border-color;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
+  transition: all 0.3s ease;
+
+  &.collapsed {
+    flex: 0 0 70px;
+
+    .content ul li {
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+
+    .link-w-icon {
+      justify-content: center;
+    }
+
+    .branding {
+      padding: 16px 12px !important;
+
+      .logo-small {
+        width: 40px !important;
+      }
+    }
+  }
 
   .content-area {
     flex: 1;
@@ -108,6 +162,7 @@ aside {
       flex: 0 0 69px;
       padding: 16px 26px;
       border-bottom: 1px solid $border-color;
+      position: relative;
 
       img {
         width: 100px;
@@ -115,6 +170,37 @@ aside {
         margin-left: auto;
         margin-right: auto;
         display: block;
+        transition: all 0.3s ease;
+      }
+
+      .logo-small {
+        width: 40px;
+      }
+
+      .collapse-toggle {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: #fff;
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+
+        i {
+          font-size: 12px;
+        }
       }
     }
 
@@ -151,13 +237,6 @@ aside {
             &:hover {
               opacity: 1;
               transition: opacity 0.3s;
-              // background: rgba($primary-color, .15);
-              // border-radius: 5px;
-              // color: $primary-color;
-
-              // i {
-              //   color: $primary-color;
-              // }
             }
           }
 
@@ -166,6 +245,12 @@ aside {
             text-transform: uppercase;
             letter-spacing: 1px;
             font-size: 12px;
+          }
+
+          .menu-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 16px 0;
           }
 
           li {
@@ -183,7 +268,6 @@ aside {
 
   .footer {
     flex: 0 0 54px;
-    // border-top: 1px solid darken($primary-color, 25%);
     border-top: 1px solid $border-color;
     padding-top: 26px;
     padding-bottom: 26px;

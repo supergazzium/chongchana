@@ -67,14 +67,14 @@ This document outlines the comprehensive wallet feature implementation plan for 
 **Summary Section:**
 ```
 ┌─────────────────────────────────────────────────┐
-│ User: [First Name] [Last Name]                 │
+│ User: [First Name] [Last Name]                  │
 │ User ID: #12345                                 │
-│                                                  │
+│                                                 │
 │ Available Balance:        ฿ 1,250.00            │
 │ Pending Balance:          ฿   150.00            │
 │ Frozen Balance:           ฿     0.00            │
 │ Total Balance:            ฿ 1,400.00            │
-│                                                  │
+│                                                 │
 │ Loyalty Points:           750 pts               │
 │ Member Since:             Jan 15, 2023          │
 │ Total Transactions:       342                   │
@@ -364,7 +364,7 @@ Reason: [Annual loyalty reward conversion    ]
 │                                        │
 ├────────────────────────────────────────┤
 │                                        │
-│  [  Top-up  ] [  Pay  ] [ Transfer ]   │
+│  [  Top-up  ] [  Pay  ]    │
 │                                        │
 ├────────────────────────────────────────┤
 │  Recent Transactions                   │
@@ -440,18 +440,15 @@ Reason: [Annual loyalty reward conversion    ]
 │                                        │
 │  Choose payment method:                │
 │                                        │
-│  ○ 💳 Credit/Debit Card               │
-│     Fee: 3% + ฿2.00 (฿17.00)         │
+│  ○ 💳 Credit/Debit Card                │
+│     Fee: 3% + ฿2.00 (฿17.00)          │
 │     You'll receive: ฿483.00           │
-│                                        │
-│  ● 📱 PromptPay QR                    │
+│                                       │
+│  ● 📱 PromptPay QR                     │
 │     Fee: Free                          │
-│     You'll receive: ฿500.00           │
+│     You'll receive: ฿500.00            │
 │                                        │
-│  ○ 🏦 Bank Transfer                   │
-│     Fee: Free                          │
-│     You'll receive: ฿500.00           │
-│     (Manual verification, 1-24 hrs)    │
+│      
 │                                        │
 │                                        │
 │  [Continue]                            │
@@ -463,20 +460,20 @@ Reason: [Annual loyalty reward conversion    ]
 
 ```
 ┌────────────────────────────────────────┐
-│  < Back    Scan to Pay ฿500.00        │
+│  < Back    Scan to Pay ฿500.00         │
 ├────────────────────────────────────────┤
 │                                        │
 │  Scan this QR code with your banking   │
 │  app to complete payment               │
 │                                        │
-│  ┌──────────────────────────────┐     │
-│  │                              │     │
-│  │     [QR CODE IMAGE]          │     │
-│  │                              │     │
-│  │                              │     │
-│  └──────────────────────────────┘     │
+│  ┌──────────────────────────────┐      │
+│  │                              │      │
+│  │     [QR CODE IMAGE]          │      │
+│  │                              │      │
+│  │                              │      │
+│  └──────────────────────────────┘      │
 │                                        │
-│  Amount: ฿500.00                      │
+│  Amount: ฿500.00                       │
 │  Ref: TX-20250308-00124                │
 │                                        │
 │  Time remaining: 14:45                 │
@@ -535,9 +532,9 @@ Reason: [Annual loyalty reward conversion    ]
 │                                        │
 │  Payment Method:                       │
 │                                        │
-│  ● 💰 Wallet Balance (฿1,750.00)        │
-│  ○ 💳 Credit Card                       │
-│  ○ 💵 Cash / Pay at Counter             │
+│  ● 💰 Wallet Balance (฿1,750.00)       │
+│  ○ 💳 Credit Card                      │
+│  ○ 💵 Cash / Pay at Counter            │
 │                                        │
 │  ☐ Use 100 Points (-฿10.00)            │
 │                                        │
@@ -757,16 +754,16 @@ Reason: [Annual loyalty reward conversion    ]
 │                                        │
 │  Active Promotions                     │
 │                                        │
-│  ┌────────────────────────────────┐   │
-│  │ 🎉 First Top-up Bonus          │   │
-│  │                                │   │
-│  │ Get ฿50 bonus on your first   │   │
-│  │ wallet top-up of ฿500+        │   │
+│  ┌────────────────────────────────┐    │
+│  │ 🎉 First Top-up Bonus          │    │
+│  │                                │    │
+│  │ Get ฿50 bonus on your first   │    │
+│  │ wallet top-up of ฿500+        │    │
 │  │                                │   │
 │  │ Valid until: Mar 31, 2025      │   │
 │  │ [Top-up Now]                   │   │
 │  └────────────────────────────────┘   │
-│                                        │
+│                                       │
 │  ┌────────────────────────────────┐   │
 │  │ 💰 Weekend Cashback            │   │
 │  │                                │   │
@@ -891,23 +888,23 @@ Reason: [Annual loyalty reward conversion    ]
 ├────────────────────────────────────────┤
 │                                        │
 │  Your Points:      750 pts             │
-│  Wallet Balance:   ฿1,750.00          │
+│  Wallet Balance:   ฿1,750.00           │
 │                                        │
-│  ─────────────────────────────────────│
+│  ───────────────────────────────────── │
 │                                        │
-│  Conversion Rate:  10 pts = ฿1.00     │
+│  Conversion Rate:  1 pts = ฿1.00       │
 │                                        │
 │  Points to convert:                    │
-│  [500] pts                             │
+│  [50] pts                              │
 │                                        │
-│  You'll receive:   ฿50.00             │
+│  You'll receive:   ฿50.00              │
 │                                        │
-│  ⓘ Conversion is instant and cannot    │
+│  ⓘ Conversion is instant and cannot   │
 │    be reversed                         │
 │                                        │
 │  After conversion:                     │
 │  • Points: 250 pts                     │
-│  • Wallet: ฿1,800.00                  │
+│  • Wallet: ฿1,800.00                   │
 │                                        │
 │  [Convert Now]                         │
 │                                        │

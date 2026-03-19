@@ -13,6 +13,11 @@ const formatError = (error) => [
 
 module.exports = {
   async staffSignin(ctx) {
+    console.log('[staffSignin] Request received:', {
+      body: ctx.request.body,
+      provider: ctx.params.provider
+    });
+
     const provider = ctx.params.provider || 'local'
     const params = ctx.request.body
 
@@ -61,12 +66,23 @@ module.exports = {
         query.username = params.identifier
       }
 
+      // Debug: Check what users exist with this email regardless of provider
+      const allUsersWithEmail = await strapi
+        .query('user', 'users-permissions')
+        .find({ email: params.identifier.toLowerCase() })
+
+      console.log('[staffSignin] All users with this email:', allUsersWithEmail.map(u => ({ id: u.id, email: u.email, provider: u.provider, role: u.role?.type })));
+
       // Check if the user exists.
       const user = await strapi
         .query('user', 'users-permissions')
         .findOne(query)
 
+      console.log('[staffSignin] User found with query:', query);
+      console.log('[staffSignin] User found:', user ? `User ID ${user.id}, role: ${user.role?.type}` : 'No user found');
+
       if (!user) {
+        console.log('[staffSignin] Returning 400: User not found');
         return ctx.badRequest(
           null,
           formatError({
@@ -87,6 +103,7 @@ module.exports = {
       }
 
       if (!(['admin', 'staff', "staff_atk"].indexOf(user.role.type) >= 0)) {
+        console.log('[staffSignin] Returning 400: User role type not allowed:', user.role.type);
         return ctx.badRequest(
           null,
           formatError({

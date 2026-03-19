@@ -19,25 +19,25 @@ class TransactionDetailScreen extends StatelessWidget {
       appBar: AppBar(
         centerTitle: true,
         title: const Text('Transaction Detail'),
-        backgroundColor: ChongjaroenColors.primaryColors,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
       ),
-      backgroundColor: ChongjaroenColors.primaryColors.shade900,
+      backgroundColor: Colors.grey.shade50,
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              _buildStatusCard(isPositive),
-              const SizedBox(height: 24),
-              _buildTransactionInfo(),
-              const SizedBox(height: 24),
-              _buildPaymentDetails(),
-              const SizedBox(height: 24),
-              _buildBalanceChanges(),
-              const SizedBox(height: 32),
-              _buildActions(context),
-            ],
-          ),
+        child: Column(
+          children: [
+            _buildStatusCard(isPositive),
+            const SizedBox(height: 16),
+            _buildTransactionInfo(),
+            const SizedBox(height: 16),
+            _buildPaymentDetails(),
+            const SizedBox(height: 16),
+            _buildBalanceChanges(),
+            const SizedBox(height: 24),
+            _buildActions(context),
+            const SizedBox(height: 32),
+          ],
         ),
       ),
     );
@@ -45,24 +45,22 @@ class TransactionDetailScreen extends StatelessWidget {
 
   Widget _buildStatusCard(bool isPositive) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            ChongjaroenColors.primaryColors.shade700,
-            ChongjaroenColors.primaryColors.shade800,
-          ],
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.shade200,
+        ),
       ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
-              color: _getStatusColor().withOpacity(0.2),
+              color: _getStatusColor().withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -77,24 +75,24 @@ class TransactionDetailScreen extends StatelessWidget {
             style: TextStyle(
               color: _getStatusColor(),
               fontSize: 14,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             transaction.getTypeLabel(),
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             '${isPositive ? '+' : ''}฿${_formatAmount(transaction.amount.abs())}',
             style: TextStyle(
               color: isPositive ? Colors.green : Colors.red,
-              fontSize: 32,
+              fontSize: 36,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -107,15 +105,15 @@ class TransactionDetailScreen extends StatelessWidget {
     return _buildInfoSection(
       title: 'Transaction Information',
       children: [
-        _buildDetailRow('Transaction ID:', transaction.id),
+        _buildDetailRow('Transaction ID', transaction.id),
         _buildDivider(),
         _buildDetailRow(
-          'Date/Time:',
+          'Date & Time',
           DateFormat('MMM d, yyyy, HH:mm').format(transaction.createdAt),
         ),
         if (transaction.referenceId != null) ...[
           _buildDivider(),
-          _buildDetailRow('Reference:', transaction.referenceId!),
+          _buildDetailRow('Reference', transaction.referenceId!),
         ],
       ],
     );
@@ -126,21 +124,22 @@ class TransactionDetailScreen extends StatelessWidget {
       title: 'Payment Details',
       children: [
         if (transaction.paymentMethod != null) ...[
-          _buildDetailRow('Method:', transaction.paymentMethod!),
+          _buildDetailRow('Payment Method', transaction.paymentMethod!),
           _buildDivider(),
         ],
         if (transaction.description != null) ...[
-          _buildDetailRow('Description:', transaction.description!),
+          _buildDetailRow('Description', transaction.description!),
           _buildDivider(),
         ],
-        _buildDetailRow('Amount Paid:', '฿${_formatAmount(transaction.amount.abs())}'),
+        _buildDetailRow('Amount Paid', '฿${_formatAmount(transaction.amount.abs())}'),
         _buildDivider(),
-        _buildDetailRow('Processing Fee:', '฿0.00'),
+        _buildDetailRow('Processing Fee', '฿0.00'),
         _buildDivider(),
         _buildDetailRow(
-          'You Received:',
+          'You Received',
           '฿${_formatAmount(transaction.amount.abs())}',
-          isHighlight: true,
+          valueColor: ChongjaroenColors.secondaryColor,
+          valueWeight: FontWeight.bold,
         ),
       ],
     );
@@ -150,18 +149,19 @@ class TransactionDetailScreen extends StatelessWidget {
     return _buildInfoSection(
       title: 'Balance Changes',
       children: [
-        _buildDetailRow('Balance Before:', '฿${_formatAmount(transaction.balanceBefore)}'),
+        _buildDetailRow('Balance Before', '฿${_formatAmount(transaction.balanceBefore)}'),
         _buildDivider(),
         _buildDetailRow(
-          'Change:',
+          'Change',
           '${transaction.amount >= 0 ? '+' : ''}฿${_formatAmount(transaction.amount.abs())}',
           valueColor: transaction.amount >= 0 ? Colors.green : Colors.red,
         ),
         _buildDivider(),
         _buildDetailRow(
-          'Balance After:',
+          'Balance After',
           '฿${_formatAmount(transaction.balanceAfter)}',
-          isHighlight: true,
+          valueColor: ChongjaroenColors.secondaryColor,
+          valueWeight: FontWeight.bold,
         ),
       ],
     );
@@ -172,10 +172,14 @@ class TransactionDetailScreen extends StatelessWidget {
     required List<Widget> children,
   }) {
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: ChongjaroenColors.primaryColors.shade800,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,9 +187,10 @@ class TransactionDetailScreen extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-              color: Colors.white,
+              color: Colors.black87,
               fontSize: 14,
               fontWeight: FontWeight.bold,
+              letterSpacing: 0.3,
             ),
           ),
           const SizedBox(height: 16),
@@ -198,8 +203,8 @@ class TransactionDetailScreen extends StatelessWidget {
   Widget _buildDetailRow(
     String label,
     String value, {
-    bool isHighlight = false,
     Color? valueColor,
+    FontWeight? valueWeight,
   }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -208,8 +213,8 @@ class TransactionDetailScreen extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 13,
+            color: Colors.grey.shade600,
+            fontSize: 14,
           ),
         ),
         const SizedBox(width: 16),
@@ -217,12 +222,9 @@ class TransactionDetailScreen extends StatelessWidget {
           child: Text(
             value,
             style: TextStyle(
-              color: valueColor ??
-                  (isHighlight
-                      ? ChongjaroenColors.secondaryColor
-                      : Colors.white),
-              fontSize: 13,
-              fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
+              color: valueColor ?? Colors.black87,
+              fontSize: 14,
+              fontWeight: valueWeight ?? FontWeight.w500,
             ),
             textAlign: TextAlign.right,
           ),
@@ -236,86 +238,92 @@ class TransactionDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Container(
         height: 1,
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.grey.shade200,
       ),
     );
   }
 
   Widget _buildActions(BuildContext context) {
-    return Column(
-      children: [
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Receipt download coming soon'),
-                  backgroundColor: Colors.orange,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Receipt download coming soon'),
+                    backgroundColor: ChongjaroenColors.secondaryColor,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.download_outlined),
+              label: const Text('Download Receipt'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ChongjaroenColors.secondaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
                 ),
-              );
-            },
-            icon: const Icon(Icons.download),
-            label: const Text('Download Receipt'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white54),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                elevation: 0,
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Share coming soon'),
-                  backgroundColor: Colors.orange,
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Share coming soon'),
+                        backgroundColor: ChongjaroenColors.secondaryColor,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.share_outlined, size: 20),
+                  label: const Text('Share'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.black87,
+                    side: BorderSide(color: Colors.grey.shade300),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
                 ),
-              );
-            },
-            icon: const Icon(Icons.share),
-            label: const Text('Share'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white54),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
               ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Help coming soon'),
-                  backgroundColor: Colors.orange,
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Help coming soon'),
+                        backgroundColor: ChongjaroenColors.secondaryColor,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.help_outline, size: 20),
+                  label: const Text('Help'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.black87,
+                    side: BorderSide(color: Colors.grey.shade300),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
                 ),
-              );
-            },
-            icon: const Icon(Icons.help_outline),
-            label: const Text('Need Help?'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white54),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
               ),
-            ),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -335,26 +343,26 @@ class TransactionDetailScreen extends StatelessWidget {
   IconData _getStatusIcon() {
     switch (transaction.status) {
       case 'completed':
-        return Icons.check_circle;
+        return Icons.check_circle_outline;
       case 'pending':
         return Icons.schedule;
       case 'failed':
-        return Icons.error;
+        return Icons.error_outline;
       default:
-        return Icons.help;
+        return Icons.help_outline;
     }
   }
 
   String _getStatusText() {
     switch (transaction.status) {
       case 'completed':
-        return '✓ Completed';
+        return 'Completed';
       case 'pending':
-        return '⏱ Pending';
+        return 'Pending';
       case 'failed':
-        return '✗ Failed';
+        return 'Failed';
       default:
-        return transaction.status;
+        return transaction.status.toUpperCase();
     }
   }
 

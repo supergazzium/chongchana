@@ -18,6 +18,28 @@ const menus = [
     icon: 'notes-medical',
   },
   {
+    label: 'Wallet Management',
+    icon: 'wallet',
+    keyword: 'wallets',
+    submenu: [
+      {
+        label: 'Wallet Overview',
+        path: '/wallets',
+        icon: 'wallet'
+      },
+      {
+        label: 'Reports & Analytics',
+        path: '/wallets/reports',
+        icon: 'chart-bar'
+      },
+      {
+        label: 'Voucher Management',
+        path: '/wallets/vouchers',
+        icon: 'ticket-alt'
+      }
+    ],
+  },
+  {
     label: 'Event/Concert',
     icon: 'music',
     submenu: [
