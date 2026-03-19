@@ -2,7 +2,7 @@ module.exports = ({ env }) => ({
   settings: {
     cors: {
       enabled: true,
-      origin: env('CORS_ORIGIN', 'http://localhost:4040').split(','),
+      origin: ['http://localhost:1337', ...env('CORS_ORIGIN', 'http://localhost:4040').split(',')],
       credentials: true,
       headers: [
         "Content-Type",
