@@ -24,8 +24,8 @@ RUN npm ci && npm cache clean --force
 # Copy source code
 COPY . .
 
-# Skip admin panel build to save memory (API-only mode)
-ENV NODE_ENV=production
+# Use development mode to avoid permission preloading (temporary test)
+ENV NODE_ENV=development
 # RUN npm run build
 
 # ============================================
