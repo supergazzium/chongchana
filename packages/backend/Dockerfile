@@ -62,6 +62,9 @@ USER strapi
 # Expose port
 EXPOSE 1337
 
+# Set Node.js memory limit for runtime (896MB for 1GB container)
+ENV NODE_OPTIONS="--max-old-space-size=896"
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD node -e "require('http').get('http://localhost:1337/_health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
