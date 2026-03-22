@@ -15,4 +15,7 @@ module.exports = ({ env }) => ({
       defaultReplyTo: 'noreply@chongjaroen.com',
     },
   },
+  documentation: {
+    enabled: false,
+  },
 });
