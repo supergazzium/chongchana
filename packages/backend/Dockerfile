@@ -27,7 +27,7 @@ COPY . .
 # Build Strapi admin panel
 ENV NODE_ENV=production
 # Increase Node.js memory limit + OpenSSL legacy provider for Webpack 4
-ENV NODE_OPTIONS="--max-old-space-size=4096 --openssl-legacy-provider"
+ENV NODE_OPTIONS="--max-old-space-size=8192 --openssl-legacy-provider"
 RUN npm run build
 
 # ============================================
