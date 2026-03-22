@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # Backend API (Strapi)
+  # ============================================
+  backend:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    container_name: chongjaroen-backend
+    ports:
+      - "1337:1337"
+    environment:
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+      - PORT=1337
+      - DATABASE_HOST=${DATABASE_HOST:-db-mysql-sgp1-51509-do-user-10174906-0.g.db.ondigitalocean.com}
+      - DATABASE_PORT=${DATABASE_PORT:-25060}
+      - DATABASE_NAME=${DATABASE_NAME:-defaultdb}
+      - DATABASE_USERNAME=${DATABASE_USERNAME:-doadmin}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_SSL=true
+      - ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - OMISE_SECRET_KEY=${OMISE_SECRET_KEY}
+      - OMISE_PUBLIC_KEY=${OMISE_PUBLIC_KEY}
+      - ONESIGNAL_APP_ID=${ONESIGNAL_APP_ID}
+      - ONESIGNAL_API_KEY=${ONESIGNAL_API_KEY}
+    volumes:
+      - ./packages/backend:/app
+      - /app/node_modules
+      - backend-cache:/app/.cache
+    networks:
+      - chongjaroen-network
+    restart: unless-stopped
+
+  # ============================================
+  # Admin Dashboard (Nuxt SSR)
+  # ============================================
+  admin:
+    build:
+      context: ./packages/admin
+      dockerfile: Dockerfile
+    container_name: chongjaroen-admin
+    ports:
+      - "4040:3000"
+    environment:
+      - NODE_ENV=development
+      - API_URL=http://backend:1337
+      - BROWSER_API_URL=http://localhost:1337
+    volumes:
+      - ./packages/admin:/app
+      - /app/node_modules
+      - /app/.nuxt
+    depends_on:
+      - backend
+    networks:
+      - chongjaroen-network
+    restart: unless-stopped
+
+  # ============================================
+  # Public Website (Nuxt SSG)
+  # ============================================
+  website:
+    build:
+      context: ./packages/website
+      dockerfile: Dockerfile
+    container_name: chongjaroen-website
+    ports:
+      - "3000:80"
+    environment:
+      - API_URL=http://backend:1337
+      - BROWSER_API_URL=http://localhost:1337
+    depends_on:
+      - backend
+    networks:
+      - chongjaroen-network
+    restart: unless-stopped
+
+  # ============================================
+  # Staff Portal (Nuxt SSG)
+  # ============================================
+  staff:
+    build:
+      context: ./packages/staff
+      dockerfile: Dockerfile
+    container_name: chongjaroen-staff
+    ports:
+      - "8080:80"
+    environment:
+      - API_URL=http://backend:1337
+      - BROWSER_API_URL=http://localhost:1337
+    depends_on:
+      - backend
+    networks:
+      - chongjaroen-network
+    restart: unless-stopped
+
+networks:
+  chongjaroen-network:
+    driver: bridge
+
+volumes:
+  backend-cache:
+    driver: local

@@ -1,0 +1,14 @@
+node_modules/
+.nuxt/
+dist/
+.env
+.env.*
+.git/
+.gitignore
+.vscode/
+.idea/
+*.swp
+.DS_Store
+*.log
+README.md
+*.md
