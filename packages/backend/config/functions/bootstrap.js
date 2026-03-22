@@ -47,6 +47,20 @@ module.exports = async () => {
 
   strapi.log.info('[Bootstrap] OPTIONS preflight handler installed');
 
+  // ============================================================================
+  // Permission Setup (Lazy Loading for Production)
+  // ============================================================================
+  // Set SKIP_PERMISSION_BOOTSTRAP=true to disable permission loading at startup
+  // This reduces memory usage for large databases in production
+  // Permissions will be loaded on-demand via Strapi's default behavior
+  if (process.env.SKIP_PERMISSION_BOOTSTRAP === 'true') {
+    strapi.log.info('[Bootstrap] ⚠️  Skipping permission setup (SKIP_PERMISSION_BOOTSTRAP=true)');
+    strapi.log.info('[Bootstrap] Permissions will be loaded on-demand');
+    return;
+  }
+
+  strapi.log.info('[Bootstrap] Loading permissions (this may take a moment with large databases)...');
+
   // Set permissions for public role to access staffSignin
   const publicRole = await strapi.query('role', 'users-permissions').findOne({ type: 'public' });
 

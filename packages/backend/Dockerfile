@@ -24,8 +24,8 @@ RUN npm ci && npm cache clean --force
 # Copy source code
 COPY . .
 
-# Use development mode to avoid permission preloading (temporary test)
-ENV NODE_ENV=development
+# Production mode with optimized bootstrap
+ENV NODE_ENV=production
 # RUN npm run build
 
 # ============================================
@@ -64,6 +64,10 @@ EXPOSE 1337
 
 # Set Node.js memory limit for runtime (896MB for 1GB container)
 ENV NODE_OPTIONS="--max-old-space-size=896"
+
+# Skip permission bootstrap to reduce memory usage at startup
+# Permissions will be loaded on-demand via Strapi's default behavior
+ENV SKIP_PERMISSION_BOOTSTRAP=true
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
