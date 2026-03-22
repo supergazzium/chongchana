@@ -24,11 +24,9 @@ RUN npm ci && npm cache clean --force
 # Copy source code
 COPY . .
 
-# Build Strapi admin panel
+# Skip admin panel build to save memory (API-only mode)
 ENV NODE_ENV=production
-# Increase Node.js memory limit + OpenSSL legacy provider for Webpack 4
-ENV NODE_OPTIONS="--max-old-space-size=8192 --openssl-legacy-provider"
-RUN npm run build
+# RUN npm run build
 
 # ============================================
 # Production Runtime Stage
@@ -48,8 +46,9 @@ WORKDIR /app
 
 # Copy built artifacts and production dependencies
 COPY --from=builder --chown=strapi:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=strapi:nodejs /app/.cache ./.cache
-COPY --from=builder --chown=strapi:nodejs /app/build ./build
+# Admin panel build artifacts not needed for API-only mode
+# COPY --from=builder --chown=strapi:nodejs /app/.cache ./.cache
+# COPY --from=builder --chown=strapi:nodejs /app/build ./build
 COPY --from=builder --chown=strapi:nodejs /app/public ./public
 COPY --from=builder --chown=strapi:nodejs /app/api ./api
 COPY --from=builder --chown=strapi:nodejs /app/config ./config
