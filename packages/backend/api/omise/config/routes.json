@@ -1,0 +1,13 @@
+{
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/omise/events",
+      "handler": "omise.handleEvents",
+      "config": {
+        "policies": [],
+        "auth": false
+      }
+    }
+  ]
+}

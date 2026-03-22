@@ -1,0 +1,306 @@
+'use strict';
+
+const paymentService = require('../services/payment');
+const utils = require('../services/utils');
+
+/**
+ * Payment Controller
+ * Handles Omise payment operations for wallet top-ups
+ */
+
+module.exports = {
+  /**
+   * GET /api/wallet/payment/methods
+   * Get supported payment methods
+   */
+  async getPaymentMethods(ctx) {
+    try {
+      const methods = await paymentService.getSupportedPaymentMethods();
+      ctx.send(utils.successResponse(methods));
+    } catch (error) {
+      strapi.log.error('[Payment] getPaymentMethods error:', error);
+      ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', error.message));
+    }
+  },
+
+  /**
+   * POST /api/wallet/payment/create-token
+   * DEPRECATED: This endpoint has been removed for PCI-DSS compliance.
+   * Card tokenization MUST be done client-side using Omise.js
+   *
+   * Client applications should use:
+   * - Flutter: omise_flutter package
+   * - Vue.js: Omise.js library
+   *
+   * Then send only the token ID to createChargeFromToken endpoint
+   */
+  async createToken(ctx) {
+    return ctx.forbidden(utils.errorResponse(
+      'ENDPOINT_DEPRECATED',
+      'This endpoint has been disabled for PCI-DSS compliance. ' +
+      'Please tokenize cards client-side using Omise.js or omise_flutter package, ' +
+      'then send the token ID to /api/wallet/payment/create-charge endpoint.'
+    ));
+  },
+
+  /**
+   * POST /api/wallet/payment/create-charge
+   * Create a charge from a token (Credit/Debit Card)
+   */
+  async createChargeFromToken(ctx) {
+    try {
+      const userId = ctx.state.user.id;
+
+      if (!userId) {
+        return ctx.unauthorized('Authentication required');
+      }
+
+      const { tokenId, amount, currency = 'THB' } = ctx.request.body;
+
+      if (!tokenId || !amount) {
+        return ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', 'Token ID and amount are required'));
+      }
+
+      // Validate amount
+      const validation = utils.validateAmount(amount, 'top_up');
+      if (!validation.valid) {
+        return ctx.badRequest(utils.errorResponse('WALLET_004', validation.error));
+      }
+
+      // Create charge
+      const charge = await paymentService.createChargeFromToken(
+        tokenId,
+        amount,
+        currency,
+        `Wallet top-up - User ${userId}`,
+        {
+          user_id: userId,
+          type: 'wallet_topup',
+        }
+      );
+
+      // If charge is successful, credit wallet immediately
+      if (charge.paid) {
+        const result = await paymentService.processSuccessfulPayment(charge.id, userId);
+
+        ctx.send(utils.successResponse({
+          success: true,
+          chargeId: charge.id,
+          transactionId: result.transactionId,
+          amount: amount,
+          status: 'completed',
+          paid: true,
+        }));
+      } else {
+        // Charge pending or failed
+        ctx.send(utils.successResponse({
+          success: charge.status === 'successful' || charge.status === 'pending',
+          chargeId: charge.id,
+          amount: amount,
+          status: charge.status,
+          paid: false,
+          failureMessage: charge.failure_message,
+        }));
+      }
+    } catch (error) {
+      strapi.log.error('[Payment] createChargeFromToken error:', error);
+      ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', error.message));
+    }
+  },
+
+  /**
+   * POST /api/wallet/payment/create-source
+   * Create a payment source (Mobile Banking, PromptPay)
+   */
+  async createPaymentSource(ctx) {
+    const { amount, currency = 'THB', paymentMethod, returnUri, platformType } = ctx.request.body;
+
+    try {
+      const userId = ctx.state.user.id;
+
+      if (!userId) {
+        return ctx.unauthorized('Authentication required');
+      }
+
+      if (!amount || !paymentMethod) {
+        return ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', 'Amount and payment method are required'));
+      }
+
+      // Validate amount
+      const validation = utils.validateAmount(amount, 'top_up');
+      if (!validation.valid) {
+        return ctx.badRequest(utils.errorResponse('WALLET_004', validation.error));
+      }
+
+      let source;
+      let charge;
+
+      // Create source based on payment method
+      if (paymentMethod.startsWith('mobile_banking_')) {
+        source = await paymentService.createMobileBankingSource(
+          amount,
+          currency,
+          paymentMethod,
+          returnUri || `chongjaroen://payment-result`,
+          platformType  // Pass platform type to Omise (IOS or ANDROID)
+        );
+      } else if (paymentMethod === 'promptpay') {
+        source = await paymentService.createPromptPaySource(amount, currency);
+      } else {
+        return ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', 'Invalid payment method'));
+      }
+
+      // Create charge from source
+      charge = await paymentService.createCharge(
+        source.id,
+        amount,
+        currency,
+        `Wallet top-up - User ${userId}`,
+        {
+          user_id: userId,
+          type: 'wallet_topup',
+          payment_method: paymentMethod,
+          return_uri: returnUri || `chongjaroen://payment-result`,
+        }
+      );
+
+      // According to Omise documentation, scannable_code is available on charge.source after creating the charge
+      // The source object must be retrieved from the charge to get the QR code
+      const scannableCode = charge.source?.scannable_code || null;
+
+      strapi.log.info('[Payment] Charge created with source:', {
+        chargeId: charge.id,
+        sourceId: charge.source?.id,
+        hasScannableCode: !!scannableCode,
+        scannableCodeType: scannableCode?.type,
+      });
+
+      // Do not log scannable_code data - contains sensitive QR payment information
+
+      ctx.send(utils.successResponse({
+        success: true,
+        chargeId: charge.id,
+        sourceId: charge.source?.id || source.id,
+        amount: amount,
+        status: charge.status,
+        authorizeUri: charge.authorize_uri,
+        scannableCode: scannableCode, // For PromptPay QR (from charge.source, not source)
+        expiresAt: charge.source?.expires_at || source.expires_at,
+      }));
+    } catch (error) {
+      strapi.log.error('[Payment] createPaymentSource error:', error);
+
+      // Check if this is a KTB-specific error (requires account activation)
+      if (paymentMethod === 'mobile_banking_ktb' && error.message &&
+          (error.message.includes('not enabled') || error.message.includes('not supported') || error.message.includes('not valid') || error.message.includes('invalid'))) {
+        return ctx.badRequest(utils.errorResponse('PAYMENT_ERROR',
+          'Krungthai NEXT is not enabled for this account. Please contact Omise support at support@omise.co to activate this payment method.'));
+      }
+
+      ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', error.message));
+    }
+  },
+
+  /**
+   * GET /api/wallet/payment/status/:chargeId
+   * Check payment status
+   */
+  async checkPaymentStatus(ctx) {
+    try {
+      const userId = ctx.state.user.id;
+
+      if (!userId) {
+        return ctx.unauthorized('Authentication required');
+      }
+
+      const { chargeId } = ctx.params;
+
+      if (!chargeId) {
+        return ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', 'Charge ID is required'));
+      }
+
+      const charge = await paymentService.getChargeStatus(chargeId);
+
+      // If payment is successful and not yet processed, credit wallet
+      if (charge.paid && charge.metadata?.user_id == userId) {
+        // Check if already processed
+        const knex = strapi.connections.default;
+        const existing = await knex('wallet_transactions')
+          .whereRaw("JSON_EXTRACT(metadata, '$.charge_id') = ?", [chargeId])
+          .first();
+
+        if (!existing) {
+          await paymentService.processSuccessfulPayment(chargeId, userId);
+        }
+      }
+
+      ctx.send(utils.successResponse({
+        chargeId: charge.id,
+        status: charge.status,
+        paid: charge.paid,
+        amount: charge.amount / 100,
+        currency: charge.currency,
+        failureMessage: charge.failure_message,
+        paidAt: charge.paid_at,
+      }));
+    } catch (error) {
+      strapi.log.error('[Payment] checkPaymentStatus error:', error);
+      ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', error.message));
+    }
+  },
+
+  /**
+   * POST /api/wallet/payment/webhook
+   * Handle Omise webhook events
+   */
+  async handleWebhook(ctx) {
+    try {
+      const event = ctx.request.body;
+
+      strapi.log.info('[Payment] Webhook received:', {
+        key: event.key,
+        chargeId: event.data?.id,
+      });
+
+      // Verify webhook source IP (security)
+      const sourceIp = ctx.request.ip ||
+                       ctx.request.headers['x-forwarded-for'] ||
+                       ctx.request.headers['x-real-ip'] ||
+                       ctx.request.socket.remoteAddress;
+
+      if (!paymentService.verifyWebhookSource(sourceIp)) {
+        strapi.log.error('[Payment] Webhook rejected - unauthorized source IP:', sourceIp);
+        return ctx.unauthorized('Webhook source not authorized');
+      }
+
+      // Handle different event types
+      if (event.key === 'charge.complete') {
+        const charge = event.data;
+
+        if (charge.paid && charge.metadata?.user_id) {
+          const userId = parseInt(charge.metadata.user_id);
+
+          // Check if already processed
+          const knex = strapi.connections.default;
+          const existing = await knex('wallet_transactions')
+            .where('metadata', 'like', `%${charge.id}%`)
+            .first();
+
+          if (!existing) {
+            await paymentService.processSuccessfulPayment(charge.id, userId);
+            strapi.log.info('[Payment] Webhook processed successfully for user:', userId);
+          } else {
+            strapi.log.info('[Payment] Charge already processed:', charge.id);
+          }
+        }
+      }
+
+      // Respond to Omise
+      ctx.send({ received: true });
+    } catch (error) {
+      strapi.log.error('[Payment] Webhook error:', error);
+      // Still respond with 200 to prevent Omise from retrying
+      ctx.send({ received: false, error: error.message });
+    }
+  },
+};

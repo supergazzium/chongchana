@@ -1,0 +1,22 @@
+{
+  "routes": [
+    {
+      "method": "OPTIONS",
+      "path": "/auth/local",
+      "handler": "auth.options",
+      "config": {
+        "policies": [],
+        "prefix": ""
+      }
+    },
+    {
+      "method": "OPTIONS",
+      "path": "/auth/:provider",
+      "handler": "auth.options",
+      "config": {
+        "policies": [],
+        "prefix": ""
+      }
+    }
+  ]
+}
