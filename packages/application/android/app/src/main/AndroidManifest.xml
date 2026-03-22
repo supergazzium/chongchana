@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.chongjaroen.app">
+
+   <!-- Internet permission for loading QR images -->
+   <uses-permission android:name="android.permission.INTERNET"/>
+
    <application
         android:label="CHONGCHANA"
         android:icon="@mipmap/ic_launcher">
@@ -31,6 +35,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Deep linking for mobile banking return -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="chongjaroen"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

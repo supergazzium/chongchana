@@ -7,6 +7,9 @@
         <button @click="exportData" class="btn-export">
           Export to CSV
         </button>
+        <nuxt-link to="/wallets/settings" class="btn-primary">
+          Settings
+        </nuxt-link>
         <nuxt-link to="/wallets/transactions" class="btn-primary">
           View All Transactions
         </nuxt-link>

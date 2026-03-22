@@ -10,6 +10,27 @@ const formatError = error => [
 ];
 
 module.exports = {
+  // Handle OPTIONS preflight requests for CORS
+  async options(ctx) {
+    const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:4040')
+      .split(',')
+      .map(origin => origin.trim());
+
+    const requestOrigin = ctx.get('Origin');
+
+    // Set CORS headers
+    if (allowedOrigins.includes(requestOrigin) || allowedOrigins.includes('*')) {
+      ctx.set('Access-Control-Allow-Origin', requestOrigin || '*');
+      ctx.set('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+      ctx.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Frame-Options, Authentication');
+      ctx.set('Access-Control-Allow-Credentials', 'true');
+      ctx.set('Access-Control-Max-Age', '86400');
+    }
+
+    ctx.status = 204;
+    ctx.body = '';
+  },
+
   async callback(ctx) {
     const provider = ctx.params.provider || 'local';
     const params = ctx.request.body;

@@ -31,15 +31,8 @@
                     <h4>Name</h4>
                     <div class="_dp-f _alit-ct" v-if="_user.first_name && _user.last_name">
                       <p>
-                        <span
-                          v-html="
-                            _user.first_name[0].toUpperCase() +
-                            _user.first_name.slice(1)
-                          "
-                        ></span>
-                        <span
-                          v-html="`${_user.last_name[0].toUpperCase()}.`"
-                        ></span>
+                        <span>{{ _user.first_name[0].toUpperCase() + _user.first_name.slice(1) }}</span>
+                        <span>{{ _user.last_name[0].toUpperCase() }}.</span>
                       </p>
                       <i class="far fa-chevron-right _mgl-12px"></i>
                     </div>
@@ -52,7 +45,7 @@
                   >
                     <h4>Mobile Number</h4>
                     <div class="_dp-f _alit-ct">
-                      <p v-html="_user.phone"></p>
+                      <p>{{ _user.phone }}</p>
                       <i class="far fa-chevron-right _mgl-12px"></i>
                     </div>
                   </div>
@@ -64,7 +57,7 @@
                   >
                     <h4>Email</h4>
                     <div class="_dp-f _alit-ct">
-                      <p v-html="_user.email"></p>
+                      <p>{{ _user.email }}</p>
                       <i class="far fa-chevron-right _mgl-12px"></i>
                     </div>
                   </div>
@@ -81,12 +74,25 @@
                     </div>
                   </div>
 
+                  <div
+                    class="setting-item"
+                    :class="{ '-active': $route.path === '/account/wallet' }"
+                    @click="$router.push('/account/wallet')"
+                  >
+                    <h4>Wallet</h4>
+                    <div class="_dp-f _alit-ct">
+                      <p v-if="loadingWallet">
+                        <span class="spinner-border spinner-border-sm" role="status"></span>
+                      </p>
+                      <p v-else style="font-weight: 600; color: #1797ad;">฿{{ formatBalance(walletBalance) }}</p>
+                      <i class="far fa-chevron-right _mgl-12px"></i>
+                    </div>
+                  </div>
+
                   <div class="setting-item -no-hover">
                     <h4>Birthdate</h4>
                     <div class="_dp-f _alit-ct">
-                      <p
-                        v-html="$moment(_user.birthdate).format('YYYY-MM-DD')"
-                      ></p>
+                      <p>{{ $moment(_user.birthdate).format('YYYY-MM-DD') }}</p>
                     </div>
                   </div>
                 </div>
@@ -144,6 +150,8 @@ export default {
     profileImageLoading: false,
     isIOS: false,
     isAndroid: false,
+    walletBalance: 0,
+    loadingWallet: true,
   }),
   methods: {
     async signout() {
@@ -160,11 +168,31 @@ export default {
       await this.__changeProfileImage(files);
       this.profileImageLoading = false;
     },
+    async fetchWalletBalance() {
+      this.loadingWallet = true;
+      try {
+        const response = await this.__getWalletBalance();
+        const data = response.data || response;
+        this.walletBalance = data.balance || 0;
+      } catch (error) {
+        console.error('Error fetching wallet balance:', error);
+        this.walletBalance = 0;
+      } finally {
+        this.loadingWallet = false;
+      }
+    },
+    formatBalance(amount) {
+      return new Intl.NumberFormat('th-TH', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount);
+    },
   },
   mounted() {
     const { userAgent } = navigator;
     this.isIOS = /iPhone|iPad|iPod/i.test(userAgent);
     this.isAndroid = /Android/i.test(userAgent);
+    this.fetchWalletBalance();
   },
 };
 </script>

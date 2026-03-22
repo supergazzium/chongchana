@@ -31,7 +31,7 @@
 			<string>com.chongjaroen.app</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>chongchana</string>
+				<string>chongjaroen</string>
 			</array>
 		</dict>
 	</array>

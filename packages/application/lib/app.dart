@@ -5,6 +5,8 @@ import 'package:chongchana/services/article.dart';
 import 'package:chongchana/services/checkout.dart';
 import 'package:chongchana/services/menu.dart';
 import 'package:chongchana/services/inbox.dart';
+import 'package:chongchana/services/omise_payment.dart';
+import 'package:chongchana/services/wallet.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -29,6 +31,8 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> {
   final menus = ChongjaroenMenus();
   final checkoutService = CheckoutService();
   final inboxService = InboxService();
+  final omisePaymentService = OmisePaymentService();
+  final walletService = WalletService();
   final _navigatorKey = GlobalKey<NavigatorState>();
   late final RouteState _routeState;
   late final SimpleRouterDelegate _routerDelegate;
@@ -89,6 +93,16 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> {
     // if (auth.signedIn) {
     articles.fetchArticleList(auth.user.special);
     _handleAppInitStateChanged();
+
+    // Clear wallet data when user logs out
+    if (!auth.signedIn) {
+      walletService.clearWalletData();
+
+      // Redirect to home if user is on wallet screen
+      if (_routeState.route.pathTemplate.startsWith('/wallet')) {
+        _routeState.go('/home');
+      }
+    }
     // }
   }
 
@@ -137,7 +151,10 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> {
           ChangeNotifierProvider<ChongjaroenMenus>(create: (_) => menus),
           ChangeNotifierProvider<CheckoutService>(
               create: (_) => checkoutService),
-          ChangeNotifierProvider<InboxService>(create: (_) => inboxService)
+          ChangeNotifierProvider<InboxService>(create: (_) => inboxService),
+          ChangeNotifierProvider<OmisePaymentService>(
+              create: (_) => omisePaymentService),
+          ChangeNotifierProvider<WalletService>(create: (_) => walletService),
         ],
         child: RouteStateScope(
           notifier: _routeState,

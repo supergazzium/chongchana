@@ -50,6 +50,63 @@
     },
     {
       "method": "GET",
+      "path": "/wallet/settings",
+      "handler": "wallet.getSettings",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/wallet/payment/methods",
+      "handler": "payment.getPaymentMethods",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/payment/create-token",
+      "handler": "payment.createToken",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/payment/create-charge",
+      "handler": "payment.createChargeFromToken",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/payment/create-source",
+      "handler": "payment.createPaymentSource",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/wallet/payment/status/:chargeId",
+      "handler": "payment.checkPaymentStatus",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/payment/webhook",
+      "handler": "payment.handleWebhook",
+      "config": {
+        "policies": [],
+        "auth": false
+      }
+    },
+    {
+      "method": "GET",
       "path": "/api/wallet-admin/wallets",
       "handler": "admin.listWallets",
       "config": {
@@ -108,6 +165,86 @@
       "method": "POST",
       "path": "/api/wallet-admin/wallet/voucher/create",
       "handler": "admin.createVoucher",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet-admin/transfer-settings",
+      "handler": "admin.getTransferSettings",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/wallet-admin/transfer-settings",
+      "handler": "admin.updateTransferSettings",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/lookup-user",
+      "handler": "transfer.lookupUser",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/transfer",
+      "handler": "transfer.initiateTransfer",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/wallet/transfers",
+      "handler": "transfer.getTransferHistory",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/wallet/transfer/:transferId",
+      "handler": "transfer.getTransferDetails",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/payment-qr/generate",
+      "handler": "payment-qr.generatePaymentQR",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/payment-qr/validate",
+      "handler": "payment-qr.validatePaymentQR",
+      "config": {
+        "policies": ["isPublicPaymentQR"]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/payment-qr/pay",
+      "handler": "payment-qr.processPayment",
+      "config": {
+        "policies": ["isPublicPaymentQR"]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/wallet/payment-qr/history",
+      "handler": "payment-qr.getPaymentHistory",
       "config": {
         "policies": []
       }

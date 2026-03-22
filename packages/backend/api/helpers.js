@@ -12,6 +12,15 @@ const slugify = str => {
 }
 
 const sendPushNotification = async ({ content, heading, external_ids, additionalData }) => {
+  // Validate OneSignal credentials
+  if (!process.env.ONESIGNAL_APP_ID || !process.env.ONESIGNAL_API_KEY) {
+    console.error('[OneSignal] ERROR: Missing credentials!');
+    console.error('[OneSignal] ONESIGNAL_APP_ID:', process.env.ONESIGNAL_APP_ID ? 'SET' : 'EMPTY');
+    console.error('[OneSignal] ONESIGNAL_API_KEY:', process.env.ONESIGNAL_API_KEY ? 'SET' : 'EMPTY');
+    console.error('[OneSignal] Please configure OneSignal credentials in .env file');
+    throw new Error('OneSignal credentials not configured');
+  }
+
   const client = new OneSignal.Client(
     process.env.ONESIGNAL_APP_ID,
     process.env.ONESIGNAL_API_KEY
@@ -31,15 +40,30 @@ const sendPushNotification = async ({ content, heading, external_ids, additional
 
   // using async/await
   try {
-    console.log('Push notification to thrid party')
+    console.log('[OneSignal] Sending push notification...');
+    console.log('[OneSignal] Heading:', heading);
+    console.log('[OneSignal] Content:', content);
+    console.log('[OneSignal] External IDs:', external_ids);
+    console.log('[OneSignal] Additional Data:', JSON.stringify(additionalData, null, 2));
+
     const response = await client.createNotification(notification)
-    console.log(response.body.id)
+
+    console.log('[OneSignal] ✅ Notification sent successfully!');
+    console.log('[OneSignal] Notification ID:', response.body.id);
+    console.log('[OneSignal] Recipients:', response.body.recipients);
+
+    return response;
   } catch (e) {
+    console.error('[OneSignal] ❌ Failed to send notification');
     if (e instanceof OneSignal.HTTPError) {
       // When status code of HTTP response is not 2xx, HTTPError is thrown.
-      console.log(e.statusCode)
-      console.log(e.body)
+      console.error('[OneSignal] HTTP Status:', e.statusCode);
+      console.error('[OneSignal] Error Body:', JSON.stringify(e.body, null, 2));
+    } else {
+      console.error('[OneSignal] Error:', e.message);
+      console.error('[OneSignal] Stack:', e.stack);
     }
+    throw e;
   }
 }
 

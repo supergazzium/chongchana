@@ -64,16 +64,32 @@ module.exports = {
         params.push(status);
       }
 
-      // Get total count
-      const countQuery = `SELECT COUNT(*) as total FROM wallets w LEFT JOIN \`users-permissions_user\` u ON w.user_id = u.id WHERE 1=1` +
-        (search ? ` AND (u.email LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.phone LIKE ?)` : '') +
-        (minBalance ? ` AND w.balance >= ${minBalance}` : '') +
-        (maxBalance ? ` AND w.balance <= ${maxBalance}` : '') +
-        (status ? ` AND w.status = '${status}'` : '');
+      // Get total count with parameterized query (SQL injection protection)
+      const countParams = [];
+      let countQuery = `SELECT COUNT(*) as total FROM wallets w LEFT JOIN \`users-permissions_user\` u ON w.user_id = u.id WHERE 1=1`;
 
-      const countResult = await strapi.connections.default.raw(countQuery, search ? [
-        `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`
-      ] : []);
+      if (search) {
+        countQuery += ` AND (u.email LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.phone LIKE ?)`;
+        const searchTerm = `%${search}%`;
+        countParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
+      }
+
+      if (minBalance) {
+        countQuery += ` AND w.balance >= ?`;
+        countParams.push(minBalance);
+      }
+
+      if (maxBalance) {
+        countQuery += ` AND w.balance <= ?`;
+        countParams.push(maxBalance);
+      }
+
+      if (status) {
+        countQuery += ` AND w.status = ?`;
+        countParams.push(status);
+      }
+
+      const countResult = await strapi.connections.default.raw(countQuery, countParams);
       const total = countResult[0][0].total;
 
       // Add sorting and pagination
@@ -305,6 +321,8 @@ module.exports = {
         toDate,
         paymentMethod,
         referenceId,
+        staffId,
+        machineId,
       } = ctx.query;
 
       let query = `
@@ -364,6 +382,17 @@ module.exports = {
         params.push(`%${referenceId}%`);
       }
 
+      // Filter by staffId or machineId in metadata JSON
+      if (staffId) {
+        query += ` AND JSON_EXTRACT(t.metadata, '$.staffId') = ?`;
+        params.push(staffId);
+      }
+
+      if (machineId) {
+        query += ` AND JSON_EXTRACT(t.metadata, '$.machineId') LIKE ?`;
+        params.push(`%${machineId}%`);
+      }
+
       // Get total count
       const countQuery = query.replace('t.*, u.email, u.first_name as firstName, u.last_name as lastName', 'COUNT(*) as total');
       const countResult = await strapi.connections.default.raw(countQuery, params);
@@ -375,27 +404,91 @@ module.exports = {
 
       const transactions = await strapi.connections.default.raw(query, params);
 
+      // Extract unique staff IDs to lookup names
+      const staffIds = new Set();
+      transactions[0].forEach(t => {
+        if (t.metadata) {
+          try {
+            const metadata = typeof t.metadata === 'string' ? JSON.parse(t.metadata) : t.metadata;
+            if (metadata.staffId) {
+              staffIds.add(metadata.staffId);
+            }
+          } catch (e) {
+            // Ignore JSON parse errors
+          }
+        }
+      });
+
+      // Lookup staff names (SQL injection protection)
+      const staffMap = {};
+      if (staffIds.size > 0) {
+        const staffIdsArray = Array.from(staffIds);
+        const placeholders = staffIdsArray.map(() => '?').join(',');
+        const staffQuery = await strapi.connections.default.raw(`
+          SELECT id, username, first_name as firstName, last_name as lastName
+          FROM \`users-permissions_user\`
+          WHERE id IN (${placeholders})
+        `, staffIdsArray);
+        staffQuery[0].forEach(staff => {
+          staffMap[staff.id] = {
+            id: staff.id,
+            username: staff.username,
+            name: `${staff.firstName || ''} ${staff.lastName || ''}`.trim() || staff.username,
+          };
+        });
+      }
+
       ctx.send(utils.successResponse({
-        transactions: transactions[0].map(t => ({
-          id: t.id,
-          userId: t.user_id,
-          user: {
-            firstName: t.firstName,
-            lastName: t.lastName,
-            email: t.email,
-          },
-          type: t.type,
-          amount: parseFloat(t.amount),
-          balanceBefore: parseFloat(t.balance_before),
-          balanceAfter: parseFloat(t.balance_after),
-          status: t.status,
-          paymentMethod: t.payment_method,
-          paymentTransactionId: t.payment_transaction_id,
-          referenceId: t.reference_id,
-          description: t.description,
-          createdAt: t.created_at,
-          completedAt: t.completed_at,
-        })),
+        transactions: transactions[0].map(t => {
+          let metadata = null;
+          let processedBy = null;
+
+          if (t.metadata) {
+            try {
+              metadata = typeof t.metadata === 'string' ? JSON.parse(t.metadata) : t.metadata;
+
+              // Determine who processed the transaction
+              if (metadata.staffId) {
+                processedBy = {
+                  type: 'staff',
+                  staffId: metadata.staffId,
+                  staff: staffMap[metadata.staffId] || { id: metadata.staffId, name: 'Unknown Staff' },
+                };
+              } else if (metadata.machineId) {
+                processedBy = {
+                  type: 'machine',
+                  machineId: metadata.machineId,
+                  machineName: metadata.machineName || metadata.machineId,
+                };
+              }
+            } catch (e) {
+              // Ignore JSON parse errors
+            }
+          }
+
+          return {
+            id: t.id,
+            userId: t.user_id,
+            user: {
+              firstName: t.firstName,
+              lastName: t.lastName,
+              email: t.email,
+            },
+            type: t.type,
+            amount: parseFloat(t.amount),
+            balanceBefore: parseFloat(t.balance_before),
+            balanceAfter: parseFloat(t.balance_after),
+            status: t.status,
+            paymentMethod: t.payment_method,
+            paymentTransactionId: t.payment_transaction_id,
+            referenceId: t.reference_id,
+            description: t.description,
+            metadata,
+            processedBy,
+            createdAt: t.created_at,
+            completedAt: t.completed_at,
+          };
+        }),
         pagination: {
           total,
           limit: parseInt(limit),
@@ -767,24 +860,43 @@ module.exports = {
    */
   async getTransferSettings(ctx) {
     try {
+      // Check if table exists first
+      const tableCheck = await strapi.connections.default.raw(`
+        SELECT COUNT(*) as count
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+        AND table_name = 'wallet_transfer_settings'
+      `);
+
+      if (tableCheck[0][0].count === 0) {
+        return ctx.badRequest(utils.errorResponse(
+          'TABLE_NOT_FOUND',
+          'Settings table not found. Please run database migration: database/migrations/wallet_transfers_points.sql'
+        ));
+      }
+
       const transferSettings = await strapi.services.transfer.getSettings();
       const redemptionSettings = await strapi.services.redemption.getSettings();
 
+      // Provide defaults if settings are missing
       ctx.send(utils.successResponse({
         settings: {
-          transferFeePercentage: transferSettings.transfer_fee_percentage,
-          transferFeeFixed: transferSettings.transfer_fee_fixed,
-          transferMinAmount: transferSettings.transfer_min_amount,
-          transferMaxAmount: transferSettings.transfer_max_amount,
-          transferDailyLimit: transferSettings.transfer_daily_limit,
-          pointConversionRate: redemptionSettings.point_conversion_rate,
-          pointMinRedemption: redemptionSettings.point_min_redemption,
-          pointRedemptionRequiresApproval: redemptionSettings.point_redemption_requires_approval,
+          transferFeePercentage: transferSettings.transfer_fee_percentage || 0,
+          transferFeeFixed: transferSettings.transfer_fee_fixed || 0,
+          transferMinAmount: transferSettings.transfer_min_amount || 1,
+          transferMaxAmount: transferSettings.transfer_max_amount || 50000,
+          transferDailyLimit: transferSettings.transfer_daily_limit || 100000,
+          pointConversionRate: redemptionSettings.point_conversion_rate || 1,
+          pointMinRedemption: redemptionSettings.point_min_redemption || 100,
+          pointRedemptionRequiresApproval: redemptionSettings.point_redemption_requires_approval || false,
         },
       }));
     } catch (error) {
       strapi.log.error('[WalletAdmin] getTransferSettings error:', error);
-      ctx.badRequest(utils.errorResponse('WALLET_ERROR', error.message));
+      ctx.badRequest(utils.errorResponse(
+        'WALLET_ERROR',
+        `Failed to load settings: ${error.message}. Please check database connection and run migrations.`
+      ));
     }
   },
 

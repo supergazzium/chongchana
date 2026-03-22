@@ -6,6 +6,8 @@
  */
 
 const moment = require('moment');
+const Decimal = require('decimal.js');
+const { sendPushNotification } = require('../../helpers');
 
 module.exports = {
   /**
@@ -68,8 +70,15 @@ module.exports = {
    */
   async calculateFee(amount) {
     const settings = await this.getSettings();
-    const percentageFee = (amount * settings.transfer_fee_percentage) / 100;
-    const totalFee = percentageFee + settings.transfer_fee_fixed;
+
+    // Use Decimal.js for precise financial calculations
+    const amountDecimal = new Decimal(amount);
+    const feePercentage = new Decimal(settings.transfer_fee_percentage);
+    const feeFixed = new Decimal(settings.transfer_fee_fixed);
+
+    const percentageFee = amountDecimal.times(feePercentage).dividedBy(100);
+    const totalFee = percentageFee.plus(feeFixed);
+
     return parseFloat(totalFee.toFixed(2));
   },
 
@@ -91,8 +100,12 @@ module.exports = {
       AND status IN ('pending', 'completed')
     `, [userId, today]);
 
-    const todayTotal = parseFloat(result[0][0]?.total || 0);
-    return (todayTotal + amount) <= settings.transfer_daily_limit;
+    // Use Decimal.js for precise financial calculations
+    const todayTotal = new Decimal(result[0][0]?.total || 0);
+    const transferAmount = new Decimal(amount);
+    const dailyLimit = new Decimal(settings.transfer_daily_limit);
+
+    return todayTotal.plus(transferAmount).lessThanOrEqualTo(dailyLimit);
   },
 
   /**
@@ -255,6 +268,46 @@ module.exports = {
 
         // Commit transaction
         await trx.commit();
+
+        // Send push notifications to both sender and receiver
+        try {
+          // Notification to sender
+          await sendPushNotification({
+            content: `You sent ฿${amount.toFixed(2)} to user #${receiverUserId}${fee > 0 ? ` (Fee: ฿${fee.toFixed(2)})` : ''}`,
+            heading: 'Transfer Sent',
+            external_ids: [senderUserId.toString()],
+            additionalData: {
+              type: 'wallet_transfer_sent',
+              transferId,
+              amount,
+              fee,
+              totalDeduction,
+              receiverUserId,
+              senderBalanceAfter,
+              timestamp: new Date().toISOString(),
+            },
+          });
+
+          // Notification to receiver
+          await sendPushNotification({
+            content: `You received ฿${amount.toFixed(2)} from user #${senderUserId}`,
+            heading: 'Transfer Received',
+            external_ids: [receiverUserId.toString()],
+            additionalData: {
+              type: 'wallet_transfer_received',
+              transferId,
+              amount,
+              senderUserId,
+              receiverBalanceAfter,
+              timestamp: new Date().toISOString(),
+            },
+          });
+
+          strapi.log.info('[Transfer] Push notifications sent for transfer:', transferId);
+        } catch (notificationError) {
+          // Don't fail the transfer if notification fails
+          strapi.log.error('[Transfer] Failed to send push notifications:', notificationError);
+        }
 
         return {
           transferId,

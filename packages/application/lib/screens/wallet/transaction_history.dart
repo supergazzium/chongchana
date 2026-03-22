@@ -1,8 +1,10 @@
 import 'package:chongchana/constants/colors.dart';
 import 'package:chongchana/models/wallet_transaction.dart';
 import 'package:chongchana/screens/wallet/transaction_detail.dart';
+import 'package:chongchana/services/wallet.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({Key? key}) : super(key: key);
@@ -30,76 +32,19 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     _loadTransactions();
   }
 
-  void _loadTransactions() {
-    // Mock data - replace with actual API call
-    transactions = [
-      WalletTransaction(
-        id: 'TX-20250308-00124',
-        type: 'top_up',
-        amount: 500.00,
-        balanceAfter: 1750.00,
-        balanceBefore: 1250.00,
-        status: 'completed',
-        paymentMethod: 'PromptPay',
-        createdAt: DateTime(2025, 3, 8, 14, 32),
-      ),
-      WalletTransaction(
-        id: 'TX-20250307-00123',
-        type: 'payment',
-        amount: -285.00,
-        balanceAfter: 1250.00,
-        balanceBefore: 1535.00,
-        status: 'completed',
-        description: 'Asoke Branch',
-        referenceId: 'Order #A-00456',
-        createdAt: DateTime(2025, 3, 7, 18, 15),
-      ),
-      WalletTransaction(
-        id: 'TX-20250307-00122',
-        type: 'bonus',
-        amount: 50.00,
-        balanceAfter: 1535.00,
-        balanceBefore: 1485.00,
-        status: 'completed',
-        description: 'Welcome Bonus',
-        referenceId: 'BONUS-2025-001',
-        createdAt: DateTime(2025, 3, 7, 12, 0),
-      ),
-      WalletTransaction(
-        id: 'TX-20250306-00121',
-        type: 'payment',
-        amount: -120.00,
-        balanceAfter: 1485.00,
-        balanceBefore: 1605.00,
-        status: 'completed',
-        description: 'Silom Branch',
-        referenceId: 'Order #S-00789',
-        createdAt: DateTime(2025, 3, 6, 19, 30),
-      ),
-      WalletTransaction(
-        id: 'TX-20250305-00098',
-        type: 'top_up',
-        amount: 1000.00,
-        balanceAfter: 1605.00,
-        balanceBefore: 605.00,
-        status: 'completed',
-        paymentMethod: 'Card ****1234',
-        createdAt: DateTime(2025, 3, 5, 16, 20),
-      ),
-      WalletTransaction(
-        id: 'TX-20250305-00097',
-        type: 'refund',
-        amount: 95.00,
-        balanceAfter: 605.00,
-        balanceBefore: 510.00,
-        status: 'completed',
-        description: 'Order Cancelled',
-        referenceId: 'Ref: Order #A-00432',
-        createdAt: DateTime(2025, 3, 5, 10, 15),
-      ),
-    ];
+  void _loadTransactions() async {
+    setState(() {
+      isLoading = true;
+    });
 
-    filteredTransactions = List.from(transactions);
+    final walletService = Provider.of<WalletService>(context, listen: false);
+    final loadedTransactions = await walletService.getTransactions(limit: 100);
+
+    setState(() {
+      transactions = loadedTransactions;
+      filteredTransactions = List.from(transactions);
+      isLoading = false;
+    });
   }
 
   void _applyFilters() {
@@ -170,9 +115,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         ],
       ),
       backgroundColor: Colors.grey.shade50,
-      body: filteredTransactions.isEmpty
-          ? _buildEmptyState()
-          : _buildTransactionList(),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : filteredTransactions.isEmpty
+              ? _buildEmptyState()
+              : _buildTransactionList(),
     );
   }
 

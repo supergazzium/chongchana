@@ -1,13 +1,13 @@
 // @import '@shoelace-style/shoelace/dist/themes/base.css';
-@import './variables';
-@import './biomatic.scss';
-@import './bootstrap-grid.scss';
-@import './locomotive.scss';
-@import './main.scss';
+@use 'variables';
+@use 'biomatic.scss';
+@use 'bootstrap-grid.scss';
+@use 'locomotive.scss';
+@use 'main.scss';
 
 // FontAwesome
-@import './fa/scss/fontawesome.scss';
-@import "./fa/scss/light.scss";
-@import "./fa/scss/regular.scss";
-@import "./fa/scss/solid.scss";
-@import "./fa/scss/brands.scss";
+@use 'fa/scss/fontawesome.scss';
+@use "fa/scss/light.scss";
+@use "fa/scss/regular.scss";
+@use "fa/scss/solid.scss";
+@use "fa/scss/brands.scss";

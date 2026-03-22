@@ -53,7 +53,13 @@ class _AddBookingPageState extends State<AddBookingPage> {
         List<DropdownMenuItem<String>>.generate(maxPeopleAmount, (int index) {
       return DropdownMenuItem<String>(
         value: '${index + 1}',
-        child: Text('${index + 1}'),
+        child: Text(
+          '${index + 1}',
+          style: const TextStyle(
+            color: ChongjaroenColors.blackColor,
+            fontSize: 16,
+          ),
+        ),
       );
     });
 
@@ -313,7 +319,13 @@ class _AddBookingPageState extends State<AddBookingPage> {
               int branchID = branchData.id;
               return DropdownMenuItem<String>(
                 value: '$branchID',
-                child: Text(branchData.name),
+                child: Text(
+                  branchData.name,
+                  style: const TextStyle(
+                    color: ChongjaroenColors.blackColor,
+                    fontSize: 16,
+                  ),
+                ),
               );
             }).toList(),
             appinit.settings.bookingConditions,
@@ -346,40 +358,25 @@ class _AddBookingPageState extends State<AddBookingPage> {
                         text: Locales.Booking,
                       ),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          Locales.LabelBranch,
-                          style: labelFormStyle,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8, bottom: 0),
-                          child: DropdownButtonFormField(
-                            key: dropdownBranchState,
-                            autovalidateMode: AutovalidateMode.disabled,
-                            value: branchsDropdownItems.first.value!,
-                            items: branchsDropdownItems,
-                            style: textFormStyle,
-                            decoration: textFormDecoration,
-                            onSaved: (String? value) {
-                              setState(() {
-                                _addBookingData.branchID = value!;
-                              });
-                            },
-                            onChanged: (String? value) {
-                              setState(() {
-                                _addBookingData.branchID = value!;
-                                branchAvailableSelected = value;
-                              });
-                              updateEventCalendarByBranch();
+                    CJRDropdowntormField(
+                      labelText: Locales.LabelBranch,
+                      initValue: branchsDropdownItems.first.value!,
+                      dropdownItems: branchsDropdownItems,
+                      onSaved: (String? value) {
+                        setState(() {
+                          _addBookingData.branchID = value!;
+                        });
+                      },
+                      onChanged: (String? value) {
+                        setState(() {
+                          _addBookingData.branchID = value!;
+                          branchAvailableSelected = value;
+                        });
+                        updateEventCalendarByBranch();
 
-                              // reset date to avoid event Date by Branch conflict
-                              _dateTextFormController.clear();
-                            },
-                          ),
-                        ),
-                      ],
+                        // reset date to avoid event Date by Branch conflict
+                        _dateTextFormController.clear();
+                      },
                     ),
                     CJRTextFormField(
                       labelText: 'Name (ชื่อ)',
@@ -403,7 +400,8 @@ class _AddBookingPageState extends State<AddBookingPage> {
                         if (value == null || value.isEmpty) {
                           return Locales.ErrorSelectMobile;
                         }
-                        RegExp regExp = RegExp(r'^(?:[+0]9)?[0-9]{10}$');
+                        // Thai phone number: must be 10 digits starting with 0
+                        RegExp regExp = RegExp(r'^0[0-9]{9}$');
                         if (!regExp.hasMatch(value)) {
                           return Locales.ErrorInvalidMobile;
                         }
@@ -450,7 +448,13 @@ class _AddBookingPageState extends State<AddBookingPage> {
                                   autovalidateMode:
                                       AutovalidateMode.onUserInteraction,
                                   style: textFormStyle,
-                                  decoration: textFormDecoration,
+                                  decoration: textFormDecoration.copyWith(
+                                    suffixIcon: const Icon(
+                                      Icons.calendar_today,
+                                      color: ChongjaroenColors.grayColor,
+                                      size: 20,
+                                    ),
+                                  ),
                                   onSaved: (value) {
                                     setState(() {
                                       _addBookingData.date = value!;

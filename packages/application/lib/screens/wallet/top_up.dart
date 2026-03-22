@@ -1,7 +1,13 @@
 import 'package:chongchana/constants/colors.dart';
+import 'package:chongchana/screens/wallet/credit_card_form.dart';
+import 'package:chongchana/screens/wallet/mobile_banking_waiting.dart';
+import 'package:chongchana/screens/wallet/promptpay_qr.dart';
+import 'package:chongchana/services/omise_payment.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class TopUpScreen extends StatefulWidget {
   const TopUpScreen({Key? key}) : super(key: key);
@@ -10,11 +16,11 @@ class TopUpScreen extends StatefulWidget {
   _TopUpScreenState createState() => _TopUpScreenState();
 }
 
-class _TopUpScreenState extends State<TopUpScreen> {
+class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
   final TextEditingController _amountController = TextEditingController();
   double? selectedAmount;
   final double currentBalance = 1250.00;
-  final double minAmount = 100.00;
+  final double minAmount = 1.00;
   final double maxAmount = 20000.00;
 
   final String cardNumber = '4622';
@@ -23,10 +29,32 @@ class _TopUpScreenState extends State<TopUpScreen> {
 
   final List<double> quickAmounts = [300, 500, 1000, 3000, 5000, 10000];
 
+  // Track pending mobile banking payment
+  String? _pendingChargeId;
+  bool _isCheckingPayment = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
   @override
   void dispose() {
     _amountController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    // When app resumes from background, check if there's a pending payment
+    if (state == AppLifecycleState.resumed && _pendingChargeId != null && !_isCheckingPayment) {
+      print('[TopUp] App resumed, checking payment status for: $_pendingChargeId');
+      _checkPendingPayment();
+    }
   }
 
   void _selectAmount(double amount) {
@@ -56,7 +84,7 @@ class _TopUpScreenState extends State<TopUpScreen> {
     }
   }
 
-  void _continue() {
+  void _continue() async {
     if (selectedAmount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -97,11 +125,197 @@ class _TopUpScreenState extends State<TopUpScreen> {
       return;
     }
 
-    // Show success confirmation
+    // Handle different payment methods
+    if (selectedPaymentMethod == 'credit_card') {
+      _handleCreditCardPayment();
+    } else if (selectedPaymentMethod == 'mobile_banking' ||
+               selectedPaymentMethod!.startsWith('mobile_banking_')) {
+      _handleMobileBankingPayment();
+    } else if (selectedPaymentMethod == 'promptpay') {
+      _handlePromptPayPayment();
+    } else {
+      _showSuccessDialog('Mock payment successful');
+    }
+  }
+
+  void _handlePromptPayPayment() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PromptPayQRScreen(
+          amount: selectedAmount!,
+        ),
+      ),
+    );
+  }
+
+  void _handleCreditCardPayment() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreditCardFormScreen(
+          amount: selectedAmount!,
+          onPaymentSuccess: (transactionId) {
+            _showSuccessDialog(transactionId);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleMobileBankingPayment() async {
+    final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
+    String bankName = _getBankName(selectedPaymentMethod!);
+
+    // Show dismissible loading dialog
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true, // User can dismiss by tapping outside
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 20),
+            Text(
+              'Creating payment with $bankName...',
+              style: const TextStyle(fontSize: 15),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    try {
+      print('[TopUp] Selected payment method: $selectedPaymentMethod');
+      print('[TopUp] Amount: $selectedAmount');
+
+      // Create internet banking charge
+      final result = await omiseService.createInternetBankingCharge(
+        amount: selectedAmount!,
+        currency: 'THB',
+        paymentMethod: selectedPaymentMethod!,
+        metadata: {
+          'type': 'wallet_topup',
+          'user': userName,
+        },
+      );
+
+      print('[TopUp] Result from createInternetBankingCharge: $result');
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+
+      if (result != null && result['success'] == true) {
+        final chargeId = result['chargeId'];
+        final authorizeUri = result['authorizeUri'];
+
+        // Store charge ID for payment verification when app resumes
+        setState(() {
+          _pendingChargeId = chargeId;
+        });
+
+        // Launch banking app
+        if (authorizeUri != null) {
+          final uri = Uri.parse(authorizeUri);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+            // Show snackbar with clear instructions
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Complete payment in $bankName app or choose another method'),
+                  duration: const Duration(seconds: 6),
+                  backgroundColor: ChongjaroenColors.primaryColors,
+                  behavior: SnackBarBehavior.floating,
+                  action: SnackBarAction(
+                    label: 'Dismiss',
+                    textColor: Colors.white,
+                    onPressed: () {},
+                  ),
+                ),
+              );
+            }
+          } else {
+            // Banking app not installed or URL cannot be launched
+            _showErrorDialog(
+              'Cannot open $bankName app. Please make sure it is installed.',
+            );
+            setState(() {
+              _pendingChargeId = null; // Clear pending payment
+            });
+          }
+        }
+      } else {
+        _showErrorDialog('Failed to create payment. Please try again.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+      _showErrorDialog('An error occurred: ${e.toString()}');
+    }
+  }
+
+  Future<void> _checkPendingPayment() async {
+    if (_pendingChargeId == null || _isCheckingPayment) return;
+
+    setState(() {
+      _isCheckingPayment = true;
+    });
+
+    final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
+
+    try {
+      print('[TopUp] Checking payment status for: $_pendingChargeId');
+
+      final isPaid = await omiseService.verifyPayment(_pendingChargeId!);
+
+      if (!mounted) return;
+
+      if (isPaid) {
+        // Payment successful!
+        print('[TopUp] Payment completed successfully');
+
+        final chargeId = _pendingChargeId!;
+        setState(() {
+          _pendingChargeId = null;
+          _isCheckingPayment = false;
+        });
+
+        // Show success dialog
+        _showSuccessDialog(chargeId);
+      } else {
+        print('[TopUp] Payment not yet completed');
+        setState(() {
+          _isCheckingPayment = false;
+        });
+      }
+    } catch (e) {
+      print('[TopUp] Error checking payment: $e');
+      if (mounted) {
+        setState(() {
+          _isCheckingPayment = false;
+        });
+      }
+    }
+  }
+
+  void _showSuccessDialog(String transactionId) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -128,6 +342,7 @@ class _TopUpScreenState extends State<TopUpScreen> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
             ),
@@ -138,13 +353,21 @@ class _TopUpScreenState extends State<TopUpScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Amount: ฿${_formatAmount(selectedAmount!)}',
-              style: const TextStyle(fontSize: 15),
+              'Amount: ฿${selectedAmount != null ? _formatAmount(selectedAmount!) : "0.00"}',
+              style: const TextStyle(fontSize: 15, color: Colors.black87),
             ),
             const SizedBox(height: 8),
             Text(
-              'Payment Method: ${selectedPaymentMethod!.replaceAll('_', ' ').toUpperCase()}',
-              style: const TextStyle(fontSize: 15),
+              'Payment Method: ${selectedPaymentMethod != null ? selectedPaymentMethod!.replaceAll('_', ' ').toUpperCase() : "N/A"}',
+              style: const TextStyle(fontSize: 15, color: Colors.black87),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Transaction ID: $transactionId',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
             ),
             const SizedBox(height: 12),
             Text(
@@ -157,18 +380,51 @@ class _TopUpScreenState extends State<TopUpScreen> {
           ],
         ),
         actions: [
-          TextButton(
+          ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to wallet overview
+              Navigator.of(dialogContext).pop(); // Close dialog
+              Navigator.of(context).pop(); // Go back to wallet overview
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ChongjaroenColors.secondaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             child: const Text(
               'Done',
               style: TextStyle(
-                color: ChongjaroenColors.secondaryColor,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Error'),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'OK',
+              style: TextStyle(color: ChongjaroenColors.secondaryColor),
             ),
           ),
         ],
@@ -416,8 +672,14 @@ class _TopUpScreenState extends State<TopUpScreen> {
         const Divider(height: 1),
         _buildPaymentMethodOption(
           icon: Icons.credit_card,
-          title: 'Use other credit / debit cards',
+          title: 'Credit / Debit Card',
           value: 'credit_card',
+        ),
+        const Divider(height: 1),
+        _buildPaymentMethodOption(
+          icon: Icons.qr_code_scanner,
+          title: 'PromptPay QR',
+          value: 'promptpay',
         ),
         const Divider(height: 1),
         _buildPaymentMethodOption(
@@ -426,11 +688,14 @@ class _TopUpScreenState extends State<TopUpScreen> {
           value: 'mobile_banking',
           hasSubOptions: true,
         ),
-        if (selectedPaymentMethod == 'mobile_banking') ...[
+        if (selectedPaymentMethod == 'mobile_banking' ||
+            (selectedPaymentMethod != null && selectedPaymentMethod!.startsWith('mobile_banking_'))) ...[
           _buildBankOption('Bangkok Bank Mobile Banking', 'bbl'),
-          _buildBankOption('K PLUS', 'kplus'),
-          _buildBankOption('Krungsri Mobile App', 'krungsri'),
-          _buildBankOption('Krungthai NEXT', 'ktb'),
+          _buildBankOption('K PLUS (Kasikorn)', 'kbank'),
+          _buildBankOption('SCB Easy', 'scb'),
+          _buildBankOption('Krungsri (Bank of Ayudhya)', 'bay'),
+          // TODO: Uncomment when Omise activates KTB for this account
+          // _buildBankOption('Krungthai NEXT', 'ktb'),
         ],
         const Divider(height: 1),
       ],
@@ -443,7 +708,12 @@ class _TopUpScreenState extends State<TopUpScreen> {
     required String value,
     bool hasSubOptions = false,
   }) {
-    final isSelected = selectedPaymentMethod == value;
+    // For mobile banking, also consider it selected if any sub-bank is selected
+    final isSelected = selectedPaymentMethod == value ||
+        (hasSubOptions &&
+         value == 'mobile_banking' &&
+         selectedPaymentMethod != null &&
+         selectedPaymentMethod!.startsWith('mobile_banking_'));
 
     return InkWell(
       onTap: () {
@@ -622,5 +892,23 @@ class _TopUpScreenState extends State<TopUpScreen> {
 
   String _formatAmount(double amount) {
     return NumberFormat('#,##0.00').format(amount);
+  }
+
+  String _getBankName(String paymentMethod) {
+    switch (paymentMethod) {
+      case 'mobile_banking_bbl':
+        return 'Bangkok Bank Mobile Banking';
+      case 'mobile_banking_kbank':
+        return 'K PLUS (Kasikorn)';
+      case 'mobile_banking_scb':
+        return 'SCB Easy';
+      case 'mobile_banking_bay':
+        return 'Krungsri (Bank of Ayudhya)';
+      // TODO: Uncomment when Omise activates KTB for this account
+      // case 'mobile_banking_ktb':
+      //   return 'Krungthai NEXT';
+      default:
+        return 'Mobile Banking';
+    }
   }
 }

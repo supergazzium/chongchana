@@ -72,6 +72,18 @@
           </div>
         </div>
 
+        <div
+          class="setting-item"
+          :class="{ '-active': $route.path === '/account/wallet' }"
+          @click="$router.push('/account/wallet')"
+        >
+          <h4>Wallet</h4>
+          <div class="_dp-f _alit-ct">
+            <p>กระเป๋าเงิน</p>
+            <i class="far fa-chevron-right _mgl-12px"></i>
+          </div>
+        </div>
+
         <div class="setting-item -no-hover">
           <h4>Birthdate</h4>
           <div class="_dp-f _alit-ct">

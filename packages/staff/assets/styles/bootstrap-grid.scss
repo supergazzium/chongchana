@@ -1,3 +1,5 @@
+@use "variables";
+
 /*!
  * Bootstrap Grid v4.3.1 (https://getbootstrap.com/)
  * Copyright 2011-2019 The Bootstrap Authors
@@ -255,7 +257,7 @@
   margin-left: 91.666667%;
 }
 
-@media (min-width: $sm) {
+@media (min-width: variables.$sm) {
   .col-sm {
     flex-basis: 0;
     flex-grow: 1;
@@ -376,7 +378,7 @@
   }
 }
 
-@media (min-width: $md) {
+@media (min-width: variables.$md) {
   .col-md {
     flex-basis: 0;
     flex-grow: 1;
@@ -497,7 +499,7 @@
   }
 }
 
-@media (min-width: $lg) {
+@media (min-width: variables.$lg) {
   .col-lg {
     flex-basis: 0;
     flex-grow: 1;
@@ -1463,7 +1465,7 @@
   padding-left: 3rem !important;
 }
 
-@media (min-width: $sm) {
+@media (min-width: variables.$sm) {
   .d-sm-none {
     display: none !important;
   }
@@ -2018,7 +2020,7 @@
   }
 }
 
-@media (min-width: $md) {
+@media (min-width: variables.$md) {
   .d-md-none {
     display: none !important;
   }
@@ -2573,7 +2575,7 @@
   }
 }
 
-@media (min-width: $lg) {
+@media (min-width: variables.$lg) {
   .d-lg-none {
     display: none !important;
   }

@@ -7,8 +7,10 @@ import 'package:chongchana/screens/wallet/transaction_history.dart';
 import 'package:chongchana/screens/wallet/transaction_detail.dart';
 import 'package:chongchana/screens/wallet/redeem_points.dart';
 import 'package:chongchana/screens/wallet/transfer.dart';
+import 'package:chongchana/services/wallet.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class WalletOverviewScreen extends StatefulWidget {
@@ -19,102 +21,76 @@ class WalletOverviewScreen extends StatefulWidget {
 }
 
 class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
-  // Mock data - replace with actual service calls
-  final Wallet wallet = Wallet(
-    balance: 1250.00,
-    pendingBalance: 150.00,
-    points: 750,
-  );
-
   final String cardNumber = '4622'; // Last 4 digits
   final String fullCardNumber = '6179185185694622';
   final String userName = 'ChongJaroen User';
 
-  final List<WalletTransaction> recentTransactions = [
-    WalletTransaction(
-      id: 'TX-20250308-00124',
-      type: 'top_up',
-      amount: 500.00,
-      balanceAfter: 1750.00,
-      status: 'completed',
-      paymentMethod: 'Card ****1234',
-      createdAt: DateTime(2025, 3, 8, 14, 32),
-    ),
-    WalletTransaction(
-      id: 'TX-20250307-00123',
-      type: 'payment',
-      amount: -285.00,
-      balanceAfter: 1250.00,
-      status: 'completed',
-      description: 'Asoke Branch',
-      createdAt: DateTime(2025, 3, 7, 18, 15),
-    ),
-    WalletTransaction(
-      id: 'TX-20250307-00122',
-      type: 'bonus',
-      amount: 50.00,
-      balanceAfter: 1535.00,
-      status: 'completed',
-      description: 'Welcome Bonus',
-      createdAt: DateTime(2025, 3, 7, 12, 0),
-    ),
-    WalletTransaction(
-      id: 'TX-20250306-00121',
-      type: 'payment',
-      amount: -120.00,
-      balanceAfter: 1485.00,
-      status: 'completed',
-      description: 'Silom Branch',
-      createdAt: DateTime(2025, 3, 6, 19, 30),
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final walletService = Provider.of<WalletService>(context, listen: false);
+      walletService.getSettings();
+      walletService.getBalance();
+      walletService.getTransactions(limit: 10);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: ChongjaroenColors.primaryColors,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopActionBar(),
-            Expanded(
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
+    return Consumer<WalletService>(
+      builder: (context, walletService, child) {
+        final wallet = walletService.wallet ?? Wallet();
+        final recentTransactions = walletService.transactions.take(3).toList();
+
+        return Scaffold(
+          backgroundColor: ChongjaroenColors.primaryColors,
+          body: SafeArea(
+            child: Column(
+              children: [
+                _buildTopActionBar(wallet),
+                Expanded(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(24),
+                        topRight: Radius.circular(24),
+                      ),
+                    ),
+                    child: walletService.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 24),
+                                _buildCardBalanceHeader(wallet),
+                                const SizedBox(height: 16),
+                                _buildWalletCard(),
+                                const SizedBox(height: 16),
+                                _buildViewAllCardsButton(),
+                                const SizedBox(height: 24),
+                                _buildPointsRedeemSection(wallet),
+                                const SizedBox(height: 24),
+                                _buildRecentTransactions(recentTransactions),
+                                const SizedBox(height: 24),
+                                _buildBenefitsSection(),
+                                const SizedBox(height: 24),
+                              ],
+                            ),
+                          ),
                   ),
                 ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 24),
-                      _buildCardBalanceHeader(),
-                      const SizedBox(height: 16),
-                      _buildWalletCard(),
-                      const SizedBox(height: 16),
-                      _buildViewAllCardsButton(),
-                      const SizedBox(height: 24),
-                      _buildPointsRedeemSection(),
-                      const SizedBox(height: 24),
-                      _buildRecentTransactions(),
-                      const SizedBox(height: 24),
-                      _buildBenefitsSection(),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildTopActionBar() {
+  Widget _buildTopActionBar(Wallet wallet) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Row(
@@ -129,7 +105,13 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
                 MaterialPageRoute(
                   builder: (context) => const TopUpScreen(),
                 ),
-              );
+              ).then((_) {
+                // Refresh wallet after top-up
+                final walletService =
+                    Provider.of<WalletService>(context, listen: false);
+                walletService.getBalance();
+                walletService.getTransactions(limit: 10);
+              });
             },
           ),
           _buildTopAction(
@@ -199,7 +181,7 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
     );
   }
 
-  Widget _buildCardBalanceHeader() {
+  Widget _buildCardBalanceHeader(Wallet wallet) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
@@ -401,9 +383,14 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
     );
   }
 
-  Widget _buildPointsRedeemSection() {
-    // Calculate conversion rate: 100 points = 10 baht
-    final double conversionRate = wallet.points / 10.0;
+  Widget _buildPointsRedeemSection(Wallet wallet) {
+    final walletService = Provider.of<WalletService>(context, listen: false);
+    final settings = walletService.settings;
+
+    // Use API conversion rate (default: 1 point = 1 baht)
+    final double conversionRate = settings != null
+        ? wallet.points * settings.pointConversion.rate
+        : wallet.points * 1.0;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -548,10 +535,7 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
     );
   }
 
-  Widget _buildRecentTransactions() {
-    // Show only the last 3 transactions
-    final recentList = recentTransactions.take(3).toList();
-
+  Widget _buildRecentTransactions(List<WalletTransaction> recentTransactions) {
     return Column(
       children: [
         Padding(
@@ -589,7 +573,19 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        ...recentList.map((transaction) => _buildTransactionItem(transaction)).toList(),
+        if (recentTransactions.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(32),
+            child: Text(
+              'No transactions yet',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 14,
+              ),
+            ),
+          )
+        else
+          ...recentTransactions.map((transaction) => _buildTransactionItem(transaction)).toList(),
       ],
     );
   }

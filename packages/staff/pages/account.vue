@@ -43,6 +43,12 @@
           </v-sl-button>
         </div>
         <div class="col-12">
+          <v-sl-button type="primary" href="/payment" class="_dp-b _w-100pct _mgbt-12px">
+            <i class="fas fa-wallet _opct-70 _mgr-8px"></i>
+            <span>ชาร์จเงินกระเป๋า</span>
+          </v-sl-button>
+        </div>
+        <div class="col-12">
           <v-sl-button type="primary" href="/bookings" class="_dp-b _w-100pct">
             <i class="fas fa-ticket _opct-70 _mgr-8px"></i>
             <span>รายการจองวันนี้</span>

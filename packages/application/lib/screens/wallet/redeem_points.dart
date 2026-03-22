@@ -1,8 +1,10 @@
 import 'package:chongchana/constants/colors.dart';
 import 'package:chongchana/screens/wallet/redeem_success.dart';
+import 'package:chongchana/services/wallet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class RedeemPointsScreen extends StatefulWidget {
   final int availablePoints;
@@ -22,9 +24,6 @@ class _RedeemPointsScreenState extends State<RedeemPointsScreen> {
   double _cashAmount = 0.0;
   bool _isValid = false;
 
-  // Conversion rate: 100 points = 10 baht
-  static const double conversionRate = 0.1;
-
   @override
   void initState() {
     super.initState();
@@ -39,6 +38,13 @@ class _RedeemPointsScreenState extends State<RedeemPointsScreen> {
 
   void _calculateConversion() {
     setState(() {
+      final walletService = Provider.of<WalletService>(context, listen: false);
+      final settings = walletService.settings;
+
+      // Use API conversion rate (default: 1 point = 1 baht)
+      final conversionRate = settings?.pointConversion.rate ?? 1.0;
+      final minimumRedemption = settings?.pointConversion.minimumRedemption ?? 100;
+
       final inputText = _pointsController.text;
       if (inputText.isEmpty) {
         _pointsToRedeem = 0;
@@ -49,7 +55,7 @@ class _RedeemPointsScreenState extends State<RedeemPointsScreen> {
         _cashAmount = _pointsToRedeem * conversionRate;
         _isValid = _pointsToRedeem > 0 &&
                    _pointsToRedeem <= widget.availablePoints &&
-                   _pointsToRedeem >= 100; // Minimum 100 points
+                   _pointsToRedeem >= minimumRedemption;
       }
     });
   }
@@ -78,6 +84,11 @@ class _RedeemPointsScreenState extends State<RedeemPointsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final walletService = Provider.of<WalletService>(context, listen: false);
+    final settings = walletService.settings;
+    final conversionRate = settings?.pointConversion.rate ?? 1.0;
+    final minimumRedemption = settings?.pointConversion.minimumRedemption ?? 100;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -249,7 +260,7 @@ class _RedeemPointsScreenState extends State<RedeemPointsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Minimum: 100 points',
+                          'Minimum: $minimumRedemption points',
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 12,
@@ -291,7 +302,7 @@ class _RedeemPointsScreenState extends State<RedeemPointsScreen> {
                                 ),
                               ),
                               Text(
-                                '100 pts = ฿10.00',
+                                '1 pt = ฿${_formatAmount(conversionRate)}',
                                 style: TextStyle(
                                   color: Colors.grey.shade700,
                                   fontSize: 14,
@@ -365,7 +376,7 @@ class _RedeemPointsScreenState extends State<RedeemPointsScreen> {
                                 Text(
                                   '• Cash will be added to your wallet immediately\n'
                                   '• Points redemption cannot be reversed\n'
-                                  '• Minimum redemption is 100 points',
+                                  '• Minimum redemption is $minimumRedemption points',
                                   style: TextStyle(
                                     color: Colors.amber.shade900,
                                     fontSize: 12,

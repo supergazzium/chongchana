@@ -1,6 +1,10 @@
+
+import 'dart:async';
 import 'package:chongchana/constants/colors.dart';
+import 'package:chongchana/services/wallet.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class PayScreen extends StatefulWidget {
@@ -11,12 +15,118 @@ class PayScreen extends StatefulWidget {
 }
 
 class _PayScreenState extends State<PayScreen> {
-  final double walletBalance = 1250.00;
-  final String userId = '6179185185694622';
-  final String userName = 'ChongJaroen User';
-  final String cardNumber = '4622';
+  String? _qrToken;
+  DateTime? _qrExpiry;
+  Timer? _refreshTimer;
+  Timer? _countdownTimer;
+  int _secondsRemaining = 900; // 15 minutes
+  bool _isLoading = true;
+  String? _error;
+  Map<String, dynamic>? _qrData;
 
-  String get qrData => 'CHONGJAROEN:WALLET:$userId:BALANCE:${walletBalance.toStringAsFixed(2)}';
+  @override
+  void initState() {
+    super.initState();
+    _initializeQR();
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initializeQR() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final walletService = Provider.of<WalletService>(context, listen: false);
+
+    try {
+      // Fetch wallet balance first
+      await walletService.getBalance();
+
+      // Generate payment QR
+      await _generateQR();
+
+      // Start auto-refresh timer (every 15 minutes)
+      _startRefreshTimer();
+
+      // Start countdown timer (every second)
+      _startCountdownTimer();
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _generateQR() async {
+    final walletService = Provider.of<WalletService>(context, listen: false);
+
+    try {
+      print('[PayScreen] Generating payment QR...');
+
+      final response = await walletService.generatePaymentQR(
+        purpose: 'payment',
+      );
+
+      if (response != null) {
+        setState(() {
+          _qrData = response;
+          _qrToken = response['qrData'] ?? response['token'];
+          _qrExpiry = response['expiresAt'] != null
+              ? DateTime.parse(response['expiresAt'])
+              : DateTime.now().add(const Duration(seconds: 900));
+          _secondsRemaining = 900;
+          _isLoading = false;
+          _error = null;
+        });
+        print('[PayScreen] QR generated successfully');
+        print('[PayScreen] Token: ${_qrToken?.substring(0, 20)}...');
+      } else {
+        setState(() {
+          _error = walletService.error ?? 'Failed to generate QR code';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+      print('[PayScreen] Error generating QR: $e');
+    }
+  }
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 900), (timer) {
+      print('[PayScreen] Auto-refreshing QR code...');
+      _generateQR();
+    });
+  }
+
+  void _startCountdownTimer() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _secondsRemaining = _qrExpiry != null
+            ? _qrExpiry!.difference(DateTime.now()).inSeconds.clamp(0, 900)
+            : _secondsRemaining - 1;
+
+        if (_secondsRemaining < 0) {
+          _secondsRemaining = 0;
+        }
+      });
+    });
+  }
+
+  String get _qrDisplayData => _qrToken ?? 'GENERATING...';
 
   @override
   Widget build(BuildContext context) {
@@ -29,31 +139,44 @@ class _PayScreenState extends State<PayScreen> {
         elevation: 0,
       ),
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            _buildWalletCard(),
-            const SizedBox(height: 16),
-            _buildCardSelector(),
-            const SizedBox(height: 24),
-            _buildCardBalance(),
-            const SizedBox(height: 32),
-            _buildQRCode(),
-            const SizedBox(height: 16),
-            _buildCardNumber(),
-            const SizedBox(height: 12),
-            _buildInstructions(),
-            const SizedBox(height: 24),
-            _buildBenefitsSection(),
-            const SizedBox(height: 32),
-          ],
-        ),
+      body: Consumer<WalletService>(
+        builder: (context, walletService, child) {
+          final wallet = walletService.wallet;
+          final walletBalance = wallet?.balance ?? 0.0;
+          final userId = wallet?.userId.toString() ?? 'Loading...';
+          final userName = _qrData?['user']?['username'] ?? 'User';
+
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                _buildWalletCard(userId),
+                const SizedBox(height: 16),
+                _buildCardSelector(userName, userId),
+                const SizedBox(height: 24),
+                _buildCardBalance(walletBalance),
+                const SizedBox(height: 32),
+                _buildQRCode(),
+                const SizedBox(height: 16),
+                _buildCardNumber(userId),
+                const SizedBox(height: 12),
+                _buildInstructions(),
+                const SizedBox(height: 24),
+                _buildRefreshButton(),
+                const SizedBox(height: 32),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildWalletCard() {
+  Widget _buildWalletCard(String cardNumber) {
+    final lastFour = cardNumber.length > 4
+        ? cardNumber.substring(cardNumber.length - 4)
+        : cardNumber;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
@@ -122,7 +245,7 @@ class _PayScreenState extends State<PayScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '($cardNumber)',
+                          '($lastFour)',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -146,31 +269,22 @@ class _PayScreenState extends State<PayScreen> {
     );
   }
 
-  Widget _buildCardSelector() {
+  Widget _buildCardSelector(String userName, String cardNumber) {
+    final lastFour = cardNumber.length > 4
+        ? cardNumber.substring(cardNumber.length - 4)
+        : cardNumber;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            '$userName ($cardNumber)',
+            '$userName ($lastFour)',
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: Colors.black87,
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              // TODO: Implement card change
-            },
-            child: const Text(
-              'Change',
-              style: TextStyle(
-                color: ChongjaroenColors.secondaryColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
             ),
           ),
         ],
@@ -178,7 +292,7 @@ class _PayScreenState extends State<PayScreen> {
     );
   }
 
-  Widget _buildCardBalance() {
+  Widget _buildCardBalance(double walletBalance) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -208,7 +322,9 @@ class _PayScreenState extends State<PayScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: ChongjaroenColors.secondaryColor.withOpacity(0.1),
+                  color: _secondsRemaining <= 60
+                      ? Colors.red.withOpacity(0.1)
+                      : ChongjaroenColors.secondaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Row(
@@ -216,13 +332,17 @@ class _PayScreenState extends State<PayScreen> {
                     Icon(
                       Icons.refresh,
                       size: 14,
-                      color: ChongjaroenColors.secondaryColor,
+                      color: _secondsRemaining <= 60
+                          ? Colors.red
+                          : ChongjaroenColors.secondaryColor,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '04:59',
+                      '${(_secondsRemaining ~/ 60).toString().padLeft(2, '0')}:${(_secondsRemaining % 60).toString().padLeft(2, '0')}',
                       style: TextStyle(
-                        color: ChongjaroenColors.secondaryColor,
+                        color: _secondsRemaining <= 60
+                            ? Colors.red
+                            : ChongjaroenColors.secondaryColor,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -246,6 +366,71 @@ class _PayScreenState extends State<PayScreen> {
   }
 
   Widget _buildQRCode() {
+    if (_isLoading) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.grey.shade200,
+            width: 1,
+          ),
+        ),
+        child: const SizedBox(
+          height: 220,
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.red.shade200,
+            width: 1,
+          ),
+        ),
+        child: SizedBox(
+          height: 220,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
+                const SizedBox(height: 16),
+                Text(
+                  'Failed to generate QR code',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.red.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _error ?? 'Unknown error',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(32),
@@ -253,15 +438,25 @@ class _PayScreenState extends State<PayScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.grey.shade200,
-          width: 1,
+          color: _secondsRemaining <= 60
+              ? Colors.red.shade200
+              : Colors.grey.shade200,
+          width: _secondsRemaining <= 60 ? 2 : 1,
         ),
       ),
       child: QrImageView(
-        data: qrData,
+        data: _qrDisplayData,
         version: QrVersions.auto,
         size: 220,
         backgroundColor: Colors.white,
+        eyeStyle: QrEyeStyle(
+          eyeShape: QrEyeShape.square,
+          color: _secondsRemaining <= 60 ? Colors.red : Colors.black,
+        ),
+        dataModuleStyle: QrDataModuleStyle(
+          dataModuleShape: QrDataModuleShape.square,
+          color: _secondsRemaining <= 60 ? Colors.red : Colors.black,
+        ),
         errorStateBuilder: (cxt, err) {
           return const Center(
             child: Text(
@@ -274,7 +469,7 @@ class _PayScreenState extends State<PayScreen> {
     );
   }
 
-  Widget _buildCardNumber() {
+  Widget _buildCardNumber(String userId) {
     return Center(
       child: Text(
         userId,
@@ -291,60 +486,46 @@ class _PayScreenState extends State<PayScreen> {
   Widget _buildInstructions() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Text(
-        'Please tell a barista to redeem the reward',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: Colors.grey.shade600,
-          fontSize: 14,
-        ),
+      child: Column(
+        children: [
+          Text(
+            'Show this QR code to staff to pay at stores',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'QR code refreshes automatically every 15 minutes for security',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildBenefitsSection() {
+  Widget _buildRefreshButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: ChongjaroenColors.secondaryColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    '2',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'YOUR BENEFIT(S)',
-                style: TextStyle(
-                  color: Colors.black87,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.grey.shade600,
-              ),
-            ],
+      child: ElevatedButton.icon(
+        onPressed: _isLoading ? null : _generateQR,
+        icon: const Icon(Icons.refresh, size: 20),
+        label: const Text('Refresh QR Code'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: ChongjaroenColors.primaryColors,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
           ),
-        ],
+        ),
       ),
     );
   }

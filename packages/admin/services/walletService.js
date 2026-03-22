@@ -208,4 +208,63 @@ export default ($axios) => ({
       document.body.removeChild(link);
     }
   },
+
+  /**
+   * Get transfer and redemption settings
+   * @returns {Promise} Settings response
+   */
+  async getTransferSettings() {
+    try {
+      const response = await $axios.get('/api/wallet-admin/transfer-settings');
+      return response.data;
+    } catch (error) {
+      console.error('[WalletService] getTransferSettings error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update transfer and redemption settings
+   * @param {object} settings - Settings to update
+   * @returns {Promise} Update response
+   */
+  async updateTransferSettings(settings) {
+    try {
+      const response = await $axios.put('/api/wallet-admin/transfer-settings', settings);
+      return response.data;
+    } catch (error) {
+      console.error('[WalletService] updateTransferSettings error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Validate customer payment QR code (staff side)
+   * @param {string} token - JWT token from customer QR code
+   * @returns {Promise} Validation response with customer info
+   */
+  async validatePaymentQR(token) {
+    try {
+      const response = await $axios.post('/api/wallet/payment-qr/validate', { token });
+      return response.data;
+    } catch (error) {
+      console.error('[WalletService] validatePaymentQR error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Process payment after QR validation (staff side)
+   * @param {object} data - Payment data
+   * @returns {Promise} Payment response
+   */
+  async processQRPayment(data) {
+    try {
+      const response = await $axios.post('/api/wallet/payment-qr/pay', data);
+      return response.data;
+    } catch (error) {
+      console.error('[WalletService] processQRPayment error:', error);
+      throw error;
+    }
+  },
 });

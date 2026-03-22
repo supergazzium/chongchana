@@ -1,3 +1,5 @@
+@use "variables";
+
 /////////////////////////////////////////
 // Font Import
 /////////////////////////////////////////
@@ -92,7 +94,7 @@ sl-button::part(base) {
   line-height: 1 !important;
   padding: 13px 0;
 
-  @media screen and (max-width: $md) {
+  @media screen and (max-width: variables.$md) {
     // font-size: 13px;
   }
 }

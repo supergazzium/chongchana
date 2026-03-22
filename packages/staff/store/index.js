@@ -4,6 +4,9 @@ export const state = () => ({
   scannerData: null,
   pointsData: null,
   toastData: null,
+  paymentData: null,
+  paymentError: null,
+  paymentResult: null,
 })
 
 export const mutations = {

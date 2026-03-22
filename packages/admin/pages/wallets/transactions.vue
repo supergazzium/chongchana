@@ -26,6 +26,8 @@
           <option value="">All Types</option>
           <option value="top_up">Top Up</option>
           <option value="payment">Payment</option>
+          <option value="store_payment">Store Payment (QR)</option>
+          <option value="beer_machine_payment">Beer Machine</option>
           <option value="refund">Refund</option>
           <option value="bonus">Bonus</option>
           <option value="adjustment">Adjustment</option>
@@ -40,6 +42,24 @@
           <option value="failed">Failed</option>
           <option value="cancelled">Cancelled</option>
         </select>
+      </div>
+      <div class="filter-group">
+        <input
+          v-model="filters.staffId"
+          type="text"
+          placeholder="Filter by Staff ID"
+          class="filter-input"
+          @change="loadTransactions"
+        />
+      </div>
+      <div class="filter-group">
+        <input
+          v-model="filters.machineId"
+          type="text"
+          placeholder="Filter by Machine"
+          class="filter-input"
+          @change="loadTransactions"
+        />
       </div>
       <div class="filter-group">
         <input
@@ -72,7 +92,7 @@
             <th>Type</th>
             <th>Amount</th>
             <th>Status</th>
-            <th>Payment Method</th>
+            <th>Processed By</th>
             <th>Date</th>
             <th>Actions</th>
           </tr>
@@ -105,7 +125,19 @@
                 {{ transaction.status }}
               </span>
             </td>
-            <td>{{ transaction.paymentMethod || '-' }}</td>
+            <td>
+              <div v-if="transaction.processedBy" class="processed-by">
+                <div v-if="transaction.processedBy.type === 'staff'" class="staff-info">
+                  <span class="badge staff-badge">Staff</span>
+                  <span>{{ transaction.processedBy.staff.name }}</span>
+                </div>
+                <div v-else-if="transaction.processedBy.type === 'machine'" class="machine-info">
+                  <span class="badge machine-badge">Machine</span>
+                  <span>{{ transaction.processedBy.machineName }}</span>
+                </div>
+              </div>
+              <span v-else class="text-muted">-</span>
+            </td>
             <td>{{ formatDate(transaction.createdAt) }}</td>
             <td class="actions">
               <button @click="showTransactionDetail(transaction)" class="btn-action">
@@ -244,6 +276,8 @@ export default {
         search: '',
         type: '',
         status: '',
+        staffId: '',
+        machineId: '',
         minAmount: '',
         maxAmount: '',
       },
@@ -302,6 +336,8 @@ export default {
         search: '',
         type: '',
         status: '',
+        staffId: '',
+        machineId: '',
         minAmount: '',
         maxAmount: '',
       };

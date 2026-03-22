@@ -9,22 +9,14 @@ const moment = require('moment');
 module.exports = {
   /**
    * Generate unique transaction ID
-   * Format: TX-YYYYMMDD-XXXXX
+   * Format: TX-YYYYMMDD-TIMESTAMP
    * @returns {Promise<string>} Transaction ID
    */
   async generateTransactionId() {
     const date = moment().format('YYYYMMDD');
-    const prefix = `TX-${date}-`;
-
-    // Get count of transactions created today
-    const count = await strapi.connections.default.raw(`
-      SELECT COUNT(*) as count
-      FROM wallet_transactions
-      WHERE id LIKE ?
-    `, [`${prefix}%`]);
-
-    const sequence = String((count[0][0].count || 0) + 1).padStart(5, '0');
-    return `${prefix}${sequence}`;
+    const timestamp = Date.now(); // Use millisecond timestamp for uniqueness
+    const randomSuffix = Math.floor(Math.random() * 1000); // Add random suffix for extra uniqueness
+    return `TX-${date}-${timestamp}${randomSuffix}`;
   },
 
   /**
@@ -132,7 +124,7 @@ module.exports = {
    */
   validateAmount(amount, type = 'top_up') {
     const limits = {
-      top_up: { min: 50, max: 50000 },
+      top_up: { min: 1, max: 50000 },
       withdrawal: { min: 100, max: 10000 },
       payment: { min: 0.01, max: 999999 },
     };

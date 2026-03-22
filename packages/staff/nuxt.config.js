@@ -58,6 +58,8 @@ export default {
     },
     '~/plugins/mixins.js',
     '~/plugins/ssr.js',
+    '~/plugins/axios-public.js',
+    '~/plugins/axios-public-instance.js',
     // '~/plugins/shoelace.js'
   ],
   /*
@@ -113,7 +115,7 @@ export default {
    ** See https://axios.nuxtjs.org/options
    */
   axios: {
-    baseURL: process.env.NUXT_ENV_BASE_URL || 'http://localhost:7000'
+    baseURL: process.env.NUXT_ENV_BASE_URL || 'http://localhost:7001'
   },
   /*
    ** Build configuration

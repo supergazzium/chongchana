@@ -17,6 +17,8 @@ TextStyle textFormStyle = const TextStyle(
 InputDecoration textFormDecoration = const InputDecoration(
   // constraints: BoxConstraints(maxHeight: 90),
   counterText: ' ',
+  filled: true,
+  fillColor: Colors.white,
   contentPadding: EdgeInsets.symmetric(vertical: 4.0, horizontal: 13.0),
   border: OutlineInputBorder(
     borderSide: BorderSide(
@@ -114,6 +116,7 @@ class CJRDropdowntormField extends StatefulWidget {
 
 class _CJRDropdowntormFieldState extends State<CJRDropdowntormField> {
   late String selectedValue;
+
   @override
   void initState() {
     selectedValue = widget.initValue;
@@ -121,11 +124,31 @@ class _CJRDropdowntormFieldState extends State<CJRDropdowntormField> {
   }
 
   @override
+  void didUpdateWidget(CJRDropdowntormField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Check if initValue changed and exists in the new items list
+    if (oldWidget.initValue != widget.initValue) {
+      final valueExists = widget.dropdownItems.any((item) => item.value == widget.initValue);
+      if (valueExists) {
+        setState(() {
+          selectedValue = widget.initValue;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Ensure selectedValue exists in the items list, otherwise use first item
+    final valueExists = widget.dropdownItems.any((item) => item.value == selectedValue);
+    if (!valueExists && widget.dropdownItems.isNotEmpty) {
+      selectedValue = widget.dropdownItems.first.value!;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(widget.labelText ?? "", style: labelFormStyle),
+        if (widget.labelText != null) Text(widget.labelText!, style: labelFormStyle),
         Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 0),
           child: DropdownButtonFormField(
@@ -134,6 +157,7 @@ class _CJRDropdowntormFieldState extends State<CJRDropdowntormField> {
             items: widget.dropdownItems,
             style: textFormStyle,
             decoration: textFormDecoration,
+            dropdownColor: Colors.white,
             onChanged: (String? value) {
               setState(() {
                 selectedValue = value!;

@@ -1,6 +1,7 @@
 'use strict';
 
 const moment = require('moment');
+const Decimal = require('decimal.js');
 const utils = require('./utils');
 
 /**
@@ -67,12 +68,18 @@ module.exports = {
       LIMIT 1
     `, [userId]);
 
+    // Use Decimal.js for precise financial calculations
+    const balance = new Decimal(wallet.balance || 0);
+    const pendingBalance = new Decimal(wallet.pending_balance || 0);
+    const frozenBalance = new Decimal(wallet.frozen_balance || 0);
+    const totalBalance = balance.plus(pendingBalance).plus(frozenBalance);
+
     return {
       userId: wallet.user_id,
-      balance: parseFloat(wallet.balance),
-      pendingBalance: parseFloat(wallet.pending_balance),
-      frozenBalance: parseFloat(wallet.frozen_balance),
-      totalBalance: parseFloat(wallet.balance) + parseFloat(wallet.pending_balance) + parseFloat(wallet.frozen_balance),
+      balance: parseFloat(balance.toFixed(2)),
+      pendingBalance: parseFloat(pendingBalance.toFixed(2)),
+      frozenBalance: parseFloat(frozenBalance.toFixed(2)),
+      totalBalance: parseFloat(totalBalance.toFixed(2)),
       currency: 'THB',
       status: wallet.status,
       points: totalPoints,
@@ -124,35 +131,37 @@ module.exports = {
         throw new Error('WALLET_002');
       }
 
-      const currentBalance = parseFloat(currentWallet.balance);
-      const transactionAmount = parseFloat(amount);
-      const netAmount = transactionAmount - parseFloat(fee);
+      // Use Decimal.js for precise financial calculations
+      const currentBalance = new Decimal(currentWallet.balance || 0);
+      const transactionAmount = new Decimal(amount);
+      const feeAmount = new Decimal(fee || 0);
+      const netAmount = transactionAmount.minus(feeAmount);
 
       // Calculate new balance based on transaction type
       let newBalance = currentBalance;
 
       if (['top_up', 'refund', 'bonus', 'conversion'].includes(type)) {
-        newBalance = currentBalance + netAmount;
+        newBalance = currentBalance.plus(netAmount);
       } else if (['payment', 'withdrawal', 'adjustment'].includes(type)) {
-        if (type === 'adjustment' && transactionAmount < 0) {
+        if (type === 'adjustment' && transactionAmount.isNegative()) {
           // Negative adjustment (deduction)
-          newBalance = currentBalance + transactionAmount; // amount is already negative
+          newBalance = currentBalance.plus(transactionAmount); // amount is already negative
         } else if (type === 'payment' || type === 'withdrawal') {
           // Check sufficient balance
-          if (currentBalance < transactionAmount) {
+          if (currentBalance.lessThan(transactionAmount)) {
             throw new Error('WALLET_001');
           }
-          newBalance = currentBalance - transactionAmount;
-        } else if (type === 'adjustment' && transactionAmount > 0) {
+          newBalance = currentBalance.minus(transactionAmount);
+        } else if (type === 'adjustment' && transactionAmount.isPositive()) {
           // Positive adjustment (addition)
-          newBalance = currentBalance + transactionAmount;
+          newBalance = currentBalance.plus(transactionAmount);
         }
       }
 
       // Generate transaction ID
       const transactionId = await utils.generateTransactionId();
 
-      // Create transaction record
+      // Create transaction record (convert Decimal to string with 2 decimal places)
       await trx.raw(`
         INSERT INTO wallet_transactions (
           id, user_id, type, amount, balance_before, balance_after,
@@ -165,17 +174,17 @@ module.exports = {
         transactionId,
         userId,
         type,
-        transactionAmount,
-        currentBalance,
-        newBalance,
+        transactionAmount.toFixed(2),
+        currentBalance.toFixed(2),
+        newBalance.toFixed(2),
         'completed',
         paymentMethod,
         paymentTransactionId,
         referenceType,
         referenceId,
         description,
-        fee,
-        netAmount,
+        feeAmount.toFixed(2),
+        netAmount.toFixed(2),
         adminId,
         adminReason,
         metadata ? JSON.stringify(metadata) : null,
@@ -188,7 +197,7 @@ module.exports = {
         UPDATE wallets
         SET balance = ?, updated_at = NOW()
         WHERE user_id = ?
-      `, [newBalance, userId]);
+      `, [newBalance.toFixed(2), userId]);
 
       // Create audit log
       await trx.raw(`

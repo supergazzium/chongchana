@@ -7,6 +7,7 @@ class TransferSuccessScreen extends StatefulWidget {
   final String recipientName;
   final String recipientPhone;
   final String note;
+  final String? transferId;
 
   const TransferSuccessScreen({
     Key? key,
@@ -14,6 +15,7 @@ class TransferSuccessScreen extends StatefulWidget {
     required this.recipientName,
     required this.recipientPhone,
     this.note = '',
+    this.transferId,
   }) : super(key: key);
 
   @override

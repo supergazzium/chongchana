@@ -24,7 +24,7 @@ export default {
       },
     ],
     link: [
-      { rel: 'icon', type: 'image/png', href: '/favicon.png' },
+      { rel: 'icon', type: 'image/png', href: '/favicon.png?v=2' },
       // {
       //   rel: 'stylesheet',
       //   href: '/shoelace/themes/base.css'
@@ -116,18 +116,44 @@ export default {
    ** See https://axios.nuxtjs.org/options
    */
   axios: {
-    baseURL: process.env.BASE_URL,
+    baseURL: process.env.BASE_URL || 'http://localhost:1337',
     headers: {
       common: {
-        Authentication: process.env.BASIC_AUTHORIZATION,
+        Authentication: process.env.BASIC_AUTHORIZATION || '',
       },
-    }
+    },
+    // Security: Retry on network errors
+    retry: { retries: 3 },
+    // Security: Enable progress tracking
+    progress: true,
   },
   /*
    ** Build configuration
    ** See https://nuxtjs.org/api/configuration-build/
    */
-  build: {},
+  build: {
+    // Security: Enable source maps in development
+    extend(config, { isDev, isClient }) {
+      if (isDev) {
+        config.devtool = isClient ? 'source-map' : 'inline-source-map'
+      }
+    },
+    // Performance: Optimize images
+    optimizeCSS: true,
+    extractCSS: true,
+  },
+
+  /*
+   ** Security: Render configuration
+   */
+  render: {
+    // Security headers
+    bundleRenderer: {
+      shouldPreload: (file, type) => {
+        return ['script', 'style', 'font'].includes(type)
+      }
+    }
+  },
   vue: {
     config: {
       ignoredElements: [/sl-*/],
@@ -142,5 +168,27 @@ export default {
   },
   server: {
     port: 8080,
+    host: '0.0.0.0', // Allow external access
   },
+
+  /*
+   ** Runtime configuration (Security: Expose only public keys)
+   */
+  publicRuntimeConfig: {
+    axios: {
+      baseURL: process.env.BASE_URL || 'http://localhost:1337'
+    },
+    omise: {
+      publicKey: process.env.OMISE_PUBLIC_KEY || '',
+      defaultPaymentMethod: process.env.OMISE_DEFAULT_PAYMENT_METHOD || 'credit_card',
+      otherPaymentMethods: process.env.OMISE_OTHER_PAYMENT_METHOD || 'promptpay',
+    },
+    gtm: {
+      id: process.env.GTM_ID || ''
+    }
+  },
+
+  privateRuntimeConfig: {
+    // Server-side only variables (if needed)
+  }
 }
