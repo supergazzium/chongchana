@@ -1,8 +1,13 @@
 module.exports = ({ env }) => ({
   upload: {
-    provider: 'local',
+    provider: 'do',
     providerOptions: {
-      sizeLimit: 100000000, // 100 MB
+      key: env('DO_SPACE_ACCESS_KEY'),
+      secret: env('DO_SPACE_SECRET_KEY'),
+      endpoint: env('DO_SPACE_ENDPOINT'),
+      space: env('DO_SPACE_BUCKET'),
+      directory: env('DO_SPACE_DIRECTORY', 'uploads'),
+      cdn: env('DO_SPACE_CDN'),
     },
   },
   email: {
