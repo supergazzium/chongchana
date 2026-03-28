@@ -1,0 +1,17 @@
+name: chongjaroen-backend
+region: sgp
+services:
+  - name: backend
+    source_dir: packages/backend
+    github:
+      branch: main
+      deploy_on_push: true
+    # Explicitly use buildpack (omit dockerfile_path)
+    build_command: npm install && npm run build
+    run_command: npm run start
+    environment_slug: node-js
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    routes:
+      - path: /
