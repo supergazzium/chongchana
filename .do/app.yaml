@@ -6,11 +6,10 @@ services:
     github:
       branch: main
       deploy_on_push: true
-    # Explicitly use buildpack (omit dockerfile_path)
-    # Skip admin build to save memory - admin UI served separately
-    build_command: npm install --production=false
-    run_command: npm run start
-    environment_slug: node-js
+    # Use multi-stage Dockerfile for memory-efficient builds
+    # Build happens on DO servers with plenty of RAM
+    # Runtime uses only 512MB RAM (basic-xxs)
+    dockerfile_path: packages/backend/Dockerfile
     http_port: 8080
     instance_count: 1
     instance_size_slug: basic-xxs
