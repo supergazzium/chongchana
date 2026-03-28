@@ -2,8 +2,7 @@
 
 /**
  * Override strapi-admin bootstrap to handle permission reset errors gracefully
- * This prevents deployment failures when database permissions reference
- * content types that no longer exist in the code
+ * AND skip permission preloading in production to reduce memory usage
  */
 
 module.exports = async () => {
@@ -15,7 +14,13 @@ module.exports = async () => {
 
   const isInitialized = await adminStore.get({ key: 'isInitialized' });
 
-  // If already initialized, skip the entire reset to avoid errors
+  // If already initialized AND in production, skip everything to save memory
+  if (isInitialized && strapi.config.environment === 'production') {
+    strapi.log.info('[Admin Bootstrap Override] Production mode: Skipping permission preloading to reduce memory usage');
+    return;
+  }
+
+  // If already initialized in development, skip the reset
   if (isInitialized) {
     strapi.log.info('[Admin Bootstrap Override] Admin already initialized, skipping all permission resets');
     return;
