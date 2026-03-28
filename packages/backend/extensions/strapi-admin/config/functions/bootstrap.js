@@ -15,17 +15,16 @@ module.exports = async () => {
 
   const isInitialized = await adminStore.get({ key: 'isInitialized' });
 
-  // If already initialized, skip the rest to avoid permission reset issues
+  // If already initialized, skip the entire reset to avoid errors
   if (isInitialized) {
-    strapi.log.info('[Admin Bootstrap] Admin already initialized, skipping permission reset');
+    strapi.log.info('[Admin Bootstrap Override] Admin already initialized, skipping all permission resets');
     return;
   }
 
-  // Only on first initialization
-  try {
-    strapi.log.info('[Admin Bootstrap] First initialization detected, setting up admin...');
+  strapi.log.info('[Admin Bootstrap Override] First initialization - setting up admin with error handling');
 
-    // Create default super admin role if it doesn't exist
+  // Create default super admin role if it doesn't exist
+  try {
     const superAdminRole = await strapi.query('role', 'admin').findOne({ code: 'strapi-super-admin' });
 
     if (!superAdminRole) {
@@ -34,27 +33,34 @@ module.exports = async () => {
         code: 'strapi-super-admin',
         description: 'Super Admins can access and manage all features and settings.',
       });
-      strapi.log.info('[Admin Bootstrap] Created super admin role');
+      strapi.log.info('[Admin Bootstrap Override] Created super admin role');
     }
-
-    // Try to reset permissions, but catch errors gracefully
-    try {
-      const roleService = strapi.admin.services.role;
-      if (roleService && roleService.resetSuperAdminPermissions) {
-        await roleService.resetSuperAdminPermissions();
-        strapi.log.info('[Admin Bootstrap] Super admin permissions reset successfully');
-      }
-    } catch (err) {
-      // Log the error but don't fail the bootstrap
-      strapi.log.warn('[Admin Bootstrap] Could not reset super admin permissions:', err.message);
-      strapi.log.warn('[Admin Bootstrap] This is not critical - continuing bootstrap...');
-    }
-
-    // Mark as initialized
-    await adminStore.set({ key: 'isInitialized', value: true });
-    strapi.log.info('[Admin Bootstrap] Admin initialization complete');
   } catch (err) {
-    strapi.log.error('[Admin Bootstrap] Error during initialization:', err);
-    // Don't throw - allow Strapi to continue starting
+    strapi.log.warn('[Admin Bootstrap Override] Error creating super admin role:', err.message);
+  }
+
+  // Try to reset permissions, but catch ALL errors gracefully
+  try {
+    const roleService = strapi.admin.services.role;
+    if (roleService && roleService.resetSuperAdminPermissions) {
+      strapi.log.info('[Admin Bootstrap Override] Attempting to reset super admin permissions...');
+      await roleService.resetSuperAdminPermissions();
+      strapi.log.info('[Admin Bootstrap Override] ✅ Super admin permissions reset successfully');
+    }
+  } catch (err) {
+    // Log the error but DON'T throw - allow Strapi to continue
+    strapi.log.warn('[Admin Bootstrap Override] ⚠️  Could not reset super admin permissions');
+    strapi.log.warn('[Admin Bootstrap Override] Error:', err.message);
+    strapi.log.warn('[Admin Bootstrap Override] This is not critical - continuing bootstrap...');
+    strapi.log.warn('[Admin Bootstrap Override] You can manually reset permissions from Strapi admin panel later');
+  }
+
+  // Always mark as initialized to prevent future attempts
+  try {
+    await adminStore.set({ key: 'isInitialized', value: true });
+    strapi.log.info('[Admin Bootstrap Override] Admin initialization complete');
+  } catch (err) {
+    strapi.log.error('[Admin Bootstrap Override] Could not save initialization flag:', err.message);
+    // Don't throw - this is not critical
   }
 };

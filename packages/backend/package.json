@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "strapi develop",
     "start": "strapi start",
-    "start:production": "node scripts/clean-admin-permissions.js && strapi start",
     "build": "strapi build",
     "strapi": "strapi",
     "clean:permissions": "node scripts/clean-admin-permissions.js"
