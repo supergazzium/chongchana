@@ -32,6 +32,9 @@ ENV NODE_ENV=production
 # Build Strapi admin panel (memory-intensive step happens here on build server)
 RUN npm run build
 
+# Remove devDependencies to reduce image size (keep only production deps)
+RUN npm prune --production
+
 # =============================================================================
 # Stage 2: Runtime Stage (lean and optimized for 512MB RAM)
 # =============================================================================
@@ -48,17 +51,16 @@ RUN addgroup -g 1001 -S strapi && \
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files for reference
 COPY package.json package-lock.json ./
 
-# Install ONLY production dependencies (no devDependencies)
-RUN npm install --production && \
-    npm cache clean --force
+# Copy node_modules from builder (already built with all native bindings)
+COPY --from=builder --chown=strapi:strapi /app/node_modules ./node_modules
 
 # Copy built admin panel from builder stage
 COPY --from=builder --chown=strapi:strapi /app/build ./build
 
-# Copy source code (excluding node_modules)
+# Copy source code
 COPY --chown=strapi:strapi . .
 
 # Create runtime directories that Strapi needs and set ownership
