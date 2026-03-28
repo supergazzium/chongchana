@@ -1,6 +1,10 @@
 # Stage 1: Build Stage
 FROM node:14.21.3-alpine AS builder
 
+# Accept build arguments
+ARG BASE_URL
+ENV BASE_URL=${BASE_URL}
+
 WORKDIR /app
 
 # Copy package files
@@ -12,7 +16,7 @@ RUN npm install
 # Copy application files
 COPY . .
 
-# Build Nuxt application
+# Build Nuxt application with BASE_URL
 RUN npm run build
 
 # Prune dev dependencies
