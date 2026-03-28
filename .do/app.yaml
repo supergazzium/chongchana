@@ -7,7 +7,8 @@ services:
       branch: main
       deploy_on_push: true
     # Explicitly use buildpack (omit dockerfile_path)
-    build_command: npm install && npm run build
+    # Skip admin build to save memory - admin UI served separately
+    build_command: npm install --production=false
     run_command: npm run start
     environment_slug: node-js
     http_port: 8080
