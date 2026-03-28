@@ -1,2 +1,15 @@
 .env.*
 chongjaroen-master.zip
+
+# Database backups and exports
+*.sql
+database/
+database-backups/
+
+# Test and debug scripts
+**/test-*.js
+**/check-*.js
+**/*-test.js
+**/fix-*.js
+**/delete-*.js
+
