@@ -1,51 +1,62 @@
-# ============================================
-# Admin Dashboard (Nuxt SSR) - Production Dockerfile
-# ============================================
-
-FROM node:18.19.0-alpine AS builder
+# Stage 1: Build Stage
+FROM node:14.21.3-alpine AS builder
 
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json package-lock.json* ./
 
 # Install dependencies
-RUN npm ci && npm cache clean --force
+RUN npm install
 
-# Copy source code
+# Copy application files
 COPY . .
 
-# Build Nuxt for production (SSR mode)
-ENV NODE_ENV=production
+# Build Nuxt application
 RUN npm run build
 
-# ============================================
-# Production Runtime
-# ============================================
-FROM node:18.19.0-alpine
+# Prune dev dependencies
+RUN npm prune --production
+
+# Stage 2: Runtime Stage
+FROM node:14.21.3-alpine
+
+# Add tini for proper signal handling
+RUN apk add --no-cache tini
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nuxt -u 1001
+RUN addgroup -g 1001 -S nuxt && \
+    adduser -S -u 1001 -G nuxt nuxt
 
 WORKDIR /app
 
-# Copy built application
-COPY --from=builder --chown=nuxt:nodejs /app/.nuxt ./.nuxt
-COPY --from=builder --chown=nuxt:nodejs /app/static ./static
-COPY --from=builder --chown=nuxt:nodejs /app/nuxt.config.js ./
-COPY --from=builder --chown=nuxt:nodejs /app/package*.json ./
-COPY --from=builder --chown=nuxt:nodejs /app/node_modules ./node_modules
+# Copy package files
+COPY package.json package-lock.json* ./
 
-# Switch to non-root user
+# Copy node_modules from builder
+COPY --from=builder --chown=nuxt:nuxt /app/node_modules ./node_modules
+
+# Copy built application
+COPY --from=builder --chown=nuxt:nuxt /app/.nuxt ./.nuxt
+COPY --from=builder --chown=nuxt:nuxt /app/static ./static
+
+# Copy nuxt config and other necessary files
+COPY --chown=nuxt:nuxt nuxt.config.js ./
+COPY --chown=nuxt:nuxt . .
+
+# Create .nuxt directory with proper permissions
+RUN mkdir -p .nuxt && chown -R nuxt:nuxt /app
+
 USER nuxt
 
-# Expose port
-EXPOSE 3000
+EXPOSE 4040
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=4040
 
-# Start Nuxt
-CMD ["npm", "start"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:4040', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["npm", "run", "start"]

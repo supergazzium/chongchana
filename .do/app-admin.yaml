@@ -1,0 +1,32 @@
+alerts:
+- rule: DEPLOYMENT_FAILED
+- rule: DOMAIN_FAILED
+name: chongjaroen-admin
+region: sgp
+services:
+- dockerfile_path: packages/admin/Dockerfile
+  envs:
+  - key: HOST
+    scope: RUN_AND_BUILD_TIME
+    value: 0.0.0.0
+  - key: PORT
+    scope: RUN_AND_BUILD_TIME
+    value: "4040"
+  - key: NODE_ENV
+    scope: RUN_AND_BUILD_TIME
+    value: production
+  - key: BASE_URL
+    scope: RUN_AND_BUILD_TIME
+    value: https://wallet-backend-test-pc-ndd56.ondigitalocean.app
+  - key: TZ
+    scope: RUN_AND_BUILD_TIME
+    value: Asia/Bangkok
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: supergazzium/chongchana
+  http_port: 4040
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  name: chongjaroen-admin
+  source_dir: packages/admin
