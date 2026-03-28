@@ -41,9 +41,9 @@ RUN apk add --no-cache \
     vips-dev \
     tini
 
-# Create app user for security
-RUN addgroup -g 1001 -S strapi && \
-    adduser -S -u 1001 -G strapi strapi
+# Create app user for security (UID 1000 for compatibility with host volumes)
+RUN addgroup -g 1000 -S strapi && \
+    adduser -S -u 1000 -G strapi strapi
 
 WORKDIR /app
 
@@ -59,6 +59,10 @@ COPY --from=builder --chown=strapi:strapi /app/build ./build
 
 # Copy source code (excluding node_modules)
 COPY --chown=strapi:strapi . .
+
+# Create runtime directories that Strapi needs and set ownership
+RUN mkdir -p .cache public/uploads && \
+    chown -R strapi:strapi /app
 
 # Switch to non-root user
 USER strapi
