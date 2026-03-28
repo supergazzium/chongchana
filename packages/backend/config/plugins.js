@@ -1,4 +1,10 @@
 module.exports = ({ env }) => ({
+  upload: {
+    provider: 'local',
+    providerOptions: {
+      sizeLimit: 100000000, // 100 MB
+    },
+  },
   email: {
     provider: 'nodemailer',
     providerOptions: {
