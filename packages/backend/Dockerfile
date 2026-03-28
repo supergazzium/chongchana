@@ -17,10 +17,11 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json package-lock.json ./
 
 # Install ALL dependencies (including devDependencies for build)
-RUN npm ci
+# Use npm install instead of npm ci for more flexibility
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -48,10 +49,10 @@ RUN addgroup -g 1000 -S strapi && \
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json package-lock.json ./
 
 # Install ONLY production dependencies (no devDependencies)
-RUN npm ci --only=production && \
+RUN npm install --production && \
     npm cache clean --force
 
 # Copy built admin panel from builder stage
