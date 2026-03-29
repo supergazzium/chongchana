@@ -25,18 +25,17 @@ RUN npm run build
 # ============================================
 FROM nginx:alpine
 
-# Copy custom nginx config
-COPY --from=builder /app/nginx.conf /etc/nginx/conf.d/default.conf 2>/dev/null || \
-    echo 'server { \
-        listen 80; \
-        root /usr/share/nginx/html; \
-        index index.html; \
-        location / { \
-            try_files $uri $uri/ /index.html; \
-        } \
-        gzip on; \
-        gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript; \
-    }' > /etc/nginx/conf.d/default.conf
+# Create nginx config
+RUN echo "server {" > /etc/nginx/conf.d/default.conf && \
+    echo "    listen 80;" >> /etc/nginx/conf.d/default.conf && \
+    echo "    root /usr/share/nginx/html;" >> /etc/nginx/conf.d/default.conf && \
+    echo "    index index.html;" >> /etc/nginx/conf.d/default.conf && \
+    echo "    location / {" >> /etc/nginx/conf.d/default.conf && \
+    echo "        try_files \$uri \$uri/ /index.html;" >> /etc/nginx/conf.d/default.conf && \
+    echo "    }" >> /etc/nginx/conf.d/default.conf && \
+    echo "    gzip on;" >> /etc/nginx/conf.d/default.conf && \
+    echo "    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;" >> /etc/nginx/conf.d/default.conf && \
+    echo "}" >> /etc/nginx/conf.d/default.conf
 
 # Copy built static files
 COPY --from=builder /app/dist /usr/share/nginx/html
