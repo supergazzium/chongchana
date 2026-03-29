@@ -1,15 +1,6 @@
 {
   "routes": [
     {
-      "method": "POST",
-      "path": "/wallet/setup",
-      "handler": "setup.runSetup",
-      "config": {
-        "policies": [],
-        "auth": false
-      }
-    },
-    {
       "method": "GET",
       "path": "/wallet/balance",
       "handler": "wallet.getBalance",
