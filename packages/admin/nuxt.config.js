@@ -105,6 +105,9 @@ export default {
           property: 'jwt',
           type: 'Bearer',
           name: 'Authorization',
+          global: true,
+          required: true,
+          maxAge: 60 * 60 * 24 * 30, // 30 days
         },
         endpoints: {
           login: {
@@ -124,6 +127,14 @@ export default {
         },
       },
     },
+    cookie: {
+      prefix: 'auth.',
+      options: {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+      }
+    },
+    localStorage: false,
   },
   server: {
     // host: '0.0.0.0',
