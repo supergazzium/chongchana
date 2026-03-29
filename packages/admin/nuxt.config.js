@@ -103,6 +103,8 @@ export default {
       local: {
         token: {
           property: 'jwt',
+          type: 'Bearer',
+          name: 'Authorization',
         },
         endpoints: {
           login: {
