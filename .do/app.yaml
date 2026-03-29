@@ -91,7 +91,7 @@ services:
     value: https://chongjaroen-assets.sgp1.cdn.digitaloceanspaces.com
   - key: CORS_ORIGIN
     scope: RUN_AND_BUILD_TIME
-    value: https://wallet-admin-testing-pc-j48x5.ondigitalocean.app
+    value: https://wallet-admin-testing-pc-j48x5.ondigitalocean.app,https://wallet-staff-testing-pc-b9lkt.ondigitalocean.app
   - key: NODE_OPTIONS
     scope: RUN_AND_BUILD_TIME
     value: --max-old-space-size=896
