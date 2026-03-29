@@ -1,0 +1,32 @@
+name: wallet-website-test-pc
+region: sgp
+services:
+- name: chongchana-packages-website
+  dockerfile_path: packages/website/Dockerfile
+  source_dir: packages/website
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: supergazzium/chongchana
+  envs:
+  - key: BASE_URL
+    scope: BUILD_TIME
+    value: https://wallet-backend-test-pc-ndd56.ondigitalocean.app
+  - key: NODE_ENV
+    scope: BUILD_TIME
+    value: production
+  - key: OMISE_PUBLIC_KEY
+    scope: BUILD_TIME
+    value: pkey_5tuer3rmwoxiudi0d04
+  - key: OMISE_DEFAULT_PAYMENT_METHOD
+    scope: BUILD_TIME
+    value: credit_card
+  - key: OMISE_OTHER_PAYMENT_METHOD
+    scope: BUILD_TIME
+    value: promptpay
+  - key: GTM_ID
+    scope: BUILD_TIME
+    value: ""
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-0.5gb

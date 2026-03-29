@@ -1,7 +1,7 @@
 # ============================================
-# Website (Nuxt SSG) - Production Dockerfile
+# Website (Nuxt SSR) - Production Dockerfile
 # ============================================
-# Static site served by nginx
+# Server-Side Rendering with Node.js
 
 FROM node:18.19.0-alpine AS builder
 
@@ -16,37 +16,54 @@ RUN npm ci && npm cache clean --force
 # Copy source code
 COPY . .
 
-# Build static site
-ENV NODE_ENV=production
+# Accept build-time environment variables from Digital Ocean
+ARG BASE_URL
+ARG NODE_ENV=production
+ARG OMISE_PUBLIC_KEY
+ARG OMISE_DEFAULT_PAYMENT_METHOD=credit_card
+ARG OMISE_OTHER_PAYMENT_METHOD=promptpay
+ARG GTM_ID
+
+# Set as environment variables for the build
+ENV BASE_URL=$BASE_URL
+ENV NODE_ENV=$NODE_ENV
+ENV OMISE_PUBLIC_KEY=$OMISE_PUBLIC_KEY
+ENV OMISE_DEFAULT_PAYMENT_METHOD=$OMISE_DEFAULT_PAYMENT_METHOD
+ENV OMISE_OTHER_PAYMENT_METHOD=$OMISE_OTHER_PAYMENT_METHOD
+ENV GTM_ID=$GTM_ID
+
+# Build for SSR (not static)
 RUN npm run build
 
 # ============================================
-# Production Runtime with Nginx
+# Production Runtime
 # ============================================
-FROM nginx:alpine
+FROM node:18.19.0-alpine
 
-# Copy custom nginx config
-COPY --from=builder /app/nginx.conf /etc/nginx/conf.d/default.conf 2>/dev/null || \
-    echo 'server { \
-        listen 80; \
-        root /usr/share/nginx/html; \
-        index index.html; \
-        location / { \
-            try_files $uri $uri/ /index.html; \
-        } \
-        gzip on; \
-        gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript; \
-    }' > /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-# Copy built static files
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies only
+RUN npm ci --production && npm cache clean --force
+
+# Copy built files from builder
+COPY --from=builder /app/.nuxt ./.nuxt
+COPY --from=builder /app/static ./static
+COPY --from=builder /app/nuxt.config.js ./nuxt.config.js
+
+# Set runtime environment variables
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=8080
 
 # Expose port
-EXPOSE 80
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+    CMD wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start Nuxt server
+CMD ["npm", "run", "start"]
