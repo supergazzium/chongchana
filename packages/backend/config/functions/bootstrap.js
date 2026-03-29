@@ -61,8 +61,9 @@ module.exports = async () => {
 
   strapi.log.info('[Bootstrap] Loading permissions (this may take a moment with large databases)...');
 
-  // Set permissions for public role to access staffSignin
-  const publicRole = await strapi.query('role', 'users-permissions').findOne({ type: 'public' });
+  try {
+    // Set permissions for public role to access staffSignin
+    const publicRole = await strapi.query('role', 'users-permissions').findOne({ type: 'public' });
 
   if (publicRole) {
     const publicPermissions = await strapi.query('permission', 'users-permissions').find({ role: publicRole.id });
@@ -341,5 +342,10 @@ module.exports = async () => {
     }
 
     strapi.log.info('[Bootstrap] Wallet permissions configuration completed');
+  }
+  } catch (error) {
+    strapi.log.error('[Bootstrap] Error during permission setup:', error.message);
+    strapi.log.error('[Bootstrap] Stack:', error.stack);
+    strapi.log.warn('[Bootstrap] Continuing startup despite error...');
   }
 };
