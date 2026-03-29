@@ -89,7 +89,7 @@
 </template>
 
 <script>
-import vSlButton from "../../../admin/components/vSlButton.vue";
+import vSlButton from "~/components/vSlButton.vue";
 
 export default {
   components: { vSlButton },
