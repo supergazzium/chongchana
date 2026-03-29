@@ -16,8 +16,15 @@ RUN npm ci && npm cache clean --force
 # Copy source code
 COPY . .
 
+# Accept build-time environment variables from Digital Ocean
+ARG NUXT_ENV_BASE_URL
+ARG NODE_ENV=production
+
+# Set as environment variables for the build
+ENV NUXT_ENV_BASE_URL=$NUXT_ENV_BASE_URL
+ENV NODE_ENV=$NODE_ENV
+
 # Build static site
-ENV NODE_ENV=production
 RUN npm run build
 
 # ============================================
