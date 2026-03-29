@@ -24,7 +24,7 @@ module.exports = async (ctx, next) => {
 
   // Check for admin privileges
   const roleType = (fullUser.role.type || fullUser.role.name || '').toLowerCase();
-  const allowedRoles = ['admin', 'superadmin', 'super-admin'];
+  const allowedRoles = ['admin', 'superadmin', 'super-admin', 'staff'];
   const isAdmin = allowedRoles.some(role => roleType.includes(role));
 
   if (!isAdmin) {
