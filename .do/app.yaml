@@ -33,13 +33,13 @@ services:
     value: production
   - key: DATABASE_HOST
     scope: RUN_AND_BUILD_TIME
-    value: chongjaroen-mysql-prod-do-user-10174906-0.b.db.ondigitalocean.com
+    value: db-mysql-sgp1-51509-do-user-10174906-0.g.db.ondigitalocean.com
   - key: DATABASE_PORT
     scope: RUN_AND_BUILD_TIME
     value: "25060"
   - key: DATABASE_NAME
     scope: RUN_AND_BUILD_TIME
-    value: chongjaroen
+    value: defaultdb
   - key: DATABASE_USERNAME
     scope: RUN_AND_BUILD_TIME
     value: doadmin
