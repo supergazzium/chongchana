@@ -10,7 +10,7 @@ module.exports = ({ env }) => ({
       headers: ['Content-Type', 'Authorization', 'X-Frame-Options', 'Authentication'],
     },
     'wallet-admin-auth': {
-      enabled: true,
+      enabled: false,
     },
     'payment-qr-public': {
       enabled: true,

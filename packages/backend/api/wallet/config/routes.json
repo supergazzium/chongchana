@@ -110,7 +110,7 @@
       "path": "/api/wallet-admin/wallets",
       "handler": "admin.listWallets",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -118,7 +118,7 @@
       "path": "/api/wallet-admin/wallet/:userId",
       "handler": "admin.getWalletDetail",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -126,7 +126,7 @@
       "path": "/api/wallet-admin/wallet/adjust",
       "handler": "admin.adjustBalance",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -134,7 +134,7 @@
       "path": "/api/wallet-admin/wallet/freeze",
       "handler": "admin.freezeWallet",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -142,7 +142,7 @@
       "path": "/api/wallet-admin/wallet/transactions",
       "handler": "admin.getAllTransactions",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -150,7 +150,7 @@
       "path": "/api/wallet-admin/wallet/refund",
       "handler": "admin.refundTransaction",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -158,7 +158,7 @@
       "path": "/api/wallet-admin/wallet/reports",
       "handler": "admin.getReports",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -166,7 +166,7 @@
       "path": "/api/wallet-admin/wallet/voucher/create",
       "handler": "admin.createVoucher",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -174,7 +174,7 @@
       "path": "/api/wallet-admin/transfer-settings",
       "handler": "admin.getTransferSettings",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -182,7 +182,7 @@
       "path": "/api/wallet-admin/transfer-settings",
       "handler": "admin.updateTransferSettings",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
