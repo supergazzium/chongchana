@@ -97,7 +97,7 @@ services:
     value: --max-old-space-size=896
   - key: SKIP_PERMISSION_BOOTSTRAP
     scope: RUN_AND_BUILD_TIME
-    value: "false"
+    value: "true"
   - key: TZ
     scope: RUN_AND_BUILD_TIME
     value: Asia/Bangkok
