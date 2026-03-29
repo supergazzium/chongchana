@@ -1,17 +1,115 @@
-name: chongjaroen-backend
+alerts:
+- rule: DEPLOYMENT_FAILED
+- rule: DOMAIN_FAILED
+databases:
+- cluster_name: db-mysql-sgp1-51509
+  db_name: defaultdb
+  db_user: doadmin
+  engine: MYSQL
+  name: db-mysql-sgp1-51509
+  production: true
+ingress:
+  rules:
+  - component:
+      name: chongchana-packages-backend
+    match:
+      authority:
+        exact: ""
+      path:
+        prefix: /
+name: wallet-backend-test-pc
 region: sgp
 services:
-  - name: backend
-    source_dir: packages/backend
-    github:
-      branch: main
-      deploy_on_push: true
-    # Use multi-stage Dockerfile for memory-efficient builds
-    # Build happens on DO servers with plenty of RAM
-    # Runtime uses only 512MB RAM (basic-xxs)
-    dockerfile_path: packages/backend/Dockerfile
-    http_port: 8080
-    instance_count: 1
-    instance_size_slug: basic-xxs
-    routes:
-      - path: /
+- dockerfile_path: packages/backend/Dockerfile
+  envs:
+  - key: HOST
+    scope: RUN_AND_BUILD_TIME
+    value: 0.0.0.0
+  - key: NODE_PORT
+    scope: RUN_AND_BUILD_TIME
+    value: "8080"
+  - key: NODE_ENV
+    scope: RUN_AND_BUILD_TIME
+    value: production
+  - key: DATABASE_HOST
+    scope: RUN_AND_BUILD_TIME
+    value: chongjaroen-mysql-prod-do-user-10174906-0.b.db.ondigitalocean.com
+  - key: DATABASE_PORT
+    scope: RUN_AND_BUILD_TIME
+    value: "25060"
+  - key: DATABASE_NAME
+    scope: RUN_AND_BUILD_TIME
+    value: chongjaroen
+  - key: DATABASE_USERNAME
+    scope: RUN_AND_BUILD_TIME
+    value: doadmin
+  - key: DATABASE_PASSWORD
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:LKchEZCNLmD4C7yP+/bfMWRuSYob0CbJ:L9i5D4kc1rRiyv/i4q+y5OWJWJ2lp+fb6u2+7nY+C3I=]
+  - key: DATABASE_SSL
+    scope: RUN_AND_BUILD_TIME
+    value: "true"
+  - key: ADMIN_JWT_SECRET
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:Ei3BCJMObZzxQlgt17jWSw6wgcP3yzHP:FpFs1ld3jiF10h6tVsULu1l+SyRFAnNGHbxjwwk5C9xLCD/XgwQWs9vsiW1UznSHLZXgjNfsFTDZQ0GJCqBTxUFnvdJ08VYG5DwyjsGKQDRmSz68catB+6i684DXj9ex3Wvu+UbFe02X5QBMktkoZrtV5utTjAjeRXE6DhsC0oIydSuBqm8qcV2SkZPPxsaV]
+  - key: JWT_SECRET
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:G7pg1J0/lQw8oD6jgu5MaGEFHVIq0gJG:cBy/J1diyRHwGF9wYXO2JVpzlr/F8C9JepS7bT4WmKxa2isAR+N7gntQWcgGglcBg7eSr04QkuEDj5KU67EhDYyjw/B8MccpTr8WDedrp2vYCzindfMel2jifDAGFvsItr09YcYddrHiuDDpHX+lQfLeNGuxSiEWb4Bhc5sbDHaO+P9VBUt7PTrWXAQF7tk+]
+  - key: OMISE_SECRET_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:zxfPUFj1rHomQ9p0ndGuMM2w7MAQVDiU:jxOcLup3g+ZBut5WpFHEhaO9cmwu6tVfoKc9PCZ9FCH1bkmPOtIRAg==]
+  - key: OMISE_PUBLIC_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:iMx1uFCHAebsh+gvSwGSgpYmPsNuzRLJ:D4qn0z5xcyI19UgXaJ/+pAx7xM/grG8dEfJG0ZL15axrt17SGD5o2A==]
+  - key: OMISE_PROMPT_PAY_EXPIRE
+    scope: RUN_AND_BUILD_TIME
+    value: "15"
+  - key: DO_SPACE_ACCESS_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:2gB5suVNAKCmUjtQTTZRxJ7C7WxQmhY7:RqeYgusP3u9bSxp25jPFo107lnZuvLgL/rk3LEI3PuLhae6g]
+  - key: DO_SPACE_SECRET_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:BYeKk4MM7R44u3yXlQL4GKrMdV/wF8Vg:GCaM6h+YY4oSqXghtp7maMF4cbJStC5pWRwMXrym1MBcDuotBTC3dWf/Uc2JvtT8adj+lZxm1GlTTCQ=]
+  - key: DO_SPACE_ENDPOINT
+    scope: RUN_AND_BUILD_TIME
+    value: sgp1.digitaloceanspaces.com
+  - key: DO_SPACE_BUCKET
+    scope: RUN_AND_BUILD_TIME
+    value: chongjaroen-assets
+  - key: DO_SPACE_DIRECTORY
+    scope: RUN_AND_BUILD_TIME
+    value: uploads
+  - key: DO_SPACE_CDN
+    scope: RUN_AND_BUILD_TIME
+    value: https://chongjaroen-assets.sgp1.cdn.digitaloceanspaces.com
+  - key: CORS_ORIGIN
+    scope: RUN_AND_BUILD_TIME
+    value: https://wallet-admin-testing-pc-j48x5.ondigitalocean.app
+  - key: NODE_OPTIONS
+    scope: RUN_AND_BUILD_TIME
+    value: --max-old-space-size=896
+  - key: SKIP_PERMISSION_BOOTSTRAP
+    scope: RUN_AND_BUILD_TIME
+    value: "true"
+  - key: TZ
+    scope: RUN_AND_BUILD_TIME
+    value: Asia/Bangkok
+  - key: DATABASE_URL
+    scope: RUN_TIME
+    value: ${production-database.DATABASE_URL}
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: supergazzium/chongchana
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  name: chongchana-packages-backend
+  source_dir: packages/backend

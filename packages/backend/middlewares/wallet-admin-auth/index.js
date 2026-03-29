@@ -12,7 +12,8 @@ module.exports = strapi => {
       strapi.app.use(async (ctx, next) => {
         // Apply to wallet admin routes
         if (ctx.request.url.startsWith('/wallet-admin/') ||
-            ctx.request.url.startsWith('/api/admin/wallet')) {
+            ctx.request.url.startsWith('/api/admin/wallet') ||
+            ctx.request.url.startsWith('/api/wallet-admin/')) {
 
           const user = ctx.state.user;
 
