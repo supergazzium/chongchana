@@ -114,6 +114,7 @@ module.exports = async () => {
     const paymentActions = ['getpaymentmethods', 'createtoken', 'createchargefromtoken', 'createpaymentsource', 'checkpaymentstatus'];
     const transferActions = ['lookupuser', 'initiatetransfer', 'gettransferhistory', 'gettransferdetails'];
     const paymentQRActions = ['generatepaymentqr', 'validatepaymentqr', 'processpayment', 'getpaymenthistory'];
+    const walletAdminActions = ['listwallets', 'getwalletdetail', 'adjustbalance', 'freezewallet', 'getalltransactions', 'refundtransaction', 'getreports', 'createvoucher', 'gettransfersettings', 'updatetransfersettings', 'getalltransfers', 'getallpointredemptions', 'canceltransfer', 'approvepointredemption', 'rejectpointredemption'];
 
     // Check if wallet permissions exist, if not create them
     const walletPermissions = authenticatedPermissions.filter(p =>
@@ -261,6 +262,34 @@ module.exports = async () => {
     } else {
       strapi.log.info(`[Bootstrap] Found ${paymentQRPermissions.length} payment-qr permissions:`,
         paymentQRPermissions.map(p => `${p.controller}.${p.action} (enabled: ${p.enabled})`));
+    }
+
+    // Check if wallet-admin permissions exist, if not create them
+    const adminPermissions = authenticatedPermissions.filter(p =>
+      (p.controller || '').toLowerCase() === 'admin' && p.plugin === 'application::wallet.wallet'
+    );
+
+    if (adminPermissions.length === 0) {
+      strapi.log.info('[Bootstrap] No wallet-admin permissions found in database, creating them...');
+
+      // Create wallet-admin permissions for authenticated role
+      const adminActionsToCreate = ['listWallets', 'getWalletDetail', 'adjustBalance', 'freezeWallet', 'getAllTransactions', 'refundTransaction', 'getReports', 'createVoucher', 'getTransferSettings', 'updateTransferSettings', 'getAllTransfers', 'getAllPointRedemptions', 'cancelTransfer', 'approvePointRedemption', 'rejectPointRedemption'];
+
+      for (const action of adminActionsToCreate) {
+        await strapi.query('permission', 'users-permissions').create({
+          type: 'application',
+          controller: 'admin',
+          action: action.toLowerCase(),
+          enabled: true,
+          policy: '',
+          role: authenticatedRole.id,
+          plugin: 'application::wallet.wallet',
+        });
+        strapi.log.info(`✅ Created and enabled permission: admin.${action.toLowerCase()}`);
+      }
+    } else {
+      strapi.log.info(`[Bootstrap] Found ${adminPermissions.length} wallet-admin permissions:`,
+        adminPermissions.map(p => `${p.controller}.${p.action} (enabled: ${p.enabled})`));
     }
 
     // Create PUBLIC role permissions for validatePaymentQR and processPayment
