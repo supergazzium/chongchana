@@ -110,7 +110,7 @@
       "path": "/api/wallet-admin/wallets",
       "handler": "admin.listWallets",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -118,7 +118,7 @@
       "path": "/api/wallet-admin/wallet/:userId",
       "handler": "admin.getWalletDetail",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -126,7 +126,7 @@
       "path": "/api/wallet-admin/wallet/adjust",
       "handler": "admin.adjustBalance",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -134,7 +134,7 @@
       "path": "/api/wallet-admin/wallet/freeze",
       "handler": "admin.freezeWallet",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -142,7 +142,7 @@
       "path": "/api/wallet-admin/wallet/transactions",
       "handler": "admin.getAllTransactions",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -150,15 +150,15 @@
       "path": "/api/wallet-admin/wallet/refund",
       "handler": "admin.refundTransaction",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
       "method": "GET",
-      "path": "/api/wallet-admin/wallet/reports",
+      "path": "/api/wallet-admin/reports",
       "handler": "admin.getReports",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -166,7 +166,7 @@
       "path": "/api/wallet-admin/wallet/voucher/create",
       "handler": "admin.createVoucher",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -174,7 +174,7 @@
       "path": "/api/wallet-admin/transfer-settings",
       "handler": "admin.getTransferSettings",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
       }
     },
     {
@@ -182,7 +182,47 @@
       "path": "/api/wallet-admin/transfer-settings",
       "handler": "admin.updateTransferSettings",
       "config": {
-        "policies": []
+        "policies": ["isWalletAdmin"]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet-admin/transfers",
+      "handler": "admin.getAllTransfers",
+      "config": {
+        "policies": ["isWalletAdmin"]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/wallet-admin/point-redemptions",
+      "handler": "admin.getAllPointRedemptions",
+      "config": {
+        "policies": ["isWalletAdmin"]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/transfer/cancel",
+      "handler": "admin.cancelTransfer",
+      "config": {
+        "policies": ["isWalletAdmin"]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/point-redemption/approve",
+      "handler": "admin.approvePointRedemption",
+      "config": {
+        "policies": ["isWalletAdmin"]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/point-redemption/reject",
+      "handler": "admin.rejectPointRedemption",
+      "config": {
+        "policies": ["isWalletAdmin"]
       }
     },
     {
