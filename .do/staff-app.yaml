@@ -1,0 +1,21 @@
+name: wallet-staff-test-pc
+region: sgp
+static_sites:
+- name: chongchana-packages-staff
+  dockerfile_path: packages/staff/Dockerfile
+  source_dir: packages/staff
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: supergazzium/chongchana
+  environment_slug: node-js
+  envs:
+  - key: NUXT_ENV_BASE_URL
+    scope: BUILD_TIME
+    value: https://wallet-backend-test-pc-ndd56.ondigitalocean.app
+  - key: NODE_ENV
+    scope: BUILD_TIME
+    value: production
+  http_port: 80
+  routes:
+  - path: /
