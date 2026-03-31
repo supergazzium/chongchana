@@ -6,6 +6,7 @@
  */
 
 const { sendPushNotification } = require('../../helpers');
+const notificationService = require('./notification');
 
 // Create TWO Omise clients according to best practices:
 // 1. Public key client for creating sources (PromptPay, Mobile Banking)
@@ -244,28 +245,16 @@ module.exports = {
       // Send push notification for successful top-up
       try {
         const paymentMethod = charge.source?.type || 'credit_card';
-        const methodName = paymentMethod === 'promptpay' ? 'PromptPay' :
-                          paymentMethod.startsWith('mobile_banking_') ? 'Mobile Banking' :
-                          'Credit Card';
-
-        await sendPushNotification({
-          content: `Your wallet has been topped up with ฿${amount.toFixed(2)} via ${methodName}`,
-          heading: 'Top-up Successful',
-          external_ids: [userId.toString()],
-          additionalData: {
-            type: 'wallet_topup',
-            transactionId,
-            amount,
-            paymentMethod,
-            chargeId,
-            timestamp: new Date().toISOString(),
-          },
-        });
-
-        strapi.log.info('[Payment] Push notification sent for top-up:', userId);
+        await notificationService.sendTopUpSuccessNotification(
+          userId,
+          amount,
+          paymentMethod,
+          chargeId
+        );
+        strapi.log.info('[Payment] OneSignal notification sent for top-up:', userId);
       } catch (notificationError) {
         // Don't fail the payment if notification fails
-        strapi.log.error('[Payment] Failed to send push notification:', notificationError);
+        strapi.log.error('[Payment] Failed to send OneSignal notification:', notificationError);
       }
 
       return {

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "230983624364",
+    "project_id": "chongjaroen-app",
+    "storage_bucket": "chongjaroen-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:230983624364:android:25e3bd47cbf64467be6109",
+        "android_client_info": {
+          "package_name": "com.chongjaroen.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWS_gbstAm8vhWtU0gx1vSesidHsUrLmw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

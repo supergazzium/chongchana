@@ -97,7 +97,7 @@ class InboxService extends ChangeNotifier {
       list.insert(
           0,
           Inbox.fromJson({
-            "id": data?["timestamp"], // fake id from notification
+            "id": data?["timestamp"] ?? DateTime.now().millisecondsSinceEpoch, // fake id from notification
             "notificationID": data?["notificationID"],
             "title": noti.title,
             "shortDescription": noti.body,
@@ -107,7 +107,7 @@ class InboxService extends ChangeNotifier {
               "url": data?["coverImage"],
             }
           }));
+      notifyListeners();
     }
-    // notifyListeners();
   }
 }
