@@ -1190,8 +1190,25 @@ module.exports = {
 
       const uploadedFile = uploadedFiles[0];
 
+      // Construct full URL if needed (handle relative URLs)
+      let imageUrl = uploadedFile.url;
+      if (!imageUrl.startsWith('http')) {
+        // If URL is relative, construct full URL using DO Spaces config
+        const endpoint = process.env.DO_SPACE_ENDPOINT;
+        const cdn = process.env.DO_SPACE_CDN;
+        const space = process.env.DO_SPACE_BUCKET;
+
+        if (cdn) {
+          imageUrl = `${cdn}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        } else if (endpoint && space) {
+          imageUrl = `${endpoint}/${space}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        } else {
+          strapi.log.error('[WalletAdmin] Cannot construct full URL - DO Spaces config missing');
+        }
+      }
+
       ctx.send(utils.successResponse({
-        imageUrl: uploadedFile.url,
+        imageUrl,
         width,
         height,
         size: imageFile.size,
@@ -1204,7 +1221,7 @@ module.exports = {
         },
       }));
 
-      strapi.log.info(`[WalletAdmin] Billboard image uploaded: ${uploadedFile.url} (${width}x${height}px)`);
+      strapi.log.info(`[WalletAdmin] Billboard image uploaded: ${imageUrl} (${width}x${height}px)`);
 
     } catch (error) {
       strapi.log.error('[WalletAdmin] uploadBillboardImage error:', error);
