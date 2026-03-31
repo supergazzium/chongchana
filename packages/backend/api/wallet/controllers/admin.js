@@ -1121,15 +1121,19 @@ module.exports = {
         ));
       }
 
-      // Get image dimensions using sharp or similar
+      // Get image dimensions
       const imageSize = require('image-size');
+      const fs = require('fs');
       let dimensions;
       try {
-        dimensions = imageSize(imageFile.path);
+        // Read file buffer - Strapi stores uploaded files temporarily
+        const buffer = fs.readFileSync(imageFile.path);
+        dimensions = imageSize(buffer);
       } catch (err) {
+        strapi.log.error('[WalletAdmin] Error reading image dimensions:', err);
         return ctx.badRequest(utils.errorResponse(
           'VALIDATION_ERROR',
-          'Could not read image dimensions. Please upload a valid image file.'
+          `Could not read image dimensions: ${err.message}`
         ));
       }
 
