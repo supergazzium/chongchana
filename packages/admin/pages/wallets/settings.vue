@@ -482,13 +482,16 @@ export default {
           this.settings = { ...response.data.settings };
           this.originalSettings = { ...response.data.settings };
 
-          // Load billboard settings if available
+          // Load billboard settings from the main settings response
           if (response.data.settings.billboard) {
             this.billboardSettings = {
               enabled: response.data.settings.billboard.enabled || false,
               autoPlayInterval: response.data.settings.billboard.autoPlayInterval || 5000,
               images: response.data.settings.billboard.images || [],
             };
+            console.log('[Admin] Loaded billboard settings:', this.billboardSettings);
+          } else {
+            console.warn('[Admin] No billboard settings found in response');
           }
         }
       } catch (error) {
@@ -711,6 +714,13 @@ export default {
     async saveBillboardSettings() {
       this.savingBillboard = true;
       try {
+        console.log('[Admin] Saving billboard settings:', {
+          enabled: this.billboardSettings.enabled,
+          autoPlayInterval: this.billboardSettings.autoPlayInterval,
+          imagesCount: this.billboardSettings.images.length,
+          images: this.billboardSettings.images,
+        });
+
         const response = await this.$axios.put(
           '/api/wallet-admin/billboard-settings',
           {
@@ -721,6 +731,9 @@ export default {
         );
 
         if (response.data.success) {
+          // Reload settings to ensure UI is in sync with database
+          await this.loadSettings();
+
           this.$swal({
             icon: 'success',
             title: 'Billboard Saved',
@@ -730,6 +743,7 @@ export default {
           });
         }
       } catch (error) {
+        console.error('[Admin] Failed to save billboard:', error);
         const errorMsg = error.response?.data?.error?.message || error.message;
         this.$swal({
           icon: 'error',
