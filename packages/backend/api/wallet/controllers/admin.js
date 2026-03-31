@@ -1085,4 +1085,125 @@ module.exports = {
       ctx.badRequest(utils.errorResponse('WALLET_ERROR', error.message));
     }
   },
+
+  /**
+   * POST /api/wallet-admin/billboard/upload-image
+   * Upload billboard image with validation
+   */
+  async uploadBillboardImage(ctx) {
+    try {
+      const files = ctx.request.files;
+
+      if (!files || !files.image) {
+        return ctx.badRequest(utils.errorResponse(
+          'VALIDATION_ERROR',
+          'No image file provided. Please upload an image.'
+        ));
+      }
+
+      const imageFile = files.image;
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+      if (!allowedTypes.includes(imageFile.type)) {
+        return ctx.badRequest(utils.errorResponse(
+          'VALIDATION_ERROR',
+          'Invalid file type. Only JPEG and PNG images are allowed.'
+        ));
+      }
+
+      // Validate file size (max 2MB)
+      const maxSize = 2 * 1024 * 1024; // 2MB
+      if (imageFile.size > maxSize) {
+        return ctx.badRequest(utils.errorResponse(
+          'VALIDATION_ERROR',
+          `File size too large. Maximum size is 2MB. Your file: ${(imageFile.size / 1024 / 1024).toFixed(2)}MB`
+        ));
+      }
+
+      // Get image dimensions using sharp or similar
+      const imageSize = require('image-size');
+      let dimensions;
+      try {
+        dimensions = imageSize(imageFile.path);
+      } catch (err) {
+        return ctx.badRequest(utils.errorResponse(
+          'VALIDATION_ERROR',
+          'Could not read image dimensions. Please upload a valid image file.'
+        ));
+      }
+
+      const { width, height } = dimensions;
+
+      // Validate dimensions
+      const minWidth = 800;
+      const minHeight = 450;
+      const maxWidth = 2400;
+      const maxHeight = 1350;
+
+      if (width < minWidth || height < minHeight) {
+        return ctx.badRequest(utils.errorResponse(
+          'VALIDATION_ERROR',
+          `Image dimensions too small. Minimum: ${minWidth}x${minHeight}px. Your image: ${width}x${height}px`
+        ));
+      }
+
+      if (width > maxWidth || height > maxHeight) {
+        return ctx.badRequest(utils.errorResponse(
+          'VALIDATION_ERROR',
+          `Image dimensions too large. Maximum: ${maxWidth}x${maxHeight}px. Your image: ${width}x${height}px. Please resize for optimal performance.`
+        ));
+      }
+
+      // Check aspect ratio (16:9 with tolerance)
+      const aspectRatio = width / height;
+      const targetAspectRatio = 16 / 9;
+      const tolerance = 0.1;
+
+      if (Math.abs(aspectRatio - targetAspectRatio) > tolerance) {
+        strapi.log.warn(`[WalletAdmin] Billboard image aspect ratio ${aspectRatio.toFixed(2)} is not 16:9`);
+      }
+
+      // Upload file using Strapi's upload plugin
+      const uploadedFiles = await strapi.plugins.upload.services.upload.upload({
+        data: {
+          fileInfo: {
+            name: `billboard-${Date.now()}`,
+            caption: 'Wallet Billboard Image',
+            alternativeText: 'Billboard',
+          },
+        },
+        files: imageFile,
+      });
+
+      if (!uploadedFiles || uploadedFiles.length === 0) {
+        return ctx.badRequest(utils.errorResponse(
+          'UPLOAD_ERROR',
+          'Failed to upload image to storage'
+        ));
+      }
+
+      const uploadedFile = uploadedFiles[0];
+
+      ctx.send(utils.successResponse({
+        imageUrl: uploadedFile.url,
+        width,
+        height,
+        size: imageFile.size,
+        aspectRatio: aspectRatio.toFixed(2),
+        recommendations: {
+          optimal: aspectRatio >= (targetAspectRatio - tolerance) && aspectRatio <= (targetAspectRatio + tolerance),
+          message: aspectRatio >= (targetAspectRatio - tolerance) && aspectRatio <= (targetAspectRatio + tolerance)
+            ? 'Perfect! Image has optimal 16:9 aspect ratio'
+            : `Image aspect ratio is ${aspectRatio.toFixed(2)}:1. Recommended: 16:9 (1.78:1) for best display`,
+        },
+      }));
+
+      strapi.log.info(`[WalletAdmin] Billboard image uploaded: ${uploadedFile.url} (${width}x${height}px)`);
+
+    } catch (error) {
+      strapi.log.error('[WalletAdmin] uploadBillboardImage error:', error);
+      ctx.badRequest(utils.errorResponse('UPLOAD_ERROR', error.message));
+    }
+  },
 };

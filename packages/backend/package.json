@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "decimal.js": "^10.6.0",
+    "image-size": "^2.0.2",
     "json-2-csv": "3.14.1",
     "knex": "0.21.18",
     "messagebird": "3.6.1",

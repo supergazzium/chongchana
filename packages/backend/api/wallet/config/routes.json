@@ -186,6 +186,22 @@
       }
     },
     {
+      "method": "PUT",
+      "path": "/api/wallet-admin/billboard-settings",
+      "handler": "admin.updateBillboardSettings",
+      "config": {
+        "policies": ["isWalletAdmin"]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/billboard/upload-image",
+      "handler": "admin.uploadBillboardImage",
+      "config": {
+        "policies": ["isWalletAdmin"]
+      }
+    },
+    {
       "method": "GET",
       "path": "/api/wallet-admin/transfers",
       "handler": "admin.getAllTransfers",
