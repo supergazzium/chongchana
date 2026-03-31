@@ -19,7 +19,7 @@ class TopUpScreen extends StatefulWidget {
 class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
   final TextEditingController _amountController = TextEditingController();
   double? selectedAmount;
-  final double currentBalance = 1250.00;
+  final double currentBalance = .00;
   final double minAmount = 1.00;
   final double maxAmount = 20000.00;
 

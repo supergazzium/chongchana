@@ -9,6 +9,9 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:chongchana/services/auth.dart';
+import 'package:chongchana/services/wallet.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class QuickProfileWidgets extends StatelessWidget {
   const QuickProfileWidgets({
@@ -100,49 +103,67 @@ class QuickProfileWidgets extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   // Wallet Balance Display
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Icon(
-                            Icons.account_balance_wallet,
-                            size: 12,
-                            color: ChongjaroenColors.whiteColors,
+                  Consumer<WalletService>(
+                    builder: (context, walletService, child) {
+                      final balance = walletService.wallet?.balance ?? 0.0;
+                      final formattedBalance = NumberFormat('#,##0.00').format(balance);
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                            width: 1,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            '฿1,250.00',
-                            style: Theme.of(context).textTheme.bodyMedium!.merge(
-                                  const TextStyle(
-                                    fontSize: 14,
-                                    color: ChongjaroenColors.whiteColors,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Icon(
+                                Icons.money,
+                                size: 13,
+                                color: ChongjaroenColors.whiteColors,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: walletService.isLoading
+                                  ? const SizedBox(
+                                      width: 12,
+                                      height: 12,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          ChongjaroenColors.whiteColors,
+                                        ),
+                                      ),
+                                    )
+                                  : Text(
+                                      '฿$formattedBalance',
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(
+                                            const TextStyle(
+                                              fontSize: 14,
+                                              color: ChongjaroenColors.whiteColors,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   )
                 ],
               ),

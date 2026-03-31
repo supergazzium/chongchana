@@ -269,6 +269,27 @@
           <p class="section-description">Configure billboard images displayed in the wallet screen (replaces card section)</p>
         </div>
 
+        <!-- Current Billboard Status -->
+        <div class="billboard-status">
+          <h3>Current Status</h3>
+          <div class="status-info">
+            <div class="status-item">
+              <span class="status-label">Billboard Status:</span>
+              <span :class="['status-badge', billboardSettings.enabled ? 'enabled' : 'disabled']">
+                {{ billboardSettings.enabled ? '✓ Enabled' : '✗ Disabled' }}
+              </span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Active Images:</span>
+              <span class="status-value">{{ billboardSettings.images.length }} image(s)</span>
+            </div>
+            <div v-if="billboardSettings.enabled && billboardSettings.images.length > 0" class="status-item">
+              <span class="status-label">Auto-play Interval:</span>
+              <span class="status-value">{{ billboardSettings.autoPlayInterval / 1000 }}s</span>
+            </div>
+          </div>
+        </div>
+
         <div class="billboard-controls">
           <label class="checkbox-label">
             <input
@@ -1084,6 +1105,62 @@ export default {
 }
 
 /* Billboard Settings Styles */
+.billboard-status {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.billboard-status h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0c4a6e;
+  margin: 0 0 16px 0;
+}
+
+.status-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-label {
+  font-size: 14px;
+  color: #475569;
+  font-weight: 500;
+}
+
+.status-value {
+  font-size: 14px;
+  color: #0c4a6e;
+  font-weight: 600;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-badge.enabled {
+  background: #10b981;
+  color: white;
+}
+
+.status-badge.disabled {
+  background: #ef4444;
+  color: white;
+}
+
 .billboard-controls {
   margin-bottom: 24px;
 }

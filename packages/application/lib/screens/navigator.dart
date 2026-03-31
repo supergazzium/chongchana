@@ -49,27 +49,39 @@ class _ChongjaroenNavigatorState extends State<ChongjaroenNavigator> {
     final String contentID = routeState.route.parameters["id"] ?? "0";
 
     Future<void> _onHandleSignin(Credentials credentials) async {
-      setState(() {
-        _isLoading = true;
-      });
-      ServiceResponse resp = await authState.signIn(
-        credentials.username,
-        credentials.password,
-      );
-      if (resp.isSuccess) {
-        routeState.go('/home');
-      } else {
+      try {
+        setState(() {
+          _isLoading = true;
+        });
+        ServiceResponse resp = await authState.signIn(
+          credentials.username,
+          credentials.password,
+        );
+        if (resp.isSuccess) {
+          routeState.go('/home');
+        } else {
+          FocusScope.of(context).requestFocus(FocusNode());
+          // Need to handle error
+          Fluttertoast.showToast(
+            timeInSecForIosWeb: 5,
+            msg: resp.errorMessage,
+            backgroundColor: ChongjaroenColors.lightBlackColors,
+          );
+        }
+      } catch (e) {
+        // Handle any unexpected exceptions
+        print('[Login Error] Exception during sign in: $e');
         FocusScope.of(context).requestFocus(FocusNode());
-        // Need to handle error
         Fluttertoast.showToast(
           timeInSecForIosWeb: 5,
-          msg: resp.errorMessage,
+          msg: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ กรุณาลองอีกครั้ง',
           backgroundColor: ChongjaroenColors.lightBlackColors,
         );
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
       }
-      setState(() {
-        _isLoading = false;
-      });
     }
 
     return Navigator(

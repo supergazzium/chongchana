@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 
 import 'package:chongchana/services/auth.dart';
+import 'package:chongchana/services/wallet.dart';
 import 'package:chongchana/widgets/article_list.dart';
 import 'package:chongchana/constants/chongjaroen_icons.dart';
 import 'package:chongchana/screens/profile/quick_profile.dart';
@@ -35,6 +36,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     WidgetsBinding.instance!.addPostFrameCallback((timeStamp) {
       articles = Provider.of<ChongjaroenArticle>(context, listen: false);
+      final auth = Provider.of<ChongjaroenAuth>(context, listen: false);
+      if (auth.signedIn) {
+        final walletService = Provider.of<WalletService>(context, listen: false);
+        walletService.getBalance();
+      }
     });
     super.initState();
   }
@@ -44,6 +50,13 @@ class _HomeScreenState extends State<HomeScreen> {
       isLoading = true;
     });
     ChongjaroenAuth _auth = await auth.fetchProfile();
+
+    // Refresh wallet balance if user is signed in
+    if (auth.signedIn) {
+      final walletService = Provider.of<WalletService>(context, listen: false);
+      walletService.getBalance();
+    }
+
     setState(() {
       isLoading = _auth.loadingFetchProfile;
       enablePullUp = true;
