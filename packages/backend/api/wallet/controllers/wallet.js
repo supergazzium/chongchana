@@ -402,6 +402,13 @@ module.exports = {
           maxAmount: parseFloat(settings.transfer_max_amount || 50000),
           dailyLimit: parseFloat(settings.transfer_daily_limit || 100000),
         },
+        billboard: {
+          enabled: settings.wallet_billboard_enabled === 'true',
+          images: settings.wallet_billboard_images
+            ? JSON.parse(settings.wallet_billboard_images)
+            : [],
+          autoPlayInterval: parseInt(settings.wallet_billboard_autoplay_interval || 5000),
+        },
       }));
     } catch (error) {
       strapi.log.error('[Wallet] getSettings error:', error);

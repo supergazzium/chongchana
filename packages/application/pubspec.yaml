@@ -69,6 +69,7 @@ dependencies:
 
   # For manage image
   cached_network_image: ^3.1.0+1
+  carousel_slider: ^5.0.0
 
   # For QR Scan
   qr_code_scanner: ^1.0.1

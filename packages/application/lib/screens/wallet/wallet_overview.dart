@@ -12,6 +12,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:carousel_slider/carousel_slider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class WalletOverviewScreen extends StatefulWidget {
   const WalletOverviewScreen({Key? key}) : super(key: key);
@@ -67,9 +70,7 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
                                 const SizedBox(height: 24),
                                 _buildCardBalanceHeader(wallet),
                                 const SizedBox(height: 16),
-                                _buildWalletCard(),
-                                const SizedBox(height: 16),
-                                _buildViewAllCardsButton(),
+                                _buildBillboard(walletService),
                                 const SizedBox(height: 24),
                                 _buildPointsRedeemSection(wallet),
                                 const SizedBox(height: 24),
@@ -236,151 +237,175 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
     );
   }
 
-  Widget _buildWalletCard() {
+  Widget _buildBillboard(WalletService walletService) {
+    final settings = walletService.settings;
+    final billboard = settings?.billboard;
+
+    // If billboard is not enabled or no images, return empty container
+    if (billboard == null || !billboard.enabled || billboard.images.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final images = billboard.images;
+
+    // Single image - display without carousel
+    if (images.length == 1) {
+      return _buildSingleBillboardImage(images[0]);
+    }
+
+    // Multiple images - use carousel
+    return _buildBillboardCarousel(images, billboard.autoPlayInterval);
+  }
+
+  Widget _buildSingleBillboardImage(dynamic image) {
+    final imageUrl = image.imageUrl;
+    final linkUrl = image.linkUrl;
+
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const PayScreen(),
-          ),
-        );
-      },
+      onTap: linkUrl != null && linkUrl.isNotEmpty
+          ? () => _openBillboardLink(linkUrl)
+          : null,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 24),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              ChongjaroenColors.primaryColors.shade400,
-              ChongjaroenColors.primaryColors.shade600,
-            ],
-          ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: ChongjaroenColors.primaryColors.withOpacity(0.3),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: Stack(
-            children: [
-              // Decorative pattern background
-              Positioned(
-                right: -20,
-                top: -20,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    shape: BoxShape.circle,
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => Container(
+                color: Colors.grey.shade200,
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: Colors.grey.shade200,
+                child: const Center(
+                  child: Icon(
+                    Icons.image_not_supported,
+                    size: 48,
+                    color: Colors.grey,
                   ),
                 ),
               ),
-              Positioned(
-                left: -40,
-                bottom: -40,
-                child: Container(
-                  width: 160,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              // Card content
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Icon(
-                          Icons.account_balance_wallet,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            'Chongjaroen Card',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 40),
-                    Text(
-                      '$userName ($cardNumber)',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      height: 3,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            ChongjaroenColors.secondaryColor,
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildViewAllCardsButton() {
-    return Center(
-      child: TextButton.icon(
-        onPressed: () {
-          // TODO: Implement view all cards
-        },
-        icon: const Text(
-          'View all cards',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 14,
-          ),
-        ),
-        label: Icon(
-          Icons.keyboard_arrow_down,
-          color: Colors.grey.shade700,
-        ),
-      ),
+  Widget _buildBillboardCarousel(List<dynamic> images, int autoPlayInterval) {
+    return StatefulBuilder(
+      builder: (context, setState) {
+        int currentIndex = 0;
+
+        return Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: CarouselSlider(
+                    options: CarouselOptions(
+                      height: double.infinity,
+                      viewportFraction: 1.0,
+                      autoPlay: true,
+                      autoPlayInterval: Duration(milliseconds: autoPlayInterval),
+                      autoPlayAnimationDuration: const Duration(milliseconds: 800),
+                      autoPlayCurve: Curves.fastOutSlowIn,
+                      enlargeCenterPage: false,
+                      onPageChanged: (index, reason) {
+                        setState(() {
+                          currentIndex = index;
+                        });
+                      },
+                    ),
+                    items: images.map((image) {
+                      return GestureDetector(
+                        onTap: image.linkUrl != null && image.linkUrl.isNotEmpty
+                            ? () => _openBillboardLink(image.linkUrl)
+                            : null,
+                        child: CachedNetworkImage(
+                          imageUrl: image.imageUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey.shade200,
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: Colors.grey.shade200,
+                            child: const Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                size: 48,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Page indicators
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: images.asMap().entries.map((entry) {
+                return Container(
+                  width: currentIndex == entry.key ? 24 : 8,
+                  height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    color: currentIndex == entry.key
+                        ? ChongjaroenColors.secondaryColor
+                        : Colors.grey.shade300,
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  Future<void> _openBillboardLink(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Widget _buildPointsRedeemSection(Wallet wallet) {

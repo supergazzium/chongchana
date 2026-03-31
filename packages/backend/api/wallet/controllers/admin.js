@@ -967,4 +967,122 @@ module.exports = {
       ctx.badRequest(utils.errorResponse('WALLET_ERROR', error.message));
     }
   },
+
+  /**
+   * PUT /api/wallet-admin/billboard-settings
+   * Update wallet billboard settings with multiple images
+   *
+   * Recommended image dimensions:
+   * - Width: 1200-1600px
+   * - Height: 675-900px
+   * - Aspect ratio: 16:9 or 4:3
+   * - Max file size: 2MB per image
+   */
+  async updateBillboardSettings(ctx) {
+    try {
+      const { images, enabled, autoPlayInterval } = ctx.request.body;
+
+      // Validate images array
+      if (enabled && (!images || !Array.isArray(images) || images.length === 0)) {
+        return ctx.badRequest(utils.errorResponse(
+          'VALIDATION_ERROR',
+          'At least one image is required when billboard is enabled'
+        ));
+      }
+
+      // Validate each image
+      if (images && Array.isArray(images)) {
+        for (let i = 0; i < images.length; i++) {
+          const img = images[i];
+
+          if (!img.imageUrl || typeof img.imageUrl !== 'string') {
+            return ctx.badRequest(utils.errorResponse(
+              'VALIDATION_ERROR',
+              `Image ${i + 1}: imageUrl is required and must be a string`
+            ));
+          }
+
+          // Validate dimensions if provided
+          if (img.width && img.height) {
+            const aspectRatio = img.width / img.height;
+            const targetAspectRatio = 16 / 9;
+            const tolerance = 0.1;
+
+            // Check if aspect ratio is close to 16:9
+            if (Math.abs(aspectRatio - targetAspectRatio) > tolerance) {
+              strapi.log.warn(`[WalletAdmin] Image ${i + 1} aspect ratio ${aspectRatio.toFixed(2)} is not 16:9. Recommended: 1200x675 or 1600x900`);
+            }
+
+            // Check minimum dimensions
+            if (img.width < 800 || img.height < 450) {
+              return ctx.badRequest(utils.errorResponse(
+                'VALIDATION_ERROR',
+                `Image ${i + 1}: Minimum dimensions are 800x450px. Provided: ${img.width}x${img.height}px`
+              ));
+            }
+
+            // Check maximum dimensions
+            if (img.width > 2400 || img.height > 1350) {
+              return ctx.badRequest(utils.errorResponse(
+                'VALIDATION_ERROR',
+                `Image ${i + 1}: Maximum dimensions are 2400x1350px. Provided: ${img.width}x${img.height}px. Please resize for optimal mobile performance.`
+              ));
+            }
+          }
+
+          // Set order if not provided
+          if (typeof img.order !== 'number') {
+            img.order = i;
+          }
+        }
+
+        // Sort images by order
+        images.sort((a, b) => a.order - b.order);
+      }
+
+      // Validate autoplay interval
+      const interval = autoPlayInterval ? parseInt(autoPlayInterval) : 5000;
+      if (interval < 2000 || interval > 10000) {
+        return ctx.badRequest(utils.errorResponse(
+          'VALIDATION_ERROR',
+          'Auto-play interval must be between 2000ms and 10000ms'
+        ));
+      }
+
+      // Update settings in database
+      const settings = [
+        { key: 'wallet_billboard_enabled', value: enabled === true ? 'true' : 'false' },
+        { key: 'wallet_billboard_images', value: images ? JSON.stringify(images) : '[]' },
+        { key: 'wallet_billboard_autoplay_interval', value: interval.toString() },
+      ];
+
+      for (const setting of settings) {
+        await strapi.connections.default.raw(`
+          INSERT INTO wallet_transfer_settings (setting_key, setting_value, updated_at)
+          VALUES (?, ?, NOW())
+          ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()
+        `, [setting.key, setting.value]);
+      }
+
+      ctx.send(utils.successResponse({
+        message: 'Billboard settings updated successfully',
+        billboard: {
+          enabled: enabled === true,
+          images: images || [],
+          autoPlayInterval: interval,
+        },
+        recommendations: {
+          aspectRatio: '16:9',
+          dimensions: '1200x675px or 1600x900px',
+          minDimensions: '800x450px',
+          maxDimensions: '2400x1350px',
+          maxFileSize: '2MB per image',
+          format: 'JPEG or PNG',
+        },
+      }));
+    } catch (error) {
+      strapi.log.error('[WalletAdmin] updateBillboardSettings error:', error);
+      ctx.badRequest(utils.errorResponse('WALLET_ERROR', error.message));
+    }
+  },
 };
