@@ -878,6 +878,36 @@ module.exports = {
       const transferSettings = await strapi.services.transfer.getSettings();
       const redemptionSettings = await strapi.services.redemption.getSettings();
 
+      // Query billboard settings from wallet_transfer_settings table
+      const billboardSettingsQuery = await strapi.connections.default.raw(`
+        SELECT setting_key, setting_value
+        FROM wallet_transfer_settings
+        WHERE setting_key IN ('wallet_billboard_enabled', 'wallet_billboard_images', 'wallet_billboard_autoplay_interval')
+      `);
+
+      strapi.log.info('[WalletAdmin] Billboard settings query result:', billboardSettingsQuery[0]);
+
+      // Parse billboard settings
+      const billboardData = {};
+      billboardSettingsQuery[0].forEach(row => {
+        billboardData[row.setting_key] = row.setting_value;
+      });
+
+      const billboardEnabled = billboardData.wallet_billboard_enabled === 'true';
+      let billboardImages = [];
+      try {
+        billboardImages = billboardData.wallet_billboard_images ? JSON.parse(billboardData.wallet_billboard_images) : [];
+      } catch (e) {
+        strapi.log.error('[WalletAdmin] Error parsing billboard images:', e);
+      }
+      const billboardAutoPlayInterval = parseInt(billboardData.wallet_billboard_autoplay_interval || '5000');
+
+      strapi.log.info('[WalletAdmin] Parsed billboard data:', {
+        enabled: billboardEnabled,
+        imagesCount: billboardImages.length,
+        autoPlayInterval: billboardAutoPlayInterval,
+      });
+
       // Provide defaults if settings are missing
       ctx.send(utils.successResponse({
         settings: {
@@ -889,6 +919,11 @@ module.exports = {
           pointConversionRate: redemptionSettings.point_conversion_rate || 1,
           pointMinRedemption: redemptionSettings.point_min_redemption || 100,
           pointRedemptionRequiresApproval: redemptionSettings.point_redemption_requires_approval || false,
+          billboard: {
+            enabled: billboardEnabled,
+            images: billboardImages,
+            autoPlayInterval: billboardAutoPlayInterval,
+          },
         },
       }));
     } catch (error) {
