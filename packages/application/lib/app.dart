@@ -121,17 +121,44 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> {
 
   Future<void> _initOneSignelService() async {
     String oneSignelAppId = dotenv.env["ONESIGNAL_APP_ID"] ?? "";
-    OneSignal.Debug.setLogLevel(OSLogLevel.info);
+
+    if (oneSignelAppId.isEmpty) {
+      print('[OneSignal] ERROR: ONESIGNAL_APP_ID is empty! Check .env file');
+      return;
+    }
+
+    print('[OneSignal] Initializing with App ID: $oneSignelAppId');
+
+    OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
     OneSignal.initialize(oneSignelAppId);
+
+    // Request notification permission
     OneSignal.Notifications.requestPermission(true);
 
     // Event for handle opened notification
     OneSignal.Notifications.addClickListener((event) {
-        Map<String, dynamic>? data = event.notification.additionalData;
-      if (data?["sendingMethod"] == "inbox_push" ||
-          data?["sendingMethod"] == "push") {
+      Map<String, dynamic>? data = event.notification.additionalData;
+      String? type = data?["type"];
+
+      // Route to wallet for financial notifications
+      if (type == "wallet_topup" ||
+          type == "wallet_topup_failed" ||
+          type == "wallet_payment" ||
+          type == "wallet_payment_failed" ||
+          type == "wallet_transfer_sent" ||
+          type == "wallet_transfer_received" ||
+          type == "wallet_qr_payment" ||
+          type == "wallet_voucher" ||
+          type == "wallet_points_convert") {
+        _routeState.go('/wallet');
+      }
+      // Route to inbox for general messages
+      else if (data?["sendingMethod"] == "inbox_push" ||
+               data?["sendingMethod"] == "push") {
         _routeState.go('/inbox');
-      } else {
+      }
+      // Default to home
+      else {
         _routeState.go('/home');
       }
     });

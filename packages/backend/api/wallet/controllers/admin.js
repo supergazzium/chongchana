@@ -1121,14 +1121,15 @@ module.exports = {
         ));
       }
 
-      // Get image dimensions
-      const imageSize = require('image-size');
+      // Get image dimensions using probe-image-size (works with streams)
+      const probe = require('probe-image-size');
       const fs = require('fs');
       let dimensions;
       try {
-        // Read file buffer - Strapi stores uploaded files temporarily
-        const buffer = fs.readFileSync(imageFile.path);
-        dimensions = imageSize(buffer);
+        // Read from file stream - more reliable in production
+        const stream = fs.createReadStream(imageFile.path);
+        dimensions = await probe(stream);
+        stream.destroy(); // Clean up stream
       } catch (err) {
         strapi.log.error('[WalletAdmin] Error reading image dimensions:', err);
         return ctx.badRequest(utils.errorResponse(

@@ -21,6 +21,7 @@
     "mysql2": "^2.3.3",
     "omise": "0.8.5",
     "onesignal-node": "3.3.0",
+    "probe-image-size": "^7.2.3",
     "qrcode": "1.4.4",
     "randomstring": "1.1.5",
     "sharp": "0.32.5",
