@@ -198,7 +198,7 @@
       "path": "/api/wallet-admin/billboard/upload-image",
       "handler": "admin.uploadBillboardImage",
       "config": {
-        "policies": ["isWalletAdmin"]
+        "policies": []
       }
     },
     {
