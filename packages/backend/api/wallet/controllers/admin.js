@@ -1197,26 +1197,33 @@ module.exports = {
 
       if (!imageUrl.startsWith('http')) {
         // If URL is relative, construct full URL using DO Spaces config
-        const endpoint = process.env.DO_SPACE_ENDPOINT || '';
-        const cdn = process.env.DO_SPACE_CDN || '';
+        let endpoint = process.env.DO_SPACE_ENDPOINT || '';
+        let cdn = process.env.DO_SPACE_CDN || '';
         const space = process.env.DO_SPACE_BUCKET || '';
 
         strapi.log.info(`[WalletAdmin] DO Config - Endpoint: ${endpoint}, CDN: ${cdn}, Space: ${space}`);
 
         // Try CDN first (preferred for public access)
-        if (cdn && cdn.startsWith('http')) {
-          // CDN is full URL
+        if (cdn) {
+          // Add https:// if missing
+          if (!cdn.startsWith('http')) {
+            cdn = `https://${cdn}`;
+          }
           const cdnBase = cdn.endsWith('/') ? cdn.slice(0, -1) : cdn;
           const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
           imageUrl = `${cdnBase}${path}`;
-        } else if (endpoint && endpoint.startsWith('http')) {
-          // Endpoint is full URL
+        } else if (endpoint && space) {
+          // Add https:// if missing
+          if (!endpoint.startsWith('http')) {
+            endpoint = `https://${endpoint}`;
+          }
+          // Construct full URL: https://bucket.endpoint/path
           const endpointBase = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
           const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-          imageUrl = `${endpointBase}${path}`;
+          imageUrl = `https://${space}.${endpoint.replace('https://', '')}${path}`;
         } else {
           strapi.log.error('[WalletAdmin] Cannot construct full URL - DO Spaces config invalid or missing');
-          strapi.log.error(`[WalletAdmin] Endpoint: "${endpoint}", CDN: "${cdn}"`);
+          strapi.log.error(`[WalletAdmin] Endpoint: "${endpoint}", CDN: "${cdn}", Space: "${space}"`);
         }
 
         strapi.log.info(`[WalletAdmin] Constructed URL: ${imageUrl}`);
