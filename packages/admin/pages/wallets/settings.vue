@@ -291,16 +291,22 @@
         </div>
 
         <div class="billboard-controls">
-          <label class="checkbox-label">
-            <input
-              v-model="billboardSettings.enabled"
-              type="checkbox"
-              class="checkbox-input"
-            />
-            <span class="checkbox-text">
-              Enable Billboard
-            </span>
-          </label>
+          <div class="toggle-switch-group">
+            <label class="toggle-label">Enable Billboard</label>
+            <div class="toggle-switch-wrapper">
+              <label class="toggle-switch">
+                <input
+                  v-model="billboardSettings.enabled"
+                  type="checkbox"
+                  class="toggle-input"
+                />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="toggle-status">
+                {{ billboardSettings.enabled ? 'Enabled' : 'Disabled' }}
+              </span>
+            </div>
+          </div>
 
           <div v-if="billboardSettings.enabled" class="billboard-settings-grid">
             <div class="form-group">
@@ -391,8 +397,8 @@
           </div>
         </div>
 
-        <!-- Save Billboard Button -->
-        <div v-if="billboardSettings.enabled" class="billboard-save-section">
+        <!-- Save Billboard Button - Always visible -->
+        <div class="billboard-save-section">
           <button
             @click="saveBillboardSettings"
             class="btn-primary"
@@ -1356,5 +1362,91 @@ export default {
   border-top: 1px solid #e5e7eb;
   display: flex;
   justify-content: flex-end;
+}
+
+/* Toggle Switch Styles */
+.toggle-switch-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.toggle-switch-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 28px;
+}
+
+.toggle-switch .toggle-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: 0.3s;
+  border-radius: 28px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.toggle-input:checked + .toggle-slider {
+  background-color: #10b981;
+}
+
+.toggle-input:focus + .toggle-slider {
+  box-shadow: 0 0 1px #10b981;
+}
+
+.toggle-input:checked + .toggle-slider:before {
+  transform: translateX(24px);
+}
+
+.toggle-status {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .toggle-switch-group {
+    gap: 8px;
+  }
+
+  .toggle-switch-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>
