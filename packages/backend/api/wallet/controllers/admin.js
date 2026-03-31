@@ -1192,19 +1192,34 @@ module.exports = {
 
       // Construct full URL if needed (handle relative URLs)
       let imageUrl = uploadedFile.url;
+
+      strapi.log.info(`[WalletAdmin] Original uploaded URL: ${imageUrl}`);
+
       if (!imageUrl.startsWith('http')) {
         // If URL is relative, construct full URL using DO Spaces config
-        const endpoint = process.env.DO_SPACE_ENDPOINT;
-        const cdn = process.env.DO_SPACE_CDN;
-        const space = process.env.DO_SPACE_BUCKET;
+        const endpoint = process.env.DO_SPACE_ENDPOINT || '';
+        const cdn = process.env.DO_SPACE_CDN || '';
+        const space = process.env.DO_SPACE_BUCKET || '';
 
-        if (cdn) {
-          imageUrl = `${cdn}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
-        } else if (endpoint && space) {
-          imageUrl = `${endpoint}/${space}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        strapi.log.info(`[WalletAdmin] DO Config - Endpoint: ${endpoint}, CDN: ${cdn}, Space: ${space}`);
+
+        // Try CDN first (preferred for public access)
+        if (cdn && cdn.startsWith('http')) {
+          // CDN is full URL
+          const cdnBase = cdn.endsWith('/') ? cdn.slice(0, -1) : cdn;
+          const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+          imageUrl = `${cdnBase}${path}`;
+        } else if (endpoint && endpoint.startsWith('http')) {
+          // Endpoint is full URL
+          const endpointBase = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+          const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+          imageUrl = `${endpointBase}${path}`;
         } else {
-          strapi.log.error('[WalletAdmin] Cannot construct full URL - DO Spaces config missing');
+          strapi.log.error('[WalletAdmin] Cannot construct full URL - DO Spaces config invalid or missing');
+          strapi.log.error(`[WalletAdmin] Endpoint: "${endpoint}", CDN: "${cdn}"`);
         }
+
+        strapi.log.info(`[WalletAdmin] Constructed URL: ${imageUrl}`);
       }
 
       ctx.send(utils.successResponse({
