@@ -129,6 +129,7 @@ class OmisePaymentService extends ChangeNotifier {
             'currency': currency,
             'status': data['status'],
             'paid': data['paid'],
+            'authorizeUri': data['authorizeUri'], // 3D Secure authentication URL
             'timestamp': DateTime.now().toIso8601String(),
           };
         } else {
