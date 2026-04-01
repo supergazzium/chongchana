@@ -43,7 +43,7 @@ module.exports = {
       // Search for user by phone number
       const knex = strapi.connections.default;
       const users = await knex('users-permissions_user')
-        .select('id', 'username', 'phone')
+        .select('id', 'username', 'phone', 'first_name', 'last_name')
         .where({ phone: normalizedPhone })
         .limit(1);
 
@@ -89,6 +89,8 @@ module.exports = {
         user: {
           id: targetUser.id,
           username: targetUser.username,
+          firstName: targetUser.first_name,
+          lastName: targetUser.last_name,
           phoneNumber: normalizedPhone,
         },
       }));
