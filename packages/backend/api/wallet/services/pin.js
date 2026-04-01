@@ -83,6 +83,11 @@ module.exports = {
       const apiKey = process.env.THAIBULK_SMS_API_KEY || process.env.THAIBULK_API_KEY;
       const apiSecret = process.env.THAIBULK_SMS_API_SECRET || process.env.THAIBULK_API_SECRET;
 
+      // Debug: Log which credentials are being used
+      const usingSmsCreds = !!process.env.THAIBULK_SMS_API_KEY;
+      strapi.log.info(`[PIN Reset] Using ${usingSmsCreds ? 'SMS API' : 'OTP API'} credentials`);
+      strapi.log.debug(`[PIN Reset] API Key (first 8 chars): ${apiKey?.substring(0, 8)}...`);
+
       if (!apiKey || !apiSecret) {
         strapi.log.error('[PIN Reset] ThaiBulkSMS credentials not configured');
         throw new Error('SMS service not configured');
