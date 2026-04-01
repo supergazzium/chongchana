@@ -144,4 +144,52 @@ module.exports = {
       ctx.badRequest('An error occurred while resetting PIN');
     }
   },
+
+  /**
+   * POST /wallet/sms/webhook
+   * ThaiBulkSMS webhook for SMS delivery status
+   *
+   * ThaiBulkSMS will POST to this endpoint with delivery status:
+   * {
+   *   status: 'success' | 'fail',
+   *   msisdn: '0812345678',
+   *   message_id: '123456',
+   *   ...other params
+   * }
+   */
+  async smsWebhook(ctx) {
+    try {
+      const body = ctx.request.body;
+
+      strapi.log.info('[ThaiBulkSMS Webhook] Received delivery status:', {
+        status: body.status,
+        msisdn: body.msisdn,
+        message_id: body.message_id,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Log full webhook data for debugging
+      strapi.log.debug('[ThaiBulkSMS Webhook] Full payload:', body);
+
+      // You can add additional logic here to:
+      // - Track SMS delivery success/failure rates
+      // - Store delivery status in database
+      // - Send notifications on delivery failures
+      // - Update user records
+
+      // Always return success to ThaiBulkSMS
+      ctx.send({
+        success: true,
+        message: 'Webhook received',
+      });
+    } catch (error) {
+      strapi.log.error('[ThaiBulkSMS Webhook] Error processing webhook:', error);
+
+      // Still return success to avoid retries
+      ctx.send({
+        success: true,
+        message: 'Webhook received with errors',
+      });
+    }
+  },
 };

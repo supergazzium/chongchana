@@ -328,6 +328,15 @@
       "config": {
         "policies": []
       }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/sms/webhook",
+      "handler": "pin.smsWebhook",
+      "config": {
+        "policies": [],
+        "auth": false
+      }
     }
   ]
 }
