@@ -59,30 +59,65 @@ module.exports = {
   },
 
   /**
-   * Send OTP via SMS using ThaiBulkSMS (existing service)
+   * Send OTP via SMS using ThaiBulkSMS custom message API
    *
-   * NOTE: ThaiBulkSMS's OTP service generates its own OTP codes.
-   * For custom OTP (PIN reset), we need a different SMS service or their custom message API.
-   * Currently logs OTP only - integrate Twilio or custom SMS service for production.
+   * Uses ThaiBulkSMS SMS API (not OTP API) to send custom messages
+   * API: https://api-v2.thaibulksms.com/sms
    */
   async sendOTPviaSMS(phone, otp) {
     strapi.log.info(`[PIN Reset] Sending SMS OTP to ${phone}`);
 
     try {
-      // Always log OTP (for development testing)
+      // Always log OTP (for development/debugging)
       strapi.log.info(`[DEV] OTP for ${phone}: ${otp}`);
-      strapi.log.info(`[DEV] Use OTP code: ${otp} to verify`);
 
-      // TODO: Integrate SMS service that supports custom messages
-      // Option 1: Check if ThaiBulkSMS has custom message API
-      // Option 2: Use Twilio for custom SMS: https://www.twilio.com/
-      // Option 3: Use AWS SNS for SMS
+      // In development mode, just log the OTP
+      if (process.env.NODE_ENV === 'development') {
+        strapi.log.info(`[DEV] Use OTP code: ${otp} to verify`);
+        strapi.log.warn(`[PIN Reset] Development mode - SMS not sent, using log-only`);
+        return true;
+      }
 
-      // For now, just log - SMS functionality pending
-      strapi.log.warn(`[PIN Reset] SMS not implemented - using log-only mode`);
+      // Production: Use ThaiBulkSMS custom message API
+      const apiKey = process.env.THAIBULK_API_KEY;
+      const apiSecret = process.env.THAIBULK_API_SECRET;
+
+      if (!apiKey || !apiSecret) {
+        strapi.log.error('[PIN Reset] ThaiBulkSMS credentials not configured');
+        throw new Error('SMS service not configured');
+      }
+
+      const axios = require('axios');
+      const message = `Your Chongjaroen wallet PIN reset code is: ${otp}. Valid for 10 minutes. Do not share this code.`;
+
+      // ThaiBulkSMS SMS API v2
+      const response = await axios.post(
+        'https://api-v2.thaibulksms.com/sms',
+        {
+          msisdn: phone,
+          message: message,
+          sender: 'Chongjaroen', // Sender name (optional)
+          force: 'standard', // SMS type: standard or premium
+        },
+        {
+          auth: {
+            username: apiKey,
+            password: apiSecret,
+          },
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      strapi.log.info(`[PIN Reset] SMS sent successfully to ${phone}`, {
+        status: response.data.status,
+        response: response.data,
+      });
+
       return true;
     } catch (error) {
-      strapi.log.error(`[PIN Reset] SMS error for ${phone}:`, error);
+      strapi.log.error(`[PIN Reset] SMS error for ${phone}:`, error.response?.data || error.message);
       throw error;
     }
   },
