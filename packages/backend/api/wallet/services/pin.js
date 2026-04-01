@@ -347,17 +347,13 @@ module.exports = {
       // Store OTP
       this.storeOTP(userId, method, otp);
 
-      // Send OTP based on method
-      let maskedContact;
-      if (method === 'phone') {
-        await this.sendOTPviaSMS(user.phone, otp);
-        maskedContact = this.maskPhoneNumber(user.phone);
-      } else if (method === 'email') {
-        await this.sendOTPviaEmail(user.email, otp, user.username);
-        maskedContact = this.maskEmail(user.email);
-      } else {
-        return { success: false, message: 'Invalid method. Use "phone" or "email"' };
+      // Send OTP via SMS only (phone method only)
+      if (method !== 'phone') {
+        return { success: false, message: 'Invalid method. Only phone (SMS) is allowed for PIN reset' };
       }
+
+      await this.sendOTPviaSMS(user.phone, otp);
+      const maskedContact = this.maskPhoneNumber(user.phone);
 
       return {
         success: true,

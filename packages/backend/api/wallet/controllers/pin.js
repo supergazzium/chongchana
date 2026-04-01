@@ -27,11 +27,12 @@ module.exports = {
       const { method } = ctx.request.body;
 
       if (!method) {
-        return ctx.badRequest('Method is required (phone or email)');
+        return ctx.badRequest('Method is required');
       }
 
-      if (method !== 'phone' && method !== 'email') {
-        return ctx.badRequest('Invalid method. Use "phone" or "email"');
+      // Only phone method is allowed for PIN reset
+      if (method !== 'phone') {
+        return ctx.badRequest('Invalid method. Only phone (SMS) is allowed for PIN reset');
       }
 
       strapi.log.info(`[PIN Reset] OTP request from user ${userId} via ${method}`);
@@ -76,8 +77,9 @@ module.exports = {
         return ctx.badRequest('OTP and method are required');
       }
 
-      if (method !== 'phone' && method !== 'email') {
-        return ctx.badRequest('Invalid method. Use "phone" or "email"');
+      // Only phone method is allowed for PIN reset
+      if (method !== 'phone') {
+        return ctx.badRequest('Invalid method. Only phone (SMS) is allowed for PIN reset');
       }
 
       strapi.log.info(`[PIN Reset] OTP verification from user ${userId} via ${method}`);
