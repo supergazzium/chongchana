@@ -81,7 +81,7 @@ module.exports = {
         return ctx.badRequest(utils.errorResponse('WALLET_004', validation.error));
       }
 
-      // Create charge
+      // Create charge with return_uri for 3D Secure support
       const charge = await paymentService.createChargeFromToken(
         tokenId,
         amount,
@@ -90,7 +90,8 @@ module.exports = {
         {
           user_id: userId,
           type: 'wallet_topup',
-        }
+        },
+        'chongjaroen://payment-result' // Deep link for 3D Secure redirect
       );
 
       // If charge is successful, credit wallet immediately
@@ -114,6 +115,7 @@ module.exports = {
           status: charge.status,
           paid: false,
           failureMessage: charge.failure_message,
+          authorizeUri: charge.authorize_uri, // 3D Secure authentication URL
         }));
       }
     } catch (error) {

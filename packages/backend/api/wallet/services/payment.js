@@ -132,22 +132,30 @@ module.exports = {
   /**
    * Create a charge from a token (Credit/Debit Card)
    */
-  async createChargeFromToken(tokenId, amount, currency, description, metadata = {}) {
+  async createChargeFromToken(tokenId, amount, currency, description, metadata = {}, returnUri) {
     try {
-      const charge = await omise.charges.create({
+      const chargeParams = {
         amount: Math.round(amount * 100),
         currency: currency || 'THB',
         card: tokenId,
         description: description,
         metadata: metadata,
         capture: true, // Auto-capture the charge
-      });
+      };
+
+      // Add return_uri for 3D Secure authentication redirect
+      if (returnUri) {
+        chargeParams.return_uri = returnUri;
+      }
+
+      const charge = await omise.charges.create(chargeParams);
 
       strapi.log.info('[Payment] Created charge from token:', {
         id: charge.id,
         amount: charge.amount,
         status: charge.status,
         card: charge.card?.last_digits,
+        authorize_uri: charge.authorize_uri ? 'present' : 'none',
       });
 
       return charge;
