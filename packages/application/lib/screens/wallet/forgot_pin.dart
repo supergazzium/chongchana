@@ -15,7 +15,7 @@ class ForgotPinScreen extends StatefulWidget {
 }
 
 class _ForgotPinScreenState extends State<ForgotPinScreen> {
-  String _selectedMethod = 'phone'; // 'phone' or 'email'
+  final String _selectedMethod = 'phone'; // Only phone is allowed
   bool _isLoading = false;
 
   // Design constants - Starbucks aesthetic
@@ -118,9 +118,9 @@ class _ForgotPinScreenState extends State<ForgotPinScreen> {
               _buildInfoCard(),
               const SizedBox(height: 32),
 
-              // Verification Method Selection
+              // Verification Method - Phone Only
               const Text(
-                'Receive verification code via',
+                'Verification code will be sent to',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -129,21 +129,70 @@ class _ForgotPinScreenState extends State<ForgotPinScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Phone option
-              _buildMethodOption(
-                icon: Icons.phone_android,
-                title: 'Phone Number',
-                subtitle: _maskPhoneNumber(user.phone),
-                value: 'phone',
-              ),
-              const SizedBox(height: 12),
-
-              // Email option
-              _buildMethodOption(
-                icon: Icons.email_outlined,
-                title: 'Email Address',
-                subtitle: _maskEmail(user.email),
-                value: 'email',
+              // Phone option (read-only display)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: _cardBackground,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _greenAccent,
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _greenAccent.withOpacity(0.1),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: _greenAccent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.phone_android,
+                        color: _greenAccent,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Phone Number',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: _greenPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _maskPhoneNumber(user.phone),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: _textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.sms_outlined,
+                      color: _greenAccent,
+                      size: 24,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 48),
 
@@ -229,7 +278,7 @@ class _ForgotPinScreenState extends State<ForgotPinScreen> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'We\'ll send you a verification code to confirm your identity before resetting your wallet PIN.',
+            'We\'ll send you a verification code via SMS to confirm your identity before resetting your wallet PIN.',
             style: TextStyle(
               fontSize: 14,
               color: _textSecondary,
@@ -238,107 +287,6 @@ class _ForgotPinScreenState extends State<ForgotPinScreen> {
             textAlign: TextAlign.center,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMethodOption({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String value,
-  }) {
-    final isSelected = _selectedMethod == value;
-
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedMethod = value;
-        });
-        HapticFeedback.selectionClick();
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: _cardBackground,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? _greenAccent : Colors.grey.shade200,
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: _greenAccent.withOpacity(0.1),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? _greenAccent.withOpacity(0.1)
-                    : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: isSelected ? _greenAccent : Colors.grey.shade600,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? _greenPrimary : _textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: _textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? _greenAccent : Colors.grey.shade400,
-                  width: 2,
-                ),
-                color: isSelected ? _greenAccent : Colors.transparent,
-              ),
-              child: isSelected
-                  ? const Icon(
-                      Icons.check,
-                      size: 16,
-                      color: Colors.white,
-                    )
-                  : null,
-            ),
-          ],
-        ),
       ),
     );
   }

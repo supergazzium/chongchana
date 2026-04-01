@@ -7,7 +7,10 @@ import 'package:chongchana/screens/wallet/transaction_history.dart';
 import 'package:chongchana/screens/wallet/transaction_detail.dart';
 import 'package:chongchana/screens/wallet/redeem_points.dart';
 import 'package:chongchana/screens/wallet/transfer.dart';
+import 'package:chongchana/screens/wallet/wallet_security.dart';
 import 'package:chongchana/services/wallet.dart';
+import 'package:chongchana/services/wallet_auth.dart';
+import 'package:chongchana/screens/wallet/pin_setup.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -15,6 +18,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class WalletOverviewScreen extends StatefulWidget {
   const WalletOverviewScreen({Key? key}) : super(key: key);
@@ -36,7 +40,44 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
       walletService.getSettings();
       walletService.getBalance();
       walletService.getTransactions(limit: 10);
+
+      // Check PIN setup and prompt if needed
+      _checkPinSetup();
     });
+  }
+
+  Future<void> _checkPinSetup() async {
+    final authService = Provider.of<WalletAuthService>(context, listen: false);
+
+    // If PIN is not setup, prompt user to set it up
+    if (!authService.hasPinSetup) {
+      // Add a small delay to let the screen fully load
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (!mounted) return;
+
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const PinSetupScreen(isFirstTimeSetup: true),
+        ),
+      );
+
+      if (result == true) {
+        Fluttertoast.showToast(
+          msg: 'Wallet security enabled! Your wallet is now protected.',
+          backgroundColor: Colors.green,
+          toastLength: Toast.LENGTH_LONG,
+        );
+      } else {
+        // User cancelled or failed PIN setup
+        Fluttertoast.showToast(
+          msg: 'PIN setup is required for wallet security',
+          backgroundColor: Colors.orange,
+          toastLength: Toast.LENGTH_LONG,
+        );
+      }
+    }
   }
 
   @override
@@ -93,53 +134,89 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
 
   Widget _buildTopActionBar(Wallet wallet) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
         children: [
-          _buildTopAction(
-            icon: Icons.account_balance_wallet,
-            label: 'Add money',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TopUpScreen(),
+          // Header with title and security button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Wallet',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                 ),
-              ).then((_) {
-                // Refresh wallet after top-up
-                final walletService =
-                    Provider.of<WalletService>(context, listen: false);
-                walletService.getBalance();
-                walletService.getTransactions(limit: 10);
-              });
-            },
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.settings,
+                  color: Colors.white,
+                  size: 28,
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const WalletSecurityScreen(),
+                    ),
+                  );
+                },
+                tooltip: 'Wallet Security',
+              ),
+            ],
           ),
-          _buildTopAction(
-            icon: Icons.swap_horiz,
-            label: 'Transfer',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TransferScreen(
-                    availableBalance: wallet.balance,
-                  ),
-                ),
-              );
-            },
-          ),
-          _buildTopAction(
-            icon: Icons.qr_code_scanner,
-            label: 'Pay in store',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PayScreen(),
-                ),
-              );
-            },
+          const SizedBox(height: 16),
+          // Action buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildTopAction(
+                icon: Icons.account_balance_wallet,
+                label: 'Add money',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TopUpScreen(),
+                    ),
+                  ).then((_) {
+                    // Refresh wallet after top-up
+                    final walletService =
+                        Provider.of<WalletService>(context, listen: false);
+                    walletService.getBalance();
+                    walletService.getTransactions(limit: 10);
+                  });
+                },
+              ),
+              _buildTopAction(
+                icon: Icons.swap_horiz,
+                label: 'Transfer',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TransferScreen(
+                        availableBalance: wallet.balance,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              _buildTopAction(
+                icon: Icons.qr_code_scanner,
+                label: 'Pay in store',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PayScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -218,19 +295,6 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
                 ),
               ),
             ],
-          ),
-          TextButton(
-            onPressed: () {
-              // TODO: Implement manage
-            },
-            child: const Text(
-              'Manage',
-              style: TextStyle(
-                color: ChongjaroenColors.secondaryColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ),
         ],
       ),

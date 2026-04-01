@@ -1,5 +1,6 @@
 import 'package:chongchana/constants/colors.dart';
 import 'package:chongchana/screens/wallet/redeem_success.dart';
+import 'package:chongchana/screens/wallet/transaction_confirmation.dart';
 import 'package:chongchana/services/wallet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -64,8 +65,59 @@ class _RedeemPointsScreenState extends State<RedeemPointsScreen> {
     _pointsController.text = widget.availablePoints.toString();
   }
 
-  void _confirmRedeem() {
-    if (_isValid) {
+  void _confirmRedeem() async {
+    if (!_isValid) return;
+
+    final walletService = Provider.of<WalletService>(context, listen: false);
+    final settings = walletService.settings;
+    final conversionRate = settings?.pointConversion.rate ?? 1.0;
+
+    // Build transaction details
+    List<TransactionDetail> details = [
+      TransactionDetail(
+        label: 'Points to Redeem',
+        value: '$_pointsToRedeem pts',
+      ),
+      TransactionDetail(
+        label: 'Conversion Rate',
+        value: '1 pt = ฿${_formatAmount(conversionRate)}',
+      ),
+      const TransactionDetail.divider(),
+      TransactionDetail(
+        label: 'Cash to Receive',
+        value: '฿${_formatAmount(_cashAmount)}',
+        isHighlighted: true,
+      ),
+    ];
+
+    // Navigate to confirmation screen
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TransactionConfirmationScreen(
+          type: TransactionType.redeem,
+          amount: _cashAmount,
+          details: details,
+          onConfirm: (pin) async {
+            // PIN is verified, now process redemption
+            return await _processRedemption();
+          },
+          onSuccess: () {
+            // Redemption successful, close confirmation and navigate
+            Navigator.pop(context); // Close confirmation screen
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _processRedemption() async {
+    // Simulate redemption processing
+    // In a real app, this would call your backend API
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Navigate to success screen
+    if (mounted) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -76,6 +128,8 @@ class _RedeemPointsScreenState extends State<RedeemPointsScreen> {
         ),
       );
     }
+
+    return true; // Return true for success
   }
 
   String _formatAmount(double amount) {

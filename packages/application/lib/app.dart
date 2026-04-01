@@ -7,6 +7,7 @@ import 'package:chongchana/services/menu.dart';
 import 'package:chongchana/services/inbox.dart';
 import 'package:chongchana/services/omise_payment.dart';
 import 'package:chongchana/services/wallet.dart';
+import 'package:chongchana/services/wallet_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -33,6 +34,7 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> {
   final inboxService = InboxService();
   final omisePaymentService = OmisePaymentService();
   final walletService = WalletService();
+  final walletAuthService = WalletAuthService();
   final _navigatorKey = GlobalKey<NavigatorState>();
   late final RouteState _routeState;
   late final SimpleRouterDelegate _routerDelegate;
@@ -182,6 +184,7 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> {
           ChangeNotifierProvider<OmisePaymentService>(
               create: (_) => omisePaymentService),
           ChangeNotifierProvider<WalletService>(create: (_) => walletService),
+          ChangeNotifierProvider<WalletAuthService>(create: (_) => walletAuthService),
         ],
         child: RouteStateScope(
           notifier: _routeState,

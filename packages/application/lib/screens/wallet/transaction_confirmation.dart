@@ -207,51 +207,68 @@ class _TransactionConfirmationScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _backgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            _buildHeader(),
+    return Consumer<WalletAuthService>(
+      builder: (context, authService, child) {
+        // Check if PIN is required based on authorization settings
+        final bool isPinRequired = widget.type != TransactionType.topUp &&
+                                   authService.shouldRequirePin(widget.amount);
 
-            // Scrollable content
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 32),
+        return Scaffold(
+          backgroundColor: _backgroundColor,
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Header
+                _buildHeader(),
 
-                    // Amount Card
-                    _buildAmountCard(),
-                    const SizedBox(height: 24),
+                // Scrollable content
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 32),
 
-                    // Transaction Details
-                    _buildDetailsCard(),
-                    const SizedBox(height: 32),
+                        // Amount Card
+                        _buildAmountCard(),
+                        const SizedBox(height: 24),
 
-                    // PIN Section
-                    if (!_isProcessing) ...[
-                      _buildPinSection(),
-                      const SizedBox(height: 32),
+                        // Transaction Details
+                        _buildDetailsCard(),
+                        const SizedBox(height: 32),
 
-                      // Numeric Keypad
-                      _buildNumericKeypad(),
-                    ] else ...[
-                      // Processing Indicator
-                      _buildProcessingIndicator(),
-                    ],
+                        // Check if PIN is required based on settings
+                        if (!isPinRequired) ...[
+                          // No PIN required - show confirm button
+                          if (!_isProcessing)
+                            _buildConfirmButton()
+                          else
+                            _buildProcessingIndicator(),
+                        ] else ...[
+                          // PIN required - show PIN keypad
+                          if (!_isProcessing) ...[
+                            _buildPinSection(),
+                            const SizedBox(height: 32),
 
-                    const SizedBox(height: 32),
-                  ],
+                            // Numeric Keypad
+                            _buildNumericKeypad(),
+                          ] else ...[
+                            // Processing Indicator
+                            _buildProcessingIndicator(),
+                          ],
+                        ],
+
+                        const SizedBox(height: 32),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -625,5 +642,114 @@ class _TransactionConfirmationScreenState
         const SizedBox(height: 48),
       ],
     );
+  }
+
+  /// Confirm button for transactions not requiring PIN
+  Widget _buildConfirmButton() {
+    String buttonText;
+    String subtitle;
+
+    switch (widget.type) {
+      case TransactionType.topUp:
+        buttonText = 'Confirm Top-Up';
+        subtitle = 'No PIN required for adding funds';
+        break;
+      case TransactionType.transfer:
+        buttonText = 'Confirm Transfer';
+        subtitle = 'No PIN required for this amount';
+        break;
+      case TransactionType.redeem:
+        buttonText = 'Confirm Redemption';
+        subtitle = 'No PIN required for this amount';
+        break;
+    }
+
+    return Column(
+      children: [
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _confirmWithoutPin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _greenAccent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 0,
+              shadowColor: _greenAccent.withOpacity(0.3),
+            ),
+            child: Text(
+              buttonText,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: _textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Process top-up without PIN verification
+  Future<void> _confirmWithoutPin() async {
+    setState(() {
+      _isProcessing = true;
+    });
+
+    HapticFeedback.mediumImpact();
+
+    try {
+      // Call onConfirm with empty PIN (top-ups don't need PIN)
+      final success = await widget.onConfirm('');
+
+      if (!mounted) return;
+
+      if (success) {
+        HapticFeedback.heavyImpact();
+        // Success - call the success callback
+        widget.onSuccess?.call();
+      } else {
+        // Transaction failed
+        setState(() {
+          _isProcessing = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Transaction failed. Please try again.'),
+            backgroundColor: Colors.red.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
+    }
   }
 }

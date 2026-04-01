@@ -1,5 +1,6 @@
 import 'package:chongchana/constants/colors.dart';
 import 'package:chongchana/screens/wallet/transfer_success.dart';
+import 'package:chongchana/screens/wallet/transaction_confirmation.dart';
 import 'package:chongchana/services/wallet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -64,7 +65,16 @@ class _TransferScreenState extends State<TransferScreen> {
             _isCheckingRecipient = false;
             if (result != null && result['found'] == true) {
               final user = result['user'];
-              _recipientName = user['username'];
+              // Build full name from firstName and lastName
+              final firstName = user['firstName'] ?? '';
+              final lastName = user['lastName'] ?? '';
+              final fullName = '$firstName $lastName'.trim();
+              // Fallback to username if no first/last name
+              if (fullName.isEmpty) {
+                _recipientName = user['username'];
+              } else {
+                _recipientName = fullName;
+              }
               _recipientUserId = user['id'];
             } else {
               _recipientName = null;
@@ -129,33 +139,77 @@ class _TransferScreenState extends State<TransferScreen> {
     });
   }
 
-  void _confirmTransfer() {
-    if (_isValid) {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => _buildConfirmationSheet(),
-      );
+  void _confirmTransfer() async {
+    if (!_isValid) return;
+
+    final walletService = Provider.of<WalletService>(context, listen: false);
+    final settings = walletService.settings;
+    final transferFee = settings?.transfer.calculateFee(_transferAmount) ?? 0.0;
+    final totalAmount = settings?.transfer.calculateTotalWithFee(_transferAmount) ?? _transferAmount;
+
+    // Build transaction details
+    List<TransactionDetail> details = [
+      TransactionDetail(
+        label: 'Recipient',
+        value: _recipientName!,
+      ),
+      TransactionDetail(
+        label: 'Phone',
+        value: _phoneController.text,
+      ),
+    ];
+
+    if (_noteController.text.isNotEmpty) {
+      details.add(TransactionDetail(
+        label: 'Note',
+        value: _noteController.text,
+      ));
     }
+
+    details.add(const TransactionDetail.divider());
+    details.add(TransactionDetail(
+      label: 'Transfer Amount',
+      value: '฿${_formatAmount(_transferAmount)}',
+    ));
+
+    if (transferFee > 0) {
+      details.add(TransactionDetail(
+        label: 'Transfer Fee',
+        value: '฿${_formatAmount(transferFee)}',
+      ));
+      details.add(const TransactionDetail.divider());
+      details.add(TransactionDetail(
+        label: 'Total Amount',
+        value: '฿${_formatAmount(totalAmount)}',
+        isHighlighted: true,
+      ));
+    }
+
+    // Navigate to confirmation screen
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TransactionConfirmationScreen(
+          type: TransactionType.transfer,
+          amount: totalAmount,
+          details: details,
+          onConfirm: (pin) async {
+            // PIN is verified, now process the transfer
+            return await _processTransfer();
+          },
+          onSuccess: () {
+            // Transfer successful, close confirmation and navigate
+            Navigator.pop(context); // Close confirmation screen
+          },
+        ),
+      ),
+    );
   }
 
-  void _processTransfer() async {
+  Future<bool> _processTransfer() async {
     if (_recipientUserId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid recipient'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
+      return false;
     }
-
-    setState(() {
-      _isProcessingTransfer = true;
-    });
-
-    Navigator.pop(context); // Close bottom sheet
 
     try {
       final walletService = Provider.of<WalletService>(context, listen: false);
@@ -167,36 +221,32 @@ class _TransferScreenState extends State<TransferScreen> {
         description: _noteController.text.isNotEmpty ? _noteController.text : null,
       );
 
-      // Debug: Print the exact structure of result
-      print('[Transfer] Result: $result');
-      print('[Transfer] Result type: ${result.runtimeType}');
-      if (result != null) {
-        print('[Transfer] Result keys: ${result.keys}');
-        print('[Transfer] transferId value: ${result['transferId']}');
-        print('[Transfer] transferId type: ${result['transferId'].runtimeType}');
-      }
-
-      if (mounted) {
-        setState(() {
-          _isProcessingTransfer = false;
-        });
-
-        if (result != null && result['success'] == true) {
-          // Navigate to success screen
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TransferSuccessScreen(
-                amount: _transferAmount,
-                recipientName: _recipientName!,
-                recipientPhone: _phoneController.text,
-                note: _noteController.text,
-                transferId: result['transferId']?.toString(),
-              ),
-            ),
-          );
-        } else {
-          // Show error
+      if (result != null && result['success'] == true) {
+        // Navigate to success screen - don't use pushReplacement
+        // The onSuccess callback will handle closing the confirmation screen
+        if (mounted) {
+          // Wait a tiny bit for confirmation screen to close via onSuccess
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TransferSuccessScreen(
+                    amount: _transferAmount,
+                    recipientName: _recipientName!,
+                    recipientPhone: _phoneController.text,
+                    note: _noteController.text,
+                    transferId: result['transferId']?.toString(),
+                  ),
+                ),
+              );
+            }
+          });
+        }
+        return true;
+      } else {
+        // Show error
+        if (mounted) {
           final error = walletService.error ?? 'Transfer failed';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -206,12 +256,10 @@ class _TransferScreenState extends State<TransferScreen> {
             ),
           );
         }
+        return false;
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isProcessingTransfer = false;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Transfer error: $e'),
@@ -220,6 +268,7 @@ class _TransferScreenState extends State<TransferScreen> {
           ),
         );
       }
+      return false;
     }
   }
 
@@ -608,205 +657,4 @@ class _TransferScreenState extends State<TransferScreen> {
     );
   }
 
-  Widget _buildConfirmationSheet() {
-    final walletService = Provider.of<WalletService>(context, listen: false);
-    final settings = walletService.settings;
-    final transferFee = settings?.transfer.calculateFee(_transferAmount) ?? 0.0;
-    final totalAmount = settings?.transfer.calculateTotalWithFee(_transferAmount) ?? _transferAmount;
-
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Confirm Transfer',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.grey.shade200,
-                ),
-              ),
-              child: Column(
-                children: [
-                  _buildConfirmRow('Recipient', _recipientName!),
-                  const SizedBox(height: 12),
-                  _buildConfirmRow('Phone', _phoneController.text),
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  _buildConfirmRow(
-                    'Transfer Amount',
-                    '฿${_formatAmount(_transferAmount)}',
-                  ),
-                  if (transferFee > 0) ...[
-                    const SizedBox(height: 12),
-                    _buildConfirmRow(
-                      'Transfer Fee',
-                      '฿${_formatAmount(transferFee)}',
-                    ),
-                    const SizedBox(height: 12),
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    _buildConfirmRow(
-                      'Total Amount',
-                      '฿${_formatAmount(totalAmount)}',
-                      isHighlighted: true,
-                    ),
-                  ] else ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'No fee',
-                            style: TextStyle(
-                              color: Colors.green,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (_noteController.text.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    _buildConfirmRow('Note', _noteController.text),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.black87,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: BorderSide(
-                        color: Colors.grey.shade300,
-                        width: 2,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: _isProcessingTransfer ? null : _processTransfer,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ChongjaroenColors.secondaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isProcessingTransfer
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text(
-                            'Confirm Transfer',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildConfirmRow(String label, String value, {bool isHighlighted = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.grey.shade600,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        Flexible(
-          child: Text(
-            value,
-            style: TextStyle(
-              color: isHighlighted
-                  ? ChongjaroenColors.primaryColors
-                  : Colors.black87,
-              fontSize: isHighlighted ? 18 : 14,
-              fontWeight: isHighlighted ? FontWeight.bold : FontWeight.w600,
-            ),
-            textAlign: TextAlign.right,
-          ),
-        ),
-      ],
-    );
-  }
 }

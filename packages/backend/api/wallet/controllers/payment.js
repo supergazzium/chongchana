@@ -25,22 +25,36 @@ module.exports = {
 
   /**
    * POST /api/wallet/payment/create-token
-   * DEPRECATED: This endpoint has been removed for PCI-DSS compliance.
-   * Card tokenization MUST be done client-side using Omise.js
-   *
-   * Client applications should use:
-   * - Flutter: omise_flutter package
-   * - Vue.js: Omise.js library
-   *
-   * Then send only the token ID to createChargeFromToken endpoint
+   * Create a card token using server-side Omise SDK
+   * NOTE: Server must be PCI-DSS compliant to handle raw card data
    */
   async createToken(ctx) {
-    return ctx.forbidden(utils.errorResponse(
-      'ENDPOINT_DEPRECATED',
-      'This endpoint has been disabled for PCI-DSS compliance. ' +
-      'Please tokenize cards client-side using Omise.js or omise_flutter package, ' +
-      'then send the token ID to /api/wallet/payment/create-charge endpoint.'
-    ));
+    try {
+      const { cardNumber, cardHolderName, expirationMonth, expirationYear, securityCode } = ctx.request.body;
+
+      if (!cardNumber || !cardHolderName || !expirationMonth || !expirationYear || !securityCode) {
+        return ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', 'All card fields are required'));
+      }
+
+      strapi.log.info('[Payment] Creating token for card ending in:', cardNumber.slice(-4));
+
+      // Create token using Omise SDK
+      const token = await paymentService.createCardToken({
+        cardNumber,
+        cardHolderName,
+        expirationMonth,
+        expirationYear,
+        securityCode,
+      });
+
+      ctx.send(utils.successResponse({
+        success: true,
+        tokenId: token.id,
+      }));
+    } catch (error) {
+      strapi.log.error('[Payment] createToken error:', error);
+      ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', error.message));
+    }
   },
 
   /**

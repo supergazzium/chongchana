@@ -1,77 +1,26 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:chongchana/services/api/fetcher.dart';
-import 'package:omise_flutter/omise_flutter.dart';
-import 'package:omise_dart/omise_dart.dart';
 
 /// Omise Payment Service for handling payment gateway operations
 class OmisePaymentService extends ChangeNotifier {
-  bool _isInitialized = false;
+  bool _isInitialized = true; // No SDK initialization needed on client side
   bool _isProcessing = false;
   String? _lastError;
-  OmisePayment? _omisePayment;
 
   bool get isInitialized => _isInitialized;
   bool get isProcessing => _isProcessing;
   String? get lastError => _lastError;
 
-  /// Initialize Omise SDK with public key from backend
+  /// Initialize Omise (No-op as we handle everything via backend)
   Future<void> initialize() async {
-    try {
-      print('[OmisePaymentService] Starting initialization...');
-
-      // Fetch Omise public key from backend
-      final serviceResponse = await Fetcher.fetch(
-        Fetcher.get,
-        '/wallet/payment-methods',
-      );
-
-      print('[OmisePaymentService] Fetcher response received:');
-      print('[OmisePaymentService]   isSuccess: ${serviceResponse.isSuccess}');
-      print('[OmisePaymentService]   statusCode: ${serviceResponse.statusCode}');
-      print('[OmisePaymentService]   data: ${serviceResponse.data}');
-      print('[OmisePaymentService]   errorMessage: ${serviceResponse.errorMessage}');
-
-      if (serviceResponse.isSuccess && serviceResponse.data != null) {
-        final data = serviceResponse.data['data'];
-        print('[OmisePaymentService] Extracted data: $data');
-
-        final publicKey = data['omisePublicKey'] as String?;
-        print('[OmisePaymentService] Public key extracted: ${publicKey != null ? '${publicKey.substring(0, 15)}...' : 'null'}');
-
-        if (publicKey != null && publicKey.isNotEmpty) {
-          print('[OmisePaymentService] Creating OmisePayment instance...');
-
-          // Initialize Omise Payment SDK
-          _omisePayment = OmisePayment(
-            publicKey: publicKey,
-            enableDebug: true,
-          );
-
-          _isInitialized = true;
-          _lastError = null;
-          print('[OmisePaymentService] ✓ Initialization successful!');
-        } else {
-          _lastError = 'Omise public key not configured on server';
-          _isInitialized = false;
-          print('[OmisePaymentService] ✗ Initialization failed: Public key is null or empty');
-        }
-      } else {
-        _lastError = 'Failed to fetch Omise configuration';
-        _isInitialized = false;
-        print('[OmisePaymentService] ✗ Initialization failed: Bad response from backend');
-      }
-    } catch (e, stackTrace) {
-      _lastError = 'Failed to initialize Omise: ${e.toString()}';
-      _isInitialized = false;
-      print('[OmisePaymentService] ✗ EXCEPTION during initialization: $e');
-      print('[OmisePaymentService] Stack trace: $stackTrace');
-    }
+    _isInitialized = true;
+    _lastError = null;
     notifyListeners();
   }
 
-  /// Create a token using client-side tokenization (PCI-DSS compliant)
-  /// Card data goes directly to Omise servers, never touches our backend
+  /// Create a token and process payment via backend
+  /// Card information is sent directly to backend which creates the token securely
   Future<String?> createToken({
     required String cardNumber,
     required String cardHolderName,
@@ -79,59 +28,44 @@ class OmisePaymentService extends ChangeNotifier {
     required String expirationYear,
     required String securityCode,
   }) async {
-    print('[OmisePaymentService] createToken called');
-    print('[OmisePaymentService]   _isInitialized: $_isInitialized');
-    print('[OmisePaymentService]   _omisePayment == null: ${_omisePayment == null}');
-
-    // Initialize if not already done
-    if (!_isInitialized) {
-      print('[OmisePaymentService] SDK not initialized, calling initialize()...');
-      await initialize();
-      print('[OmisePaymentService] After initialize(): _isInitialized = $_isInitialized');
-    }
-
-    if (!_isInitialized || _omisePayment == null) {
-      print('[OmisePaymentService] ✗ Cannot create token: SDK not initialized');
-      print('[OmisePaymentService]   _lastError: $_lastError');
-      _lastError = 'Omise SDK not initialized';
-      return null;
-    }
-
     _isProcessing = true;
     _lastError = null;
     notifyListeners();
 
     try {
-      print('[OmisePaymentService] Creating token with Omise SDK...');
-
-      // Create token request
-      final tokenRequest = CreateTokenRequest(
-        name: cardHolderName,
-        number: cardNumber,
-        expirationMonth: expirationMonth,
-        expirationYear: expirationYear,
-        securityCode: securityCode,
+      // Send card data to backend to create token securely
+      // Backend will use Omise SDK to create token
+      final serviceResponse = await Fetcher.fetch(
+        Fetcher.post,
+        '/wallet/payment/create-token',
+        params: {
+          'cardNumber': cardNumber,
+          'cardHolderName': cardHolderName,
+          'expirationMonth': expirationMonth,
+          'expirationYear': expirationYear,
+          'securityCode': securityCode,
+        },
       );
-
-      // Create token using Omise API Service
-      final token = await _omisePayment!.omiseApiService.createToken(tokenRequest);
 
       _isProcessing = false;
       notifyListeners();
 
-      if (token.id != null && token.id!.isNotEmpty) {
-        print('[OmisePaymentService] Token created successfully: ${token.id}');
-        return token.id;
+      if (serviceResponse.isSuccess && serviceResponse.data != null) {
+        final data = serviceResponse.data['data'];
+        if (data['success'] == true && data['tokenId'] != null) {
+          return data['tokenId'];
+        } else {
+          _lastError = data['error'] ?? 'Failed to create token';
+          return null;
+        }
       } else {
-        _lastError = 'Failed to create payment token';
-        print('[OmisePaymentService] Token creation failed: token has no ID');
+        _lastError = serviceResponse.errorMessage ?? 'Failed to create token';
         return null;
       }
     } catch (e) {
       _lastError = 'Failed to create token: ${e.toString()}';
       _isProcessing = false;
       notifyListeners();
-      print('[OmisePaymentService] Token creation error: $e');
       return null;
     }
   }

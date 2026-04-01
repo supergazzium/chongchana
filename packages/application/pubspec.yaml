@@ -90,6 +90,9 @@ dependencies:
   flutter_widget_from_html: ^0.17.1
   win32: ^5.15.0
   share_plus: ^12.0.1
+  omise_flutter: ^0.6.0
+  local_auth: ^3.0.1
+  flutter_secure_storage: ^10.0.0
 
 dev_dependencies:
   flutter_test:

@@ -4,6 +4,10 @@
    <!-- Internet permission for loading QR images -->
    <uses-permission android:name="android.permission.INTERNET"/>
 
+   <!-- Biometric authentication permissions -->
+   <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+   <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
+
    <application
         android:label="CHONGCHANA"
         android:icon="@mipmap/ic_launcher">

@@ -1,6 +1,12 @@
 import 'package:chongchana/constants/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:chongchana/services/wallet_auth.dart';
+import 'package:chongchana/screens/wallet/pin_setup.dart';
+import 'package:chongchana/screens/wallet/forgot_pin.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'dart:math' as math;
 
 class WalletSecurityScreen extends StatefulWidget {
   const WalletSecurityScreen({Key? key}) : super(key: key);
@@ -10,11 +16,6 @@ class WalletSecurityScreen extends StatefulWidget {
 }
 
 class _WalletSecurityScreenState extends State<WalletSecurityScreen> {
-  String paymentAuthLevel = 'always';
-  bool useFingerprintFaceId = true;
-  bool usePin = true;
-  bool usePassword = false;
-
   bool notifyTopUp = true;
   bool notifyPayment = true;
   bool notifyRefund = true;
@@ -26,108 +27,20 @@ class _WalletSecurityScreenState extends State<WalletSecurityScreen> {
   final String lastDevice = 'iPhone 13 Pro';
   final String lastLocation = 'Bangkok, Thailand';
 
-  void _changePin() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: ChongjaroenColors.primaryColors.shade800,
-        title: const Text(
-          'Change PIN',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              obscureText: true,
-              maxLength: 6,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'Current PIN',
-                labelStyle: const TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(
-                    color: ChongjaroenColors.primaryColors.shade600,
-                  ),
-                ),
-                focusedBorder: const OutlineInputBorder(
-                  borderSide: BorderSide(
-                    color: ChongjaroenColors.secondaryColor,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              obscureText: true,
-              maxLength: 6,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'New PIN',
-                labelStyle: const TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(
-                    color: ChongjaroenColors.primaryColors.shade600,
-                  ),
-                ),
-                focusedBorder: const OutlineInputBorder(
-                  borderSide: BorderSide(
-                    color: ChongjaroenColors.secondaryColor,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              obscureText: true,
-              maxLength: 6,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'Confirm New PIN',
-                labelStyle: const TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(
-                    color: ChongjaroenColors.primaryColors.shade600,
-                  ),
-                ),
-                focusedBorder: const OutlineInputBorder(
-                  borderSide: BorderSide(
-                    color: ChongjaroenColors.secondaryColor,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white54),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('PIN changed successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ChongjaroenColors.secondaryColor,
-            ),
-            child: const Text('Change PIN'),
-          ),
-        ],
+  void _changePin() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PinSetupScreen(isFirstTimeSetup: false),
       ),
     );
+
+    if (result == true) {
+      Fluttertoast.showToast(
+        msg: 'PIN changed successfully',
+        backgroundColor: Colors.green,
+      );
+    }
   }
 
   void _viewLoginHistory() {
@@ -142,161 +55,387 @@ class _WalletSecurityScreenState extends State<WalletSecurityScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text('Wallet Security'),
-        backgroundColor: ChongjaroenColors.primaryColors,
-      ),
-      backgroundColor: ChongjaroenColors.primaryColors.shade900,
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: Colors.grey[50],
+      body: Stack(
+        children: [
+          // Topological background
+          Positioned(
+            top: -80,
+            right: -60,
+            child: Transform.rotate(
+              angle: math.pi / 4,
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: ChongjaroenColors.secondaryColors.withOpacity(0.08),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 100,
+            left: -50,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: ChongjaroenColors.primaryColors.withOpacity(0.06),
+              ),
+            ),
+          ),
+
+          // Main content
+          Column(
             children: [
-              _buildPaymentAuthorization(),
-              const SizedBox(height: 24),
-              _buildAuthenticationMethod(),
-              const SizedBox(height: 24),
-              _buildNotifications(),
-              const SizedBox(height: 24),
-              _buildActivityLog(),
+              // Topology-styled app bar
+              Container(
+                decoration: BoxDecoration(
+                  color: ChongjaroenColors.primaryColors,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Stack(
+                    children: [
+                      // Topology circles
+                      Positioned(
+                        top: -30,
+                        right: -20,
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color:
+                                ChongjaroenColors.secondaryColors.withOpacity(0.2),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: -15,
+                        left: 20,
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: ChongjaroenColors.primaryColors.shade700,
+                          ),
+                        ),
+                      ),
+
+                      // App bar content
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back, color: Colors.white),
+                              onPressed: () => Navigator.pop(context),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            const SizedBox(width: 16),
+                            const Expanded(
+                              child: Text(
+                                'Wallet Security',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.shield_outlined,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Scrollable content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _buildPaymentAuthorization(),
+                      const SizedBox(height: 12),
+                      _buildAuthenticationMethod(),
+                      const SizedBox(height: 12),
+                      _buildNotifications(),
+                      const SizedBox(height: 12),
+                      _buildActivityLog(),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildPaymentAuthorization() {
-    return _buildSection(
-      title: 'Payment Authorization',
-      child: Column(
-        children: [
-          const Text(
-            'Require authentication for payments',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
+    return Consumer<WalletAuthService>(
+      builder: (context, authService, child) {
+        return _buildSection(
+          icon: Icons.lock_outline,
+          title: 'PIN Authorization',
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              _buildAuthLevelOption(
+                icon: Icons.verified_user,
+                label: 'Always',
+                subtitle: 'PIN required for every transaction',
+                level: PinAuthLevel.always,
+                authService: authService,
+              ),
+              const SizedBox(height: 8),
+              _buildAuthLevelOption(
+                icon: Icons.account_balance_wallet,
+                label: 'Above ฿${_formatAmount(authService.pinThresholdAmount)}',
+                subtitle: 'PIN required for high-value transactions',
+                level: PinAuthLevel.aboveAmount,
+                authService: authService,
+              ),
+              const SizedBox(height: 8),
+              _buildAuthLevelOption(
+                icon: Icons.lock_open,
+                label: 'Never',
+                subtitle: 'Security disabled',
+                level: PinAuthLevel.never,
+                authService: authService,
+                showWarning: true,
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          _buildRadioOption('Always', 'always'),
-          _buildRadioOption('For payments above ฿500', 'above_500'),
-          _buildRadioOption('Never', 'never'),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildAuthenticationMethod() {
-    return _buildSection(
-      title: 'Authentication Method',
-      child: Column(
-        children: [
-          _buildSwitchTile(
-            title: 'Fingerprint / Face ID',
-            value: useFingerprintFaceId,
-            onChanged: (value) {
-              setState(() {
-                useFingerprintFaceId = value;
-              });
-            },
-          ),
-          const SizedBox(height: 8),
-          _buildSwitchTile(
-            title: '6-digit PIN',
-            value: usePin,
-            onChanged: (value) {
-              setState(() {
-                usePin = value;
-              });
-            },
-          ),
-          const SizedBox(height: 8),
-          _buildSwitchTile(
-            title: 'Password',
-            value: usePassword,
-            onChanged: (value) {
-              setState(() {
-                usePassword = value;
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: _changePin,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.white54),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+    return Consumer<WalletAuthService>(
+      builder: (context, authService, child) {
+        return _buildSection(
+          icon: Icons.fingerprint,
+          title: 'Authentication',
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              if (authService.isBiometricAvailable)
+                _buildSwitchTile(
+                  icon: Icons.fingerprint,
+                  title: authService.getBiometricTypeName(),
+                  value: authService.isBiometricEnabled,
+                  onChanged: (value) async {
+                    try {
+                      await authService.setBiometricEnabled(value);
+                      Fluttertoast.showToast(
+                        msg: value ? 'Biometric enabled' : 'Biometric disabled',
+                        backgroundColor: Colors.green,
+                      );
+                    } catch (e) {
+                      Fluttertoast.showToast(
+                        msg: 'Update failed',
+                        backgroundColor: Colors.red,
+                      );
+                    }
+                  },
                 ),
+              if (authService.isBiometricAvailable) const SizedBox(height: 8),
+              _buildSwitchTile(
+                icon: Icons.dialpad,
+                title: '6-digit PIN',
+                value: authService.isPinEnabled && authService.hasPinSetup,
+                onChanged: authService.hasPinSetup
+                    ? (value) async {
+                        try {
+                          await authService.setPinEnabled(value);
+                          Fluttertoast.showToast(
+                            msg: value ? 'PIN enabled' : 'PIN disabled',
+                            backgroundColor: Colors.green,
+                          );
+                        } catch (e) {
+                          Fluttertoast.showToast(
+                            msg: 'Update failed',
+                            backgroundColor: Colors.red,
+                          );
+                        }
+                      }
+                    : null,
               ),
-              child: const Text('Change PIN'),
-            ),
+              if (!authService.hasPinSetup) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline,
+                          color: Colors.orange.shade700, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Setup PIN for security',
+                          style: TextStyle(
+                            color: Colors.orange.shade700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _changePin,
+                      icon: Icon(
+                        authService.hasPinSetup ? Icons.edit : Icons.add,
+                        size: 18,
+                      ),
+                      label: Text(
+                        authService.hasPinSetup ? 'Change PIN' : 'Setup PIN',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ChongjaroenColors.primaryColors,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (authService.hasPinSetup) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ForgotPinScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.help_outline, size: 18),
+                  label: const Text('Forgot PIN?'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ChongjaroenColors.secondaryColors,
+                    side: BorderSide(color: ChongjaroenColors.secondaryColors),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: () async {
+                  await authService.resetAuthentication();
+                  Fluttertoast.showToast(
+                    msg: 'Authentication reset',
+                    backgroundColor: Colors.orange,
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange,
+                  side: const BorderSide(color: Colors.orange),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text('🔧 Reset'),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildNotifications() {
     return _buildSection(
+      icon: Icons.notifications_outlined,
       title: 'Notifications',
       child: Column(
         children: [
+          const SizedBox(height: 12),
           _buildSwitchTile(
+            icon: Icons.add_circle_outline,
             title: 'Top-up confirmation',
             value: notifyTopUp,
-            onChanged: (value) {
-              setState(() {
-                notifyTopUp = value;
-              });
-            },
+            onChanged: (v) => setState(() => notifyTopUp = v),
           ),
           const SizedBox(height: 8),
           _buildSwitchTile(
+            icon: Icons.payment,
             title: 'Payment confirmation',
             value: notifyPayment,
-            onChanged: (value) {
-              setState(() {
-                notifyPayment = value;
-              });
-            },
+            onChanged: (v) => setState(() => notifyPayment = v),
           ),
           const SizedBox(height: 8),
           _buildSwitchTile(
+            icon: Icons.arrow_circle_down,
             title: 'Refund received',
             value: notifyRefund,
-            onChanged: (value) {
-              setState(() {
-                notifyRefund = value;
-              });
-            },
+            onChanged: (v) => setState(() => notifyRefund = v),
           ),
           const SizedBox(height: 8),
           _buildSwitchTile(
-            title: 'Low balance alert (฿${_formatAmount(lowBalanceThreshold)})',
+            icon: Icons.warning_amber_outlined,
+            title: 'Low balance (฿${_formatAmount(lowBalanceThreshold)})',
             value: notifyLowBalance,
-            onChanged: (value) {
-              setState(() {
-                notifyLowBalance = value;
-              });
-            },
+            onChanged: (v) => setState(() => notifyLowBalance = v),
           ),
           const SizedBox(height: 8),
           _buildSwitchTile(
+            icon: Icons.shield_outlined,
             title: 'Suspicious activity',
             value: notifySuspicious,
-            onChanged: (value) {
-              setState(() {
-                notifySuspicious = value;
-              });
-            },
+            onChanged: (v) => setState(() => notifySuspicious = v),
           ),
         ],
       ),
@@ -305,32 +444,32 @@ class _WalletSecurityScreenState extends State<WalletSecurityScreen> {
 
   Widget _buildActivityLog() {
     return _buildSection(
+      icon: Icons.history,
       title: 'Activity Log',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDetailRow(
-            'Last login:',
-            DateFormat('MMM d, yyyy, HH:mm').format(lastLogin),
+          const SizedBox(height: 12),
+          _buildInfoRow(
+            Icons.access_time,
+            'Last login',
+            DateFormat('MMM d, HH:mm').format(lastLogin),
           ),
           const SizedBox(height: 8),
-          _buildDetailRow('Device:', lastDevice),
+          _buildInfoRow(Icons.phone_android, 'Device', lastDevice),
           const SizedBox(height: 8),
-          _buildDetailRow('Location:', lastLocation),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: _viewLoginHistory,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.white54),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          _buildInfoRow(Icons.location_on, 'Location', lastLocation),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _viewLoginHistory,
+            icon: const Icon(Icons.list_alt, size: 18),
+            label: const Text('View History'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: ChongjaroenColors.primaryColors,
+              side: BorderSide(color: ChongjaroenColors.primaryColors),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text('View All Login History'),
             ),
           ),
         ],
@@ -339,103 +478,289 @@ class _WalletSecurityScreenState extends State<WalletSecurityScreen> {
   }
 
   Widget _buildSection({
+    required IconData icon,
     required String title,
     required Widget child,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: ChongjaroenColors.primaryColors.shade800,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: ChongjaroenColors.primaryColors.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: ChongjaroenColors.primaryColors,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAuthLevelOption({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required PinAuthLevel level,
+    required WalletAuthService authService,
+    bool showWarning = false,
+  }) {
+    final isSelected = authService.pinAuthLevel == level;
+    // Starbucks color: Deep Green #006241
+    final deepGreen = const Color(0xFF006241);
+    final lightRed = Colors.red.shade50;
+    final warningRed = Colors.red.shade400;
+
+    return GestureDetector(
+      onTap: () async {
+        // Auto-save: update immediately without Save button
+        await authService.setPinAuthLevel(level);
+
+        // Show brief haptic-like snackbar
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Setting Updated'),
+                ],
+              ),
+              backgroundColor: deepGreen,
+              duration: const Duration(milliseconds: 1200),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              margin: const EdgeInsets.only(bottom: 60, left: 16, right: 16),
+            ),
+          );
+        }
+      },
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              // Pure white background with high negative space
               color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? deepGreen : Colors.grey.shade200,
+                width: isSelected ? 2 : 1,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: deepGreen.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? deepGreen.withOpacity(0.1)
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isSelected ? deepGreen : Colors.grey[600],
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                          color: isSelected ? deepGreen : Colors.black87,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected ? deepGreen : Colors.grey.shade400,
+                      width: 2,
+                    ),
+                    color: isSelected ? deepGreen : Colors.transparent,
+                  ),
+                  child: isSelected
+                      ? const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 14,
+                        )
+                      : null,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          child,
+          // Show "Not Recommended" warning for "Never" option
+          if (showWarning && isSelected) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: lightRed,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: warningRed.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: warningRed, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Not Recommended - Your wallet is unprotected',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: warningRed,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildRadioOption(String label, String value) {
-    return RadioListTile<String>(
-      title: Text(
-        label,
-        style: const TextStyle(color: Colors.white),
-      ),
-      value: value,
-      groupValue: paymentAuthLevel,
-      onChanged: (newValue) {
-        setState(() {
-          paymentAuthLevel = newValue!;
-        });
-      },
-      activeColor: ChongjaroenColors.secondaryColor,
-      contentPadding: EdgeInsets.zero,
-    );
-  }
-
   Widget _buildSwitchTile({
+    required IconData icon,
     required String title,
     required bool value,
-    required ValueChanged<bool> onChanged,
+    required ValueChanged<bool>? onChanged,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: ChongjaroenColors.primaryColors.shade700,
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Icon(
+            icon,
+            color: value ? ChongjaroenColors.primaryColors : Colors.grey[600],
+            size: 18,
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               title,
               style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: ChongjaroenColors.secondaryColor,
+            activeColor: ChongjaroenColors.primaryColors,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 14,
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: ChongjaroenColors.secondaryColors, size: 16),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -450,7 +775,7 @@ class LoginHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> loginHistory = [
+    final loginHistory = [
       {
         'date': DateTime(2025, 3, 8, 14, 30),
         'device': 'iPhone 13 Pro',
@@ -472,12 +797,16 @@ class LoginHistoryScreen extends StatelessWidget {
     ];
 
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        centerTitle: true,
-        title: const Text('Login History'),
+        elevation: 0,
         backgroundColor: ChongjaroenColors.primaryColors,
+        title: const Text(
+          'Login History',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
-      backgroundColor: ChongjaroenColors.primaryColors.shade900,
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: loginHistory.length,
@@ -485,81 +814,53 @@ class LoginHistoryScreen extends StatelessWidget {
           final login = loginHistory[index];
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: ChongjaroenColors.primaryColors.shade800,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  DateFormat('MMM d, yyyy, HH:mm').format(login['date']),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  DateFormat('MMM d, yyyy, HH:mm').format(login['date'] as DateTime),
+                  style: TextStyle(
+                    color: ChongjaroenColors.primaryColors,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.phone_android,
-                      size: 14,
-                      color: Colors.white54,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      login['device'],
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
+                _buildHistoryRow(Icons.phone_android, login['device'] as String),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.location_on,
-                      size: 14,
-                      color: Colors.white54,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      login['location'],
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
+                _buildHistoryRow(Icons.location_on, login['location'] as String),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.dns,
-                      size: 14,
-                      color: Colors.white54,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      login['ip'],
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
+                _buildHistoryRow(Icons.dns, login['ip'] as String),
               ],
             ),
           );
         },
       ),
+    );
+  }
+
+  Widget _buildHistoryRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[600]),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+        ),
+      ],
     );
   }
 }

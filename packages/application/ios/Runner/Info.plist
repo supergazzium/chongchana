@@ -48,6 +48,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to scan QR codes</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Enable Face ID / Touch ID for secure and quick wallet authentication</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Use location when user open our branch in map.</string>
 	<key>OneSignal_app_groups_key</key>

@@ -112,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           controller: _refreshController,
           onRefresh: () => _onRefresh(auth),
+
           onLoading: () => _onLoading(auth),
           child: _content(),
         ),

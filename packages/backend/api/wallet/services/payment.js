@@ -23,6 +23,38 @@ const omise = require('omise')({
 
 module.exports = {
   /**
+   * Create a card token using Omise SDK
+   * Card data is sent to Omise to create a secure token
+   * Uses PUBLIC KEY for token creation
+   */
+  async createCardToken({ cardNumber, cardHolderName, expirationMonth, expirationYear, securityCode }) {
+    try {
+      strapi.log.info('[Payment] Creating card token using Omise SDK');
+
+      // Use PUBLIC KEY client for token creation (per Omise documentation)
+      const token = await omisePublic.tokens.create({
+        card: {
+          name: cardHolderName,
+          number: cardNumber,
+          expiration_month: expirationMonth,
+          expiration_year: expirationYear,
+          security_code: securityCode,
+        },
+      });
+
+      strapi.log.info('[Payment] Created card token:', {
+        id: token.id,
+        card_last_digits: token.card?.last_digits,
+      });
+
+      return token;
+    } catch (error) {
+      strapi.log.error('[Payment] createCardToken error:', error);
+      throw new Error(error.message || 'Failed to create card token');
+    }
+  },
+
+  /**
    * Create a payment source for mobile banking
    * Supports: mobile_banking_kbank, mobile_banking_scb, mobile_banking_bay, etc.
    * Uses PUBLIC KEY as per Omise best practices

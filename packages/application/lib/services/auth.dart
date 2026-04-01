@@ -21,7 +21,17 @@ class ChongjaroenAuth extends ChangeNotifier {
   bool get loadingFetchProfile => _loadingFetchProfile;
   Future<String?> getAccessToken() async {
     final SharedPreferences prefs = await _prefs;
-    return prefs.getString("accessToken");
+    final token = prefs.getString("accessToken");
+
+    // DEBUG: Print JWT token for testing
+    if (token != null) {
+      print('=' * 80);
+      print('🔑 JWT TOKEN FOR TESTING:');
+      print(token);
+      print('=' * 80);
+    }
+
+    return token;
   }
 
   Future<void> signOut() async {

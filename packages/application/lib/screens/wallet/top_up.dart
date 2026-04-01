@@ -2,9 +2,14 @@ import 'package:chongchana/constants/colors.dart';
 import 'package:chongchana/screens/wallet/credit_card_form.dart';
 import 'package:chongchana/screens/wallet/mobile_banking_waiting.dart';
 import 'package:chongchana/screens/wallet/promptpay_qr.dart';
+import 'package:chongchana/screens/wallet/pin_setup.dart';
+import 'package:chongchana/screens/wallet/transaction_confirmation.dart';
 import 'package:chongchana/services/omise_payment.dart';
+import 'package:chongchana/services/wallet_auth.dart';
+import 'package:chongchana/widgets/pin_auth_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -125,17 +130,54 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
       return;
     }
 
-    // Handle different payment methods
-    if (selectedPaymentMethod == 'credit_card') {
-      _handleCreditCardPayment();
-    } else if (selectedPaymentMethod == 'mobile_banking' ||
-               selectedPaymentMethod!.startsWith('mobile_banking_')) {
-      _handleMobileBankingPayment();
-    } else if (selectedPaymentMethod == 'promptpay') {
-      _handlePromptPayPayment();
-    } else {
-      _showSuccessDialog('Mock payment successful');
-    }
+    // Show transaction confirmation screen with PIN verification
+    String paymentMethodName = _getPaymentMethodName(selectedPaymentMethod!);
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TransactionConfirmationScreen(
+          type: TransactionType.topUp,
+          amount: selectedAmount!,
+          details: [
+            TransactionDetail(
+              label: 'Wallet',
+              value: '$userName ($cardNumber)',
+            ),
+            TransactionDetail(
+              label: 'Payment Method',
+              value: paymentMethodName,
+            ),
+            const TransactionDetail.divider(),
+            TransactionDetail(
+              label: 'Amount',
+              value: '฿${_formatAmount(selectedAmount!)}',
+              isHighlighted: true,
+            ),
+          ],
+          onConfirm: (pin) async {
+            // This callback is called after PIN is verified
+            // Process the actual payment
+            return await _processPayment();
+          },
+          onSuccess: () {
+            // Payment processed successfully
+            Navigator.pop(context); // Close confirmation screen
+            // Then show the appropriate payment flow
+            if (selectedPaymentMethod == 'credit_card') {
+              _handleCreditCardPayment();
+            } else if (selectedPaymentMethod == 'mobile_banking' ||
+                       selectedPaymentMethod!.startsWith('mobile_banking_')) {
+              _handleMobileBankingPayment();
+            } else if (selectedPaymentMethod == 'promptpay') {
+              _handlePromptPayPayment();
+            } else {
+              _showSuccessDialog('Mock payment successful');
+            }
+          },
+        ),
+      ),
+    );
   }
 
   void _handlePromptPayPayment() {
@@ -910,5 +952,28 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
       default:
         return 'Mobile Banking';
     }
+  }
+
+  String _getPaymentMethodName(String paymentMethod) {
+    switch (paymentMethod) {
+      case 'credit_card':
+        return 'Credit / Debit Card';
+      case 'promptpay':
+        return 'PromptPay QR';
+      case 'mobile_banking':
+        return 'Mobile Banking';
+      default:
+        if (paymentMethod.startsWith('mobile_banking_')) {
+          return _getBankName(paymentMethod);
+        }
+        return paymentMethod.replaceAll('_', ' ').toUpperCase();
+    }
+  }
+
+  Future<bool> _processPayment() async {
+    // Simulate payment processing
+    // In a real app, this would integrate with your payment backend
+    await Future.delayed(const Duration(milliseconds: 500));
+    return true; // Return true for success, false for failure
   }
 }
