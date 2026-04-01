@@ -60,34 +60,27 @@ module.exports = {
 
   /**
    * Send OTP via SMS using ThaiBulkSMS (existing service)
+   *
+   * NOTE: ThaiBulkSMS's OTP service generates its own OTP codes.
+   * For custom OTP (PIN reset), we need a different SMS service or their custom message API.
+   * Currently logs OTP only - integrate Twilio or custom SMS service for production.
    */
   async sendOTPviaSMS(phone, otp) {
     strapi.log.info(`[PIN Reset] Sending SMS OTP to ${phone}`);
 
     try {
-      // In development mode, just log the OTP
-      if (process.env.NODE_ENV === 'development') {
-        strapi.log.info(`[DEV] OTP for ${phone}: ${otp}`);
-        strapi.log.info(`[DEV] Use OTP code: ${otp} to verify`);
-        return true;
-      }
+      // Always log OTP (for development testing)
+      strapi.log.info(`[DEV] OTP for ${phone}: ${otp}`);
+      strapi.log.info(`[DEV] Use OTP code: ${otp} to verify`);
 
-      // In production, use existing ThaiBulkSMS service
-      // Note: ThaiBulkSMS generates its own OTP, so we need to store their token
-      // For now, we'll send a custom SMS with our OTP
-      const response = await strapi.config.functions.otpService.request({
-        mobile: phone,
-      });
+      // TODO: Integrate SMS service that supports custom messages
+      // Option 1: Check if ThaiBulkSMS has custom message API
+      // Option 2: Use Twilio for custom SMS: https://www.twilio.com/
+      // Option 3: Use AWS SNS for SMS
 
-      if (response.success) {
-        strapi.log.info(`[PIN Reset] SMS sent successfully to ${phone}`);
-        // Note: In production, you might want to use ThaiBulkSMS's OTP instead
-        // For now, we're using our generated OTP in development
-        return true;
-      } else {
-        strapi.log.error(`[PIN Reset] SMS failed for ${phone}:`, response.message);
-        throw new Error(response.message || 'Failed to send SMS');
-      }
+      // For now, just log - SMS functionality pending
+      strapi.log.warn(`[PIN Reset] SMS not implemented - using log-only mode`);
+      return true;
     } catch (error) {
       strapi.log.error(`[PIN Reset] SMS error for ${phone}:`, error);
       throw error;
