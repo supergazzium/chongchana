@@ -55,11 +55,27 @@ class OmisePaymentService extends ChangeNotifier {
         if (data['success'] == true && data['tokenId'] != null) {
           return data['tokenId'];
         } else {
-          _lastError = data['error'] ?? 'Failed to create token';
+          // Handle error which can be String or Map
+          final error = data['error'];
+          if (error is String) {
+            _lastError = error;
+          } else if (error is Map) {
+            _lastError = error['message']?.toString() ?? error.toString();
+          } else {
+            _lastError = 'Failed to create token';
+          }
           return null;
         }
       } else {
-        _lastError = serviceResponse.errorMessage ?? 'Failed to create token';
+        // Handle errorMessage which can be String or Map
+        if (serviceResponse.errorMessage is String) {
+          _lastError = serviceResponse.errorMessage as String;
+        } else if (serviceResponse.errorMessage is Map) {
+          final errorMap = serviceResponse.errorMessage as Map;
+          _lastError = errorMap['message']?.toString() ?? errorMap.toString();
+        } else {
+          _lastError = 'Failed to create token';
+        }
         return null;
       }
     } catch (e) {
@@ -116,11 +132,21 @@ class OmisePaymentService extends ChangeNotifier {
             'timestamp': DateTime.now().toIso8601String(),
           };
         } else {
-          _lastError = data['failureMessage'] ?? 'Payment failed';
+          // Handle failureMessage which can be String or null
+          final failureMsg = data['failureMessage'];
+          _lastError = failureMsg?.toString() ?? 'Payment failed';
           return null;
         }
       } else {
-        _lastError = serviceResponse.errorMessage ?? 'Payment failed';
+        // Handle errorMessage which can be String or Map
+        if (serviceResponse.errorMessage is String) {
+          _lastError = serviceResponse.errorMessage as String;
+        } else if (serviceResponse.errorMessage is Map) {
+          final errorMap = serviceResponse.errorMessage as Map;
+          _lastError = errorMap['message']?.toString() ?? errorMap.toString();
+        } else {
+          _lastError = 'Payment failed';
+        }
         return null;
       }
     } catch (e) {
@@ -197,7 +223,15 @@ class OmisePaymentService extends ChangeNotifier {
           return null;
         }
       } else {
-        _lastError = serviceResponse.errorMessage ?? 'Failed to create payment source';
+        // Handle errorMessage which can be String or Map
+        if (serviceResponse.errorMessage is String) {
+          _lastError = serviceResponse.errorMessage as String;
+        } else if (serviceResponse.errorMessage is Map) {
+          final errorMap = serviceResponse.errorMessage as Map;
+          _lastError = errorMap['message']?.toString() ?? errorMap.toString();
+        } else {
+          _lastError = 'Failed to create payment source';
+        }
         return null;
       }
     } catch (e) {
