@@ -103,7 +103,7 @@ module.exports = {
         qs.stringify({
           msisdn: phone,
           message: message,
-          sender: 'Chongjaroen', // Sender name (optional)
+          // sender: 'Chongjaroen', // Omit sender to use default (needs pre-approval)
           force: 'standard', // SMS type: standard or premium
         }),
         {
