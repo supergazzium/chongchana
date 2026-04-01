@@ -102,8 +102,17 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
 
         if (result != null && result['success'] == true) {
           if (!mounted) return;
-          widget.onPaymentSuccess(result['transactionId']);
-          Navigator.pop(context);
+
+          // Check if payment is completed (has transactionId) or pending
+          if (result['paid'] == true && result['transactionId'] != null) {
+            // Payment completed immediately (rare for credit cards)
+            widget.onPaymentSuccess(result['transactionId']);
+            Navigator.pop(context);
+          } else {
+            // Payment is pending (typical for credit cards - awaiting bank approval)
+            Navigator.pop(context);
+            _showPendingDialog(result['chargeId']);
+          }
         } else {
           if (!mounted) return;
           _showErrorDialog('Payment failed. Please try again.');
@@ -137,6 +146,70 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
           ],
         ),
         content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'OK',
+              style: TextStyle(color: ChongjaroenColors.secondaryColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPendingDialog(String chargeId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: Row(
+          children: [
+            Icon(Icons.hourglass_empty, color: Colors.orange.shade700),
+            const SizedBox(width: 8),
+            const Text('Payment Processing'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your payment is being processed by your bank.',
+              style: TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'This usually takes a few minutes. You will receive a notification once the payment is confirmed.',
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.receipt, size: 16, color: Colors.black54),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Charge ID: ${chargeId.substring(0, 20)}...',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
