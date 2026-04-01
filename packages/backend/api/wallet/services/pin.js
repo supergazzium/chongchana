@@ -97,18 +97,20 @@ module.exports = {
       const qs = require('querystring');
       const message = `Your Chongjaroen wallet PIN reset code is: ${otp}. Valid for 10 minutes. Do not share this code.`;
 
-      // ThaiBulkSMS SMS API v2 - requires form-urlencoded
+      // ThaiBulkSMS SMS API v2 - uses Basic Auth + form-urlencoded body
       const response = await axios.post(
         'https://api-v2.thaibulksms.com/sms',
         qs.stringify({
-          key: apiKey,
-          secret: apiSecret,
           msisdn: phone,
           message: message,
           sender: 'Chongjaroen', // Sender name (optional)
           force: 'standard', // SMS type: standard or premium
         }),
         {
+          auth: {
+            username: apiKey,
+            password: apiSecret,
+          },
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'accept': 'application/json',
