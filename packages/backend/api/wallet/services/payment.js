@@ -321,10 +321,11 @@ module.exports = {
   },
 
   /**
-   * Get supported payment methods
+   * Get supported payment methods and Omise public key
    */
   async getSupportedPaymentMethods() {
     return {
+      omisePublicKey: process.env.OMISE_PUBLIC_KEY,
       credit_card: {
         id: 'credit_card',
         name: 'Credit/Debit Card',
