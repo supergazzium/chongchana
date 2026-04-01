@@ -102,6 +102,96 @@ class ChongjaroenAuth extends ChangeNotifier {
     notifyListeners();
     return this;
   }
+
+  /// Request OTP for PIN reset via phone or email
+  Future<Map<String, dynamic>> requestPinResetOTP({
+    required String method,
+  }) async {
+    try {
+      ServiceResponse resp = await apiRequestPinResetOTP(method);
+
+      if (resp.isSuccess) {
+        return {
+          'success': true,
+          'maskedContact': resp.data['maskedContact'] ?? '',
+          'message': resp.data['message'] ?? 'OTP sent successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': resp.errorMessages.isNotEmpty
+              ? resp.errorMessages[0].message
+              : 'Failed to send OTP',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'An error occurred: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Verify OTP for PIN reset
+  Future<Map<String, dynamic>> verifyPinResetOTP({
+    required String otp,
+    required String method,
+  }) async {
+    try {
+      ServiceResponse resp = await apiVerifyPinResetOTP(otp, method);
+
+      if (resp.isSuccess) {
+        return {
+          'success': true,
+          'resetToken': resp.data['resetToken'] ?? '',
+          'message': resp.data['message'] ?? 'OTP verified successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': resp.errorMessages.isNotEmpty
+              ? resp.errorMessages[0].message
+              : 'Invalid OTP',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'An error occurred: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Reset PIN with verified token
+  Future<Map<String, dynamic>> resetPinWithToken({
+    required String resetToken,
+    required String newPin,
+  }) async {
+    try {
+      ServiceResponse resp = await apiResetPinWithToken(resetToken, newPin);
+
+      if (resp.isSuccess) {
+        // PIN reset successful - update local storage
+        // The backend should handle storing the new PIN
+        return {
+          'success': true,
+          'message': resp.data['message'] ?? 'PIN reset successfully',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': resp.errorMessages.isNotEmpty
+              ? resp.errorMessages[0].message
+              : 'Failed to reset PIN',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'An error occurred: ${e.toString()}',
+      };
+    }
+  }
 }
 
 class ChongjaroenAuthScope extends InheritedNotifier<ChongjaroenAuth> {

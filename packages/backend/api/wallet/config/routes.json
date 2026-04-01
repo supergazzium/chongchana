@@ -304,6 +304,30 @@
       "config": {
         "policies": []
       }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/pin/request-reset-otp",
+      "handler": "pin.requestResetOTP",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/pin/verify-reset-otp",
+      "handler": "pin.verifyResetOTP",
+      "config": {
+        "policies": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/pin/reset-with-token",
+      "handler": "pin.resetWithToken",
+      "config": {
+        "policies": []
+      }
     }
   ]
 }
