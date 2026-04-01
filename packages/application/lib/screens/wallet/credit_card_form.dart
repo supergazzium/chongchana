@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CreditCardFormScreen extends StatefulWidget {
   final double amount;
@@ -105,11 +106,15 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
 
           // Check if payment is completed (has transactionId) or pending
           if (result['paid'] == true && result['transactionId'] != null) {
-            // Payment completed immediately (rare for credit cards)
+            // Payment completed immediately (cards without 3D Secure)
             widget.onPaymentSuccess(result['transactionId']);
             Navigator.pop(context);
+          } else if (result['authorizeUri'] != null) {
+            // Payment requires 3D Secure authentication
+            Navigator.pop(context);
+            _handle3DSecureAuth(result['authorizeUri'], result['chargeId']);
           } else {
-            // Payment is pending (typical for credit cards - awaiting bank approval)
+            // Payment is pending (awaiting bank approval without 3D Secure)
             Navigator.pop(context);
             _showPendingDialog(result['chargeId']);
           }
@@ -221,6 +226,184 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _handle3DSecureAuth(String authorizeUri, String chargeId) async {
+    // Show dialog with instructions
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: Row(
+          children: [
+            Icon(Icons.security, color: Colors.blue.shade700),
+            const SizedBox(width: 8),
+            const Text('Bank Verification Required'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your bank requires additional verification (3D Secure).',
+              style: TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'You will be redirected to your bank\'s website to verify this payment. This usually involves entering an OTP (One-Time Password).',
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'After verifying, return to the app to complete your top-up.',
+                      style: TextStyle(fontSize: 12, color: Colors.black87),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ChongjaroenColors.secondaryColor,
+            ),
+            child: const Text('Verify Now', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (proceed == true) {
+      // Open authorize_uri in browser
+      final uri = Uri.parse(authorizeUri);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+        // Show dialog to check payment status after user returns
+        if (mounted) {
+          _showCheckPaymentDialog(chargeId);
+        }
+      } else {
+        if (mounted) {
+          _showErrorDialog('Unable to open bank verification page');
+        }
+      }
+    }
+  }
+
+  void _showCheckPaymentDialog(String chargeId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text('Verify Payment'),
+        content: const Text(
+          'Have you completed the bank verification?',
+          style: TextStyle(fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Not Yet'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _checkPaymentStatus(chargeId);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ChongjaroenColors.secondaryColor,
+            ),
+            child: const Text('Yes, Check Status', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _checkPaymentStatus(String chargeId) async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        backgroundColor: Colors.white,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Checking payment status...'),
+          ],
+        ),
+      ),
+    );
+
+    final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
+    final isPaid = await omiseService.verifyPayment(chargeId);
+
+    if (!mounted) return;
+    Navigator.pop(context); // Close loading
+
+    if (isPaid) {
+      // Payment successful!
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: Colors.white,
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green.shade600),
+              const SizedBox(width: 8),
+              const Text('Payment Successful!'),
+            ],
+          ),
+          content: const Text(
+            'Your wallet has been topped up successfully.',
+            style: TextStyle(fontSize: 15),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                // Trigger success callback if needed
+                // widget.onPaymentSuccess(transactionId);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ChongjaroenColors.secondaryColor,
+              ),
+              child: const Text('OK', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Still pending or failed
+      _showPendingDialog(chargeId);
+    }
   }
 
   @override
