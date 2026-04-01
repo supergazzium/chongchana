@@ -79,8 +79,9 @@ module.exports = {
       }
 
       // Production: Use ThaiBulkSMS custom message API
-      const apiKey = process.env.THAIBULK_API_KEY;
-      const apiSecret = process.env.THAIBULK_API_SECRET;
+      // Try SMS-specific credentials first, fallback to OTP credentials
+      const apiKey = process.env.THAIBULK_SMS_API_KEY || process.env.THAIBULK_API_KEY;
+      const apiSecret = process.env.THAIBULK_SMS_API_SECRET || process.env.THAIBULK_API_SECRET;
 
       if (!apiKey || !apiSecret) {
         strapi.log.error('[PIN Reset] ThaiBulkSMS credentials not configured');
