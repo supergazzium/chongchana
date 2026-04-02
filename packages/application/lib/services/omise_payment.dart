@@ -326,7 +326,8 @@ class OmisePaymentService extends ChangeNotifier {
 
   /// Verify payment status
   /// Query backend to check the payment status
-  Future<bool> verifyPayment(String chargeId) async {
+  /// Returns payment data if paid, null otherwise
+  Future<Map<String, dynamic>?> verifyPayment(String chargeId) async {
     print('[OmisePayment] verifyPayment called for chargeId: $chargeId');
     _isProcessing = true;
     notifyListeners();
@@ -352,21 +353,27 @@ class OmisePaymentService extends ChangeNotifier {
         print('[OmisePayment]   data[\'data\']: $data');
 
         if (data != null && data['paid'] == true) {
-          print('[OmisePayment] Payment is PAID! Returning true');
-          return true;
+          print('[OmisePayment] Payment is PAID! Returning payment data');
+          return {
+            'paid': true,
+            'transactionId': data['transactionId'] ?? chargeId,
+            'chargeId': chargeId,
+            'status': data['status'],
+            'amount': data['amount'],
+          };
         } else {
           print('[OmisePayment] Payment not paid yet. paid=${data?['paid']}, status=${data?['status']}');
         }
       }
 
-      print('[OmisePayment] Returning false');
-      return false;
+      print('[OmisePayment] Returning null');
+      return null;
     } catch (e) {
       print('[OmisePayment] ERROR in verifyPayment: $e');
       _lastError = 'Payment verification failed: ${e.toString()}';
       _isProcessing = false;
       notifyListeners();
-      return false;
+      return null;
     }
   }
 

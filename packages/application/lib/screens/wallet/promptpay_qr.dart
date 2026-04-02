@@ -172,10 +172,10 @@ class _PromptPayQRScreenState extends State<PromptPayQRScreen> {
     final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
 
     try {
-      final isPaid = await omiseService.verifyPayment(_chargeId!);
-      print('[PromptPay] Payment verification result: isPaid=$isPaid');
+      final paymentData = await omiseService.verifyPayment(_chargeId!);
+      print('[PromptPay] Payment verification result: $paymentData');
 
-      if (isPaid) {
+      if (paymentData != null && paymentData['paid'] == true) {
         print('[PromptPay] Payment successful! Showing success dialog');
         if (mounted) {
           _showSuccessDialog();

@@ -28,6 +28,10 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
   final _cvvController = TextEditingController();
 
   bool _isProcessing = false;
+  String? _pendingChargeId;
+  bool _isPollingPayment = false;
+  int _pollCount = 0;
+  static const int _maxPolls = 40; // 40 polls × 3 seconds = 2 minutes
 
   @override
   void dispose() {
@@ -109,7 +113,10 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
             // Payment completed immediately (cards without 3D Secure)
             widget.onPaymentSuccess(result['transactionId']);
             Navigator.pop(context);
-          } else if (result['authorizeUri'] != null) {
+          } else if (result['authorizeUri'] != null &&
+                     result['authorizeUri'] != 'none' &&
+                     result['authorizeUri'].toString().isNotEmpty &&
+                     result['authorizeUri'].toString().startsWith('http')) {
             // Payment requires 3D Secure authentication
             Navigator.pop(context);
             _handle3DSecureAuth(result['authorizeUri'], result['chargeId']);
@@ -165,8 +172,13 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
   }
 
   void _showPendingDialog(String chargeId) {
+    // Start polling for payment status
+    _pendingChargeId = chargeId;
+    _startPaymentPolling();
+
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
         title: Row(
@@ -186,7 +198,7 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'This usually takes a few minutes. You will receive a notification once the payment is confirmed.',
+              'This usually takes a few seconds to a few minutes. We\'ll check automatically.',
               style: TextStyle(fontSize: 13, color: Colors.black54),
             ),
             const SizedBox(height: 12),
@@ -217,15 +229,106 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              _isPollingPayment = false;
+              _pendingChargeId = null;
+              Navigator.pop(context);
+            },
             child: const Text(
-              'OK',
-              style: TextStyle(color: ChongjaroenColors.secondaryColor),
+              'Cancel',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await _checkPendingPaymentStatus(chargeId);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ChongjaroenColors.secondaryColor,
+            ),
+            child: const Text(
+              'Check Status',
+              style: TextStyle(color: Colors.white),
             ),
           ),
         ],
       ),
     );
+  }
+
+  void _startPaymentPolling() {
+    _isPollingPayment = true;
+    _pollPaymentStatus();
+  }
+
+  Future<void> _pollPaymentStatus() async {
+    if (!_isPollingPayment || _pendingChargeId == null) return;
+
+    await Future.delayed(const Duration(seconds: 3));
+
+    if (!mounted || !_isPollingPayment || _pendingChargeId == null) return;
+
+    await _checkPendingPaymentStatus(_pendingChargeId!);
+
+    // Continue polling if still pending
+    if (_isPollingPayment && _pendingChargeId != null) {
+      _pollPaymentStatus();
+    }
+  }
+
+  Future<void> _checkPendingPaymentStatus(String chargeId) async {
+    final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
+
+    try {
+      final paymentData = await omiseService.verifyPayment(chargeId);
+
+      if (!mounted) return;
+
+      if (paymentData != null && paymentData['paid'] == true) {
+        // Payment successful!
+        _isPollingPayment = false;
+        _pendingChargeId = null;
+
+        // Close pending dialog
+        Navigator.pop(context);
+
+        // Call success callback
+        widget.onPaymentSuccess(paymentData['transactionId']);
+
+        // Show success message
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: Colors.white,
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green.shade600),
+                const SizedBox(width: 8),
+                const Text('Payment Successful!'),
+              ],
+            ),
+            content: const Text(
+              'Your wallet has been topped up successfully.',
+              style: TextStyle(fontSize: 15),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close success dialog
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ChongjaroenColors.secondaryColor,
+                ),
+                child: const Text('OK', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // Continue polling on error
+      print('[CreditCard] Error checking payment status: $e');
+    }
   }
 
   Future<void> _handle3DSecureAuth(String authorizeUri, String chargeId) async {
@@ -363,13 +466,18 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
     );
 
     final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
-    final isPaid = await omiseService.verifyPayment(chargeId);
+    final paymentData = await omiseService.verifyPayment(chargeId);
 
     if (!mounted) return;
     Navigator.pop(context); // Close loading
 
-    if (isPaid) {
+    if (paymentData != null && paymentData['paid'] == true) {
       // Payment successful!
+      final transactionId = paymentData['transactionId'];
+
+      // Call success callback to process the top-up
+      widget.onPaymentSuccess(transactionId);
+
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -389,8 +497,6 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context); // Close dialog
-                // Trigger success callback if needed
-                // widget.onPaymentSuccess(transactionId);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: ChongjaroenColors.secondaryColor,

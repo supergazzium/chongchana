@@ -321,22 +321,22 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
     try {
       print('[TopUp] Checking payment status for: $_pendingChargeId');
 
-      final isPaid = await omiseService.verifyPayment(_pendingChargeId!);
+      final paymentData = await omiseService.verifyPayment(_pendingChargeId!);
 
       if (!mounted) return;
 
-      if (isPaid) {
+      if (paymentData != null && paymentData['paid'] == true) {
         // Payment successful!
         print('[TopUp] Payment completed successfully');
 
-        final chargeId = _pendingChargeId!;
+        final transactionId = paymentData['transactionId'];
         setState(() {
           _pendingChargeId = null;
           _isCheckingPayment = false;
         });
 
         // Show success dialog
-        _showSuccessDialog(chargeId);
+        _showSuccessDialog(transactionId);
       } else {
         print('[TopUp] Payment not yet completed');
         setState(() {

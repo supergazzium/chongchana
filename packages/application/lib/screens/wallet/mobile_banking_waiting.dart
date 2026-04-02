@@ -55,9 +55,9 @@ class _MobileBankingWaitingScreenState extends State<MobileBankingWaitingScreen>
     final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
 
     try {
-      final isPaid = await omiseService.verifyPayment(widget.chargeId);
+      final paymentData = await omiseService.verifyPayment(widget.chargeId);
 
-      if (isPaid) {
+      if (paymentData != null && paymentData['paid'] == true) {
         if (mounted) {
           setState(() {
             _isChecking = false;
