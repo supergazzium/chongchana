@@ -206,6 +206,33 @@ module.exports = {
   },
 
   /**
+   * Update charge with return_uri (for 3D Secure)
+   * Required because we need the charge ID to construct proper return_uri
+   */
+  async updateChargeReturnUri(chargeId, returnUri) {
+    try {
+      strapi.log.info('[Payment] Updating charge return_uri:', {
+        chargeId,
+        returnUri,
+      });
+
+      const charge = await omise.charges.update(chargeId, {
+        return_uri: returnUri,
+      });
+
+      strapi.log.info('[Payment] Charge updated with return_uri:', {
+        id: charge.id,
+        authorize_uri: charge.authorize_uri ? 'present' : 'none',
+      });
+
+      return charge;
+    } catch (error) {
+      strapi.log.error('[Payment] updateChargeReturnUri error:', error);
+      throw new Error(error.message || 'Failed to update charge');
+    }
+  },
+
+  /**
    * Get charge status
    */
   async getChargeStatus(chargeId) {

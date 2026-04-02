@@ -81,9 +81,12 @@ module.exports = {
         return ctx.badRequest(utils.errorResponse('WALLET_004', validation.error));
       }
 
-      // Create charge WITHOUT return_uri first to get the charge ID
-      // Then we'll construct the proper return_uri with the charge ID
-      const charge = await paymentService.createChargeFromToken(
+      // Create charge with return_uri that includes charge_id in query parameter
+      // We'll use a temporary token approach - store charge in metadata
+      const baseUrl = process.env.PUBLIC_URL || 'https://wallet-backend-test-pc-ndd56.ondigitalocean.app';
+
+      // First create charge without return_uri to get the charge ID
+      let charge = await paymentService.createChargeFromToken(
         tokenId,
         amount,
         currency,
@@ -91,10 +94,25 @@ module.exports = {
         {
           user_id: userId,
           type: 'wallet_topup',
-          charge_id: 'placeholder', // Will be updated after charge creation
         }
-        // return_uri will be added in a second step after we have the charge ID
       );
+
+      // If charge requires 3DS (has authorize_uri), update it with proper return_uri
+      if (charge.authorize_uri && charge.status === 'pending') {
+        const returnUri = `${baseUrl}/wallet/payment/3ds-return?charge_id=${charge.id}`;
+
+        strapi.log.info('[Payment] Updating charge with return_uri for 3DS:', {
+          chargeId: charge.id,
+          returnUri: returnUri,
+        });
+
+        try {
+          // Update the charge with return_uri containing the charge_id
+          charge = await paymentService.updateChargeReturnUri(charge.id, returnUri);
+        } catch (error) {
+          strapi.log.error('[Payment] Failed to update return_uri, continuing anyway:', error);
+        }
+      }
 
       // If charge is successful, credit wallet immediately
       if (charge.paid) {
