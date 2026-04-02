@@ -81,7 +81,8 @@ module.exports = {
         return ctx.badRequest(utils.errorResponse('WALLET_004', validation.error));
       }
 
-      // Create charge with return_uri for 3D Secure authentication
+      // Create charge (no return_uri needed - app uses polling to check status)
+      // For credit cards, Omise provides authorize_uri automatically for 3D Secure
       const charge = await paymentService.createChargeFromToken(
         tokenId,
         amount,
@@ -90,8 +91,8 @@ module.exports = {
         {
           user_id: userId,
           type: 'wallet_topup',
-        },
-        'chongjaroen://payment-result' // Required for 3D Secure to work
+        }
+        // return_uri omitted - not required for credit cards, app polls for status
       );
 
       // If charge is successful, credit wallet immediately
