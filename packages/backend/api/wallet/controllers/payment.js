@@ -81,12 +81,13 @@ module.exports = {
         return ctx.badRequest(utils.errorResponse('WALLET_004', validation.error));
       }
 
-      // Create charge with return_uri that includes charge_id in query parameter
-      // We'll use a temporary token approach - store charge in metadata
+      // Create charge with return_uri to trigger 3DS authentication
+      // Omise needs return_uri UPFRONT to decide whether to trigger 3DS
       const baseUrl = process.env.PUBLIC_URL || 'https://wallet-backend-test-pc-ndd56.ondigitalocean.app';
+      const returnUri = `${baseUrl}/wallet/payment/3ds-return`;
 
-      // First create charge without return_uri to get the charge ID
-      let charge = await paymentService.createChargeFromToken(
+      // Create charge WITH return_uri so Omise triggers 3DS if card requires it
+      const charge = await paymentService.createChargeFromToken(
         tokenId,
         amount,
         currency,
@@ -94,25 +95,16 @@ module.exports = {
         {
           user_id: userId,
           type: 'wallet_topup',
-        }
+        },
+        returnUri  // Pass return_uri immediately
       );
 
-      // If charge requires 3DS (has authorize_uri), update it with proper return_uri
-      if (charge.authorize_uri && charge.status === 'pending') {
-        const returnUri = `${baseUrl}/wallet/payment/3ds-return?charge_id=${charge.id}`;
-
-        strapi.log.info('[Payment] Updating charge with return_uri for 3DS:', {
-          chargeId: charge.id,
-          returnUri: returnUri,
-        });
-
-        try {
-          // Update the charge with return_uri containing the charge_id
-          charge = await paymentService.updateChargeReturnUri(charge.id, returnUri);
-        } catch (error) {
-          strapi.log.error('[Payment] Failed to update return_uri, continuing anyway:', error);
-        }
-      }
+      strapi.log.info('[Payment] Charge created:', {
+        chargeId: charge.id,
+        status: charge.status,
+        paid: charge.paid,
+        hasAuthorizeUri: !!charge.authorize_uri,
+      });
 
       // If charge is successful, credit wallet immediately
       if (charge.paid) {
