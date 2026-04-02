@@ -362,17 +362,30 @@ module.exports = {
       const signature = ctx.request.headers['omise-signature'];
       const timestamp = ctx.request.headers['omise-signature-timestamp'];
 
-      // Get raw body for signature verification
-      // Note: Strapi parses the body, so we need to reconstruct it
-      const rawBody = JSON.stringify(event);
+      // Verify webhook signature if secret is configured
+      if (signature && timestamp) {
+        // Get raw body for signature verification
+        // The webhook-raw-body middleware captures this before parsing
+        const rawBody = ctx.request.rawBody || JSON.stringify(event);
 
-      // Verify webhook signature (HMAC-SHA256)
-      if (!paymentService.verifyWebhookSignature(signature, timestamp, rawBody)) {
-        strapi.log.error('[Payment] Webhook rejected - invalid signature');
-        return ctx.unauthorized('Invalid webhook signature');
+        const isValid = paymentService.verifyWebhookSignature(signature, timestamp, rawBody);
+
+        strapi.log.info('[Payment] Webhook signature verification:', {
+          hasSignature: !!signature,
+          hasTimestamp: !!timestamp,
+          hasSecret: !!process.env.OMISE_WEBHOOK_SECRET,
+          isValid: isValid,
+        });
+
+        if (!isValid) {
+          strapi.log.error('[Payment] Webhook rejected - invalid signature');
+          return ctx.unauthorized('Invalid webhook signature');
+        }
+
+        strapi.log.info('[Payment] Webhook signature verified successfully');
+      } else {
+        strapi.log.warn('[Payment] Webhook received without signature headers');
       }
-
-      strapi.log.info('[Payment] Webhook signature verified successfully');
 
       // Handle different event types
       if (event.key === 'charge.complete') {

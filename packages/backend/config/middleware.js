@@ -1,5 +1,8 @@
 module.exports = ({ env }) => ({
   settings: {
+    'webhook-raw-body': {
+      enabled: true,
+    },
     'options-handler': {
       enabled: true,
     },
