@@ -97,6 +97,15 @@
       }
     },
     {
+      "method": "GET",
+      "path": "/wallet/payment/3ds-return",
+      "handler": "payment.handle3DSReturn",
+      "config": {
+        "policies": [],
+        "auth": false
+      }
+    },
+    {
       "method": "POST",
       "path": "/wallet/payment/webhook",
       "handler": "payment.handleWebhook",

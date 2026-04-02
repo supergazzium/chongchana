@@ -81,8 +81,12 @@ module.exports = {
         return ctx.badRequest(utils.errorResponse('WALLET_004', validation.error));
       }
 
-      // Create charge (no return_uri needed - app uses polling to check status)
-      // For credit cards, Omise provides authorize_uri automatically for 3D Secure
+      // Create charge with return_uri for 3D Secure authentication
+      // The return_uri must be an HTTPS URL where users are redirected after completing 3DS
+      // Omise will automatically append the charge_id to the return_uri
+      const baseUrl = process.env.PUBLIC_URL || 'https://wallet-backend-test-pc-ndd56.ondigitalocean.app';
+      const returnUri = `${baseUrl}/wallet/payment/3ds-return`;
+
       const charge = await paymentService.createChargeFromToken(
         tokenId,
         amount,
@@ -91,8 +95,8 @@ module.exports = {
         {
           user_id: userId,
           type: 'wallet_topup',
-        }
-        // return_uri omitted - not required for credit cards, app polls for status
+        },
+        returnUri // Required for 3D Secure to work properly
       );
 
       // If charge is successful, credit wallet immediately
@@ -263,6 +267,66 @@ module.exports = {
     } catch (error) {
       strapi.log.error('[Payment] checkPaymentStatus error:', error);
       ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', error.message));
+    }
+  },
+
+  /**
+   * GET /api/wallet/payment/3ds-return
+   * Handle 3D Secure return redirect
+   * User is redirected here after completing 3DS authentication at their bank
+   */
+  async handle3DSReturn(ctx) {
+    try {
+      // Omise sends the charge ID in various ways - check all possibilities
+      // Examples: ?charge_id=chrg_xxx or ?id=chrg_xxx or in path
+      const chargeId = ctx.query.charge_id || ctx.query.chargeId || ctx.query.id;
+
+      strapi.log.info('[Payment] 3DS return received:', {
+        query: ctx.query,
+        chargeId: chargeId,
+      });
+
+      if (!chargeId) {
+        strapi.log.warn('[Payment] 3DS return: No charge ID found in query');
+        // Redirect to app with unknown status
+        ctx.redirect('chongjaroen://payment-result?status=unknown');
+        return;
+      }
+
+      strapi.log.info('[Payment] 3DS return processing charge:', chargeId);
+
+      // Get the charge status
+      const charge = await paymentService.getChargeStatus(chargeId);
+
+      // If payment is successful and not yet processed, credit wallet
+      if (charge.paid && charge.metadata?.user_id) {
+        const userId = parseInt(charge.metadata.user_id);
+
+        // Check if already processed
+        const knex = strapi.connections.default;
+        const existing = await knex('wallet_transactions')
+          .whereRaw("JSON_EXTRACT(metadata, '$.charge_id') = ?", [chargeId])
+          .first();
+
+        if (!existing) {
+          await paymentService.processSuccessfulPayment(chargeId, userId);
+          strapi.log.info('[Payment] 3DS payment processed successfully for user:', userId);
+        }
+
+        // Redirect to app with success
+        ctx.redirect(`chongjaroen://payment-result?status=success&charge_id=${chargeId}`);
+      } else if (charge.status === 'failed') {
+        // Payment failed
+        strapi.log.info('[Payment] 3DS payment failed:', chargeId);
+        ctx.redirect(`chongjaroen://payment-result?status=failed&charge_id=${chargeId}`);
+      } else {
+        // Payment still pending (authentication might not be complete)
+        strapi.log.info('[Payment] 3DS payment still pending:', chargeId);
+        ctx.redirect(`chongjaroen://payment-result?status=pending&charge_id=${chargeId}`);
+      }
+    } catch (error) {
+      strapi.log.error('[Payment] 3DS return handler error:', error);
+      ctx.redirect('chongjaroen://payment-result?status=error');
     }
   },
 
