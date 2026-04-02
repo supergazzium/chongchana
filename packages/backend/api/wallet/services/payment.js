@@ -154,8 +154,11 @@ module.exports = {
         id: charge.id,
         amount: charge.amount,
         status: charge.status,
+        paid: charge.paid,
         card: charge.card?.last_digits,
-        authorize_uri: charge.authorize_uri ? 'present' : 'none',
+        authorize_uri: charge.authorize_uri || null,
+        failure_code: charge.failure_code,
+        failure_message: charge.failure_message,
       });
 
       return charge;
@@ -310,54 +313,83 @@ module.exports = {
   },
 
   /**
-   * Verify webhook authenticity using IP whitelisting
-   * Omise doesn't use HMAC signatures, so we verify by checking source IP
+   * Verify webhook authenticity using HMAC signature verification
+   * This is the industry-standard secure method for webhook verification
    *
-   * @param {string} sourceIp - IP address from which the webhook was sent
-   * @returns {boolean} - true if IP is from Omise, false otherwise
+   * @param {string} signature - Signature from Omise-Signature header
+   * @param {string} timestamp - Timestamp from Omise-Signature-Timestamp header
+   * @param {string} rawBody - Raw request body (must be unmodified)
+   * @returns {boolean} - true if signature is valid, false otherwise
    */
-  verifyWebhookSource(sourceIp) {
-    // Omise webhook IP addresses (as of 2024)
-    // These should be updated if Omise changes their infrastructure
-    // Source: https://docs.opn.ooo/security-best-practices#webhook-security
-    const OMISE_WEBHOOK_IPS = [
-      '52.77.251.16',    // Singapore datacenter
-      '52.77.251.52',    // Singapore datacenter
-      '52.77.251.97',    // Singapore datacenter
-      '54.254.229.219',  // Singapore datacenter
-      '54.254.229.250',  // Singapore datacenter
-    ];
+  verifyWebhookSignature(signature, timestamp, rawBody) {
+    const crypto = require('crypto');
 
-    // Only allow localhost in development environment
-    if (process.env.NODE_ENV === 'development' || strapi.config.environment === 'development') {
-      OMISE_WEBHOOK_IPS.push('127.0.0.1', '::1');
-    }
+    // Get webhook secret from environment
+    const webhookSecret = process.env.OMISE_WEBHOOK_SECRET;
 
-    if (!sourceIp) {
-      strapi.log.warn('[Payment] Webhook source IP not provided');
+    if (!webhookSecret) {
+      strapi.log.error('[Payment] OMISE_WEBHOOK_SECRET not configured');
       return false;
     }
 
-    // Extract IP from X-Forwarded-For if behind proxy (Cloudflare, AWS ALB, etc.)
-    let ip = sourceIp;
-    if (ip.includes(',')) {
-      ip = ip.split(',')[0].trim();
-    }
-    // Remove IPv6 prefix if present (::ffff:xxx.xxx.xxx.xxx)
-    if (ip.startsWith('::ffff:')) {
-      ip = ip.substring(7);
+    if (!signature || !timestamp || !rawBody) {
+      strapi.log.warn('[Payment] Missing required webhook verification parameters');
+      return false;
     }
 
-    const isAllowed = OMISE_WEBHOOK_IPS.includes(ip);
+    // Verify timestamp to prevent replay attacks (allow 5-minute window)
+    const currentTime = Math.floor(Date.now() / 1000);
+    const timestampAge = currentTime - parseInt(timestamp);
 
-    if (!isAllowed) {
-      strapi.log.warn('[Payment] Webhook from unauthorized IP:', {
-        sourceIp: ip,
-        allowedIps: OMISE_WEBHOOK_IPS,
+    if (timestampAge > 300) { // 5 minutes
+      strapi.log.warn('[Payment] Webhook timestamp too old:', {
+        age: timestampAge,
+        maxAge: 300,
       });
+      return false;
     }
 
-    return isAllowed;
+    // Construct the signed payload: timestamp.rawBody
+    const signedPayload = `${timestamp}.${rawBody}`;
+
+    // Compute HMAC-SHA256 signature
+    const expectedSignature = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(signedPayload, 'utf8')
+      .digest('hex');
+
+    // Handle multiple signatures (during secret rotation)
+    // Signature header format: "v1=signature1,v1=signature2"
+    const signatures = signature.split(',').map(sig => {
+      const parts = sig.trim().split('=');
+      return parts.length === 2 ? parts[1] : sig.trim();
+    });
+
+    // Use constant-time comparison to prevent timing attacks
+    let isValid = false;
+    for (const sig of signatures) {
+      try {
+        // crypto.timingSafeEqual requires buffers of same length
+        if (sig.length === expectedSignature.length) {
+          const sigBuffer = Buffer.from(sig, 'utf8');
+          const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+
+          if (crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+            isValid = true;
+            break;
+          }
+        }
+      } catch (err) {
+        // Continue checking other signatures
+        continue;
+      }
+    }
+
+    if (!isValid) {
+      strapi.log.warn('[Payment] Invalid webhook signature');
+    }
+
+    return isValid;
   },
 
   /**

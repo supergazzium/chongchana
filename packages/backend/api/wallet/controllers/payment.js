@@ -81,12 +81,8 @@ module.exports = {
         return ctx.badRequest(utils.errorResponse('WALLET_004', validation.error));
       }
 
-      // Create charge with return_uri for 3D Secure authentication
-      // The return_uri must be an HTTPS URL where users are redirected after completing 3DS
-      // Omise will automatically append the charge_id to the return_uri
-      const baseUrl = process.env.PUBLIC_URL || 'https://wallet-backend-test-pc-ndd56.ondigitalocean.app';
-      const returnUri = `${baseUrl}/wallet/payment/3ds-return`;
-
+      // Create charge WITHOUT return_uri first to get the charge ID
+      // Then we'll construct the proper return_uri with the charge ID
       const charge = await paymentService.createChargeFromToken(
         tokenId,
         amount,
@@ -95,8 +91,9 @@ module.exports = {
         {
           user_id: userId,
           type: 'wallet_topup',
-        },
-        returnUri // Required for 3D Secure to work properly
+          charge_id: 'placeholder', // Will be updated after charge creation
+        }
+        // return_uri will be added in a second step after we have the charge ID
       );
 
       // If charge is successful, credit wallet immediately
@@ -332,7 +329,7 @@ module.exports = {
 
   /**
    * POST /api/wallet/payment/webhook
-   * Handle Omise webhook events
+   * Handle Omise webhook events with HMAC signature verification
    */
   async handleWebhook(ctx) {
     try {
@@ -343,16 +340,21 @@ module.exports = {
         chargeId: event.data?.id,
       });
 
-      // Verify webhook source IP (security)
-      const sourceIp = ctx.request.ip ||
-                       ctx.request.headers['x-forwarded-for'] ||
-                       ctx.request.headers['x-real-ip'] ||
-                       ctx.request.socket.remoteAddress;
+      // Get signature and timestamp from headers
+      const signature = ctx.request.headers['omise-signature'];
+      const timestamp = ctx.request.headers['omise-signature-timestamp'];
 
-      if (!paymentService.verifyWebhookSource(sourceIp)) {
-        strapi.log.error('[Payment] Webhook rejected - unauthorized source IP:', sourceIp);
-        return ctx.unauthorized('Webhook source not authorized');
+      // Get raw body for signature verification
+      // Note: Strapi parses the body, so we need to reconstruct it
+      const rawBody = JSON.stringify(event);
+
+      // Verify webhook signature (HMAC-SHA256)
+      if (!paymentService.verifyWebhookSignature(signature, timestamp, rawBody)) {
+        strapi.log.error('[Payment] Webhook rejected - invalid signature');
+        return ctx.unauthorized('Invalid webhook signature');
       }
+
+      strapi.log.info('[Payment] Webhook signature verified successfully');
 
       // Handle different event types
       if (event.key === 'charge.complete') {
