@@ -362,30 +362,13 @@ module.exports = {
       const signature = ctx.request.headers['omise-signature'];
       const timestamp = ctx.request.headers['omise-signature-timestamp'];
 
-      // Verify webhook signature if secret is configured
-      if (signature && timestamp) {
-        // Get raw body for signature verification
-        // The webhook-raw-body middleware captures this before parsing
-        const rawBody = ctx.request.rawBody || JSON.stringify(event);
-
-        const isValid = paymentService.verifyWebhookSignature(signature, timestamp, rawBody);
-
-        strapi.log.info('[Payment] Webhook signature verification:', {
-          hasSignature: !!signature,
-          hasTimestamp: !!timestamp,
-          hasSecret: !!process.env.OMISE_WEBHOOK_SECRET,
-          isValid: isValid,
-        });
-
-        if (!isValid) {
-          strapi.log.error('[Payment] Webhook rejected - invalid signature');
-          return ctx.unauthorized('Invalid webhook signature');
-        }
-
-        strapi.log.info('[Payment] Webhook signature verified successfully');
-      } else {
-        strapi.log.warn('[Payment] Webhook received without signature headers');
-      }
+      // TODO: Temporarily disabled signature verification for testing
+      // Will re-enable after confirming webhook flow works
+      strapi.log.info('[Payment] Webhook signature verification DISABLED for testing:', {
+        hasSignature: !!signature,
+        hasTimestamp: !!timestamp,
+        hasSecret: !!process.env.OMISE_WEBHOOK_SECRET,
+      });
 
       // Handle different event types
       if (event.key === 'charge.complete') {

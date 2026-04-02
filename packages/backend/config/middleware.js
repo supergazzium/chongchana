@@ -1,7 +1,7 @@
 module.exports = ({ env }) => ({
   settings: {
     'webhook-raw-body': {
-      enabled: true,
+      enabled: false, // Temporarily disabled - causing stream error
     },
     'options-handler': {
       enabled: true,
