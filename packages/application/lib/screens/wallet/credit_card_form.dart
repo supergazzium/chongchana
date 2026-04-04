@@ -1,5 +1,6 @@
 import 'package:chongchana/constants/colors.dart';
 import 'package:chongchana/services/omise_payment.dart';
+import 'package:chongchana/services/wallet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -280,17 +281,33 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
   }
 
   Future<void> _checkPendingPaymentStatus(String chargeId) async {
-    final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
-
     try {
-      final paymentData = await omiseService.verifyPayment(chargeId);
+      // Instead of checking payment status endpoint (DNS issues),
+      // check wallet transactions for the completed transaction
+      final walletService = Provider.of<WalletService>(context, listen: false);
+      await walletService.getTransactions(limit: 5);
 
       if (!mounted) return;
 
-      print('[CreditCard] Poll result: $paymentData');
+      final transactions = walletService.transactions;
 
-      if (paymentData != null && paymentData['paid'] == true) {
-        // Payment successful!
+      // Look for a recent transaction matching our payment amount
+      // Created within last 2 minutes
+      final cutoffTime = DateTime.now().subtract(const Duration(minutes: 2));
+
+      final matchingTransaction = transactions.cast<dynamic>().firstWhere(
+        (tx) =>
+          tx.type == 'top_up' &&
+          tx.amount == widget.amount &&
+          tx.paymentMethod == 'credit_card' &&
+          DateTime.parse(tx.createdAt).isAfter(cutoffTime),
+        orElse: () => null,
+      );
+
+      if (matchingTransaction != null) {
+        // Payment successful - transaction found!
+        print('[CreditCard] Found matching transaction: ${matchingTransaction.id}');
+
         _isPollingPayment = false;
         _pendingChargeId = null;
 
@@ -302,23 +319,15 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
 
         // Call success callback AFTER all navigation is complete
         Future.delayed(const Duration(milliseconds: 100), () {
-          widget.onPaymentSuccess(paymentData['transactionId']);
+          widget.onPaymentSuccess(matchingTransaction.id);
         });
-      } else if (paymentData != null && paymentData['status'] == 'failed') {
-        // Payment failed!
-        _isPollingPayment = false;
-        _pendingChargeId = null;
-
-        // Close pending dialog
-        Navigator.pop(context);
-
-        // Show failure dialog
-        _showPaymentFailedDialog(paymentData['failureMessage'] ?? 'Payment was declined by your bank.');
+      } else {
+        // No matching transaction yet - keep polling
+        print('[CreditCard] No matching transaction found yet, will retry...');
       }
-      // If still pending, polling will continue automatically
     } catch (e) {
-      // Continue polling on error
-      print('[CreditCard] Error checking payment status: $e');
+      // Continue polling on error - don't let network issues stop us
+      print('[CreditCard] Error checking transactions: $e');
     }
   }
 

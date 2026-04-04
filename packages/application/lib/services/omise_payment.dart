@@ -361,16 +361,20 @@ class OmisePaymentService extends ChangeNotifier {
 
         if (data != null && data['paid'] == true) {
           print('[OmisePayment] Payment is PAID! Returning payment data');
-          return {
+          final result = {
             'paid': true,
             'transactionId': data['transactionId'] ?? chargeId,
             'chargeId': chargeId,
             'status': data['status'],
             'amount': data['amount'],
           };
+          print('[OmisePayment] About to return: $result');
+          return result;
         } else {
           print('[OmisePayment] Payment not paid yet. paid=${data?['paid']}, status=${data?['status']}');
         }
+      } else {
+        print('[OmisePayment] Response not successful or data is null');
       }
 
       print('[OmisePayment] Returning null');
