@@ -249,6 +249,8 @@ module.exports = {
 
       const charge = await paymentService.getChargeStatus(chargeId);
 
+      let transactionId = null;
+
       // If payment is successful and not yet processed, credit wallet
       if (charge.paid && charge.metadata?.user_id == userId) {
         // Check if already processed
@@ -258,14 +260,18 @@ module.exports = {
           .first();
 
         if (!existing) {
-          await paymentService.processSuccessfulPayment(chargeId, userId);
+          const result = await paymentService.processSuccessfulPayment(chargeId, userId);
+          transactionId = result.transactionId;
+        } else {
+          transactionId = existing.id;
         }
       }
 
       ctx.send(utils.successResponse({
-        chargeId: charge.id,
-        status: charge.status,
         paid: charge.paid,
+        status: charge.status,
+        transactionId: transactionId || charge.id,
+        chargeId: charge.id,
         amount: charge.amount / 100,
         currency: charge.currency,
         failureMessage: charge.failure_message,

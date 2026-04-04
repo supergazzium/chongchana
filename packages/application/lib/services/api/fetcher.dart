@@ -92,6 +92,12 @@ class Fetcher {
 
       resp.statusCode = response.statusCode;
       dynamic data = jsonDecode(response.body);
+
+      // Debug logging
+      print('API Response: $path');
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
       switch (response.statusCode) {
         case 200:
           resp.success({

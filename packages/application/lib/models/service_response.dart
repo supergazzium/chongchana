@@ -37,7 +37,32 @@ class ServiceResponse<T> {
   setErrorObject(Map<String, dynamic> json) {
     isSuccess = false;
     statusCode = json["statusCode"] ?? 500;
-    ErrorMessages e = ErrorMessages(id: "", message: json["message"]);
-    errorMessages = [e];
+
+    // Handle nested error structure from Strapi
+    if (json["data"] != null && json["data"] is List && json["data"].isNotEmpty) {
+      var dataList = json["data"] as List;
+      if (dataList[0] is Map && dataList[0]["messages"] != null) {
+        var messages = dataList[0]["messages"] as List;
+        if (messages.isNotEmpty) {
+          var firstMessage = messages[0] as Map<String, dynamic>;
+          ErrorMessages e = ErrorMessages(
+            id: firstMessage["id"] ?? "",
+            message: firstMessage["message"] ?? "Unknown error"
+          );
+          errorMessages = [e];
+          return;
+        }
+      }
+    }
+
+    // Fallback to simple message structure
+    var message = json["message"];
+    if (message is String) {
+      ErrorMessages e = ErrorMessages(id: "", message: message);
+      errorMessages = [e];
+    } else {
+      ErrorMessages e = ErrorMessages(id: "", message: "Unknown error occurred");
+      errorMessages = [e];
+    }
   }
 }

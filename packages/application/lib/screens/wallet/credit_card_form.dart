@@ -111,18 +111,21 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
           // Check if payment is completed (has transactionId) or pending
           if (result['paid'] == true && result['transactionId'] != null) {
             // Payment completed immediately (cards without 3D Secure)
-            widget.onPaymentSuccess(result['transactionId']);
-            Navigator.pop(context);
+            Navigator.pop(context); // Close credit card form
+            // Call callback with delay to ensure navigation completes
+            Future.delayed(const Duration(milliseconds: 100), () {
+              widget.onPaymentSuccess(result['transactionId']);
+            });
           } else if (result['authorizeUri'] != null &&
                      result['authorizeUri'] != 'none' &&
                      result['authorizeUri'].toString().isNotEmpty &&
                      result['authorizeUri'].toString().startsWith('http')) {
             // Payment requires 3D Secure authentication
-            Navigator.pop(context);
+            // DON'T pop yet - keep credit card form open during 3DS flow
             _handle3DSecureAuth(result['authorizeUri'], result['chargeId']);
           } else {
             // Payment is pending (awaiting bank approval without 3D Secure)
-            Navigator.pop(context);
+            // DON'T pop yet - keep credit card form open during polling
             _showPendingDialog(result['chargeId']);
           }
         } else {
@@ -284,6 +287,8 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
 
       if (!mounted) return;
 
+      print('[CreditCard] Poll result: $paymentData');
+
       if (paymentData != null && paymentData['paid'] == true) {
         // Payment successful!
         _isPollingPayment = false;
@@ -292,39 +297,25 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
         // Close pending dialog
         Navigator.pop(context);
 
-        // Call success callback
-        widget.onPaymentSuccess(paymentData['transactionId']);
+        // Close the credit card form
+        Navigator.pop(context);
 
-        // Show success message
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: Colors.white,
-            title: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green.shade600),
-                const SizedBox(width: 8),
-                const Text('Payment Successful!'),
-              ],
-            ),
-            content: const Text(
-              'Your wallet has been topped up successfully.',
-              style: TextStyle(fontSize: 15),
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context); // Close success dialog
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: ChongjaroenColors.secondaryColor,
-                ),
-                child: const Text('OK', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        );
+        // Call success callback AFTER all navigation is complete
+        Future.delayed(const Duration(milliseconds: 100), () {
+          widget.onPaymentSuccess(paymentData['transactionId']);
+        });
+      } else if (paymentData != null && paymentData['status'] == 'failed') {
+        // Payment failed!
+        _isPollingPayment = false;
+        _pendingChargeId = null;
+
+        // Close pending dialog
+        Navigator.pop(context);
+
+        // Show failure dialog
+        _showPaymentFailedDialog(paymentData['failureMessage'] ?? 'Payment was declined by your bank.');
       }
+      // If still pending, polling will continue automatically
     } catch (e) {
       // Continue polling on error
       print('[CreditCard] Error checking payment status: $e');
@@ -341,44 +332,51 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
           children: [
             Icon(Icons.security, color: Colors.blue.shade700),
             const SizedBox(width: 8),
-            const Text('Bank Verification Required'),
+            const Flexible(
+              child: Text(
+                'Bank Verification Required',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Your bank requires additional verification (3D Secure).',
-              style: TextStyle(fontSize: 15),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'You will be redirected to your bank\'s website to verify this payment. This usually involves entering an OTP (One-Time Password).',
-              style: TextStyle(fontSize: 13, color: Colors.black54),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Your bank requires additional verification (3D Secure).',
+                style: TextStyle(fontSize: 15),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'After verifying, return to the app to complete your top-up.',
-                      style: TextStyle(fontSize: 12, color: Colors.black87),
+              const SizedBox(height: 12),
+              const Text(
+                'You will be redirected to your bank\'s website to verify this payment. This usually involves entering an OTP (One-Time Password).',
+                style: TextStyle(fontSize: 13, color: Colors.black54),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'After verifying, return to the app to complete your top-up.',
+                        style: TextStyle(fontSize: 12, color: Colors.black87),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -415,101 +413,108 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
   }
 
   void _showCheckPaymentDialog(String chargeId) {
+    // Start automatic polling instead of asking user
+    _pendingChargeId = chargeId;
+    _startPaymentPolling();
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        title: const Text('Verify Payment'),
-        content: const Text(
-          'Have you completed the bank verification?',
-          style: TextStyle(fontSize: 15),
+        title: Row(
+          children: [
+            Icon(Icons.sync, color: Colors.blue.shade700),
+            const SizedBox(width: 8),
+            const Text('Verifying Payment'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Please wait while we verify your payment...',
+              style: TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 16),
+            const Center(child: CircularProgressIndicator()),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.black54),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This usually takes a few seconds. We\'re checking automatically.',
+                      style: TextStyle(fontSize: 12, color: Colors.black87),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () {
+              _isPollingPayment = false;
+              _pendingChargeId = null;
               Navigator.pop(context);
             },
-            child: const Text('Not Yet'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _checkPaymentStatus(chargeId);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ChongjaroenColors.secondaryColor,
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey),
             ),
-            child: const Text('Yes, Check Status', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _checkPaymentStatus(String chargeId) async {
-    // Show loading
+  void _showPaymentFailedDialog(String message) {
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: Colors.white,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+        title: const Row(
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Checking payment status...'),
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Payment Failed'),
           ],
         ),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(); // Close failed dialog
+              Navigator.of(context).pop(); // Close credit card form
+            },
+            child: const Text('Close', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(); // Close failed dialog - stay on credit card form to retry
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ChongjaroenColors.secondaryColor,
+            ),
+            child: const Text('Try Again', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
-
-    final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
-    final paymentData = await omiseService.verifyPayment(chargeId);
-
-    if (!mounted) return;
-    Navigator.pop(context); // Close loading
-
-    if (paymentData != null && paymentData['paid'] == true) {
-      // Payment successful!
-      final transactionId = paymentData['transactionId'];
-
-      // Call success callback to process the top-up
-      widget.onPaymentSuccess(transactionId);
-
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: Colors.white,
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green.shade600),
-              const SizedBox(width: 8),
-              const Text('Payment Successful!'),
-            ],
-          ),
-          content: const Text(
-            'Your wallet has been topped up successfully.',
-            style: TextStyle(fontSize: 15),
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context); // Close dialog
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ChongjaroenColors.secondaryColor,
-              ),
-              child: const Text('OK', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      );
-    } else {
-      // Still pending or failed
-      _showPendingDialog(chargeId);
-    }
   }
 
   @override

@@ -343,7 +343,14 @@ class OmisePaymentService extends ChangeNotifier {
 
       print('[OmisePayment] API response received:');
       print('[OmisePayment]   isSuccess: ${serviceResponse.isSuccess}');
+      print('[OmisePayment]   statusCode: ${serviceResponse.statusCode}');
       print('[OmisePayment]   data: ${serviceResponse.data}');
+      print('[OmisePayment]   errorMessages: ${serviceResponse.errorMessages}');
+      if (serviceResponse.errorMessages != null && serviceResponse.errorMessages!.isNotEmpty) {
+        for (var error in serviceResponse.errorMessages!) {
+          print('[OmisePayment]   ERROR: ${error.message}');
+        }
+      }
 
       _isProcessing = false;
       notifyListeners();
