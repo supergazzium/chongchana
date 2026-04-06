@@ -352,15 +352,25 @@ export default {
     },
     getTransactionTitle(type) {
       const titles = {
-        'credit': 'Top Up',
-        'debit': 'Payment',
+        'top_up': 'Top Up',
         'payment': 'Payment',
-        'topup': 'Top Up',
         'refund': 'Refund',
-        'voucher': 'Voucher',
-        'points': 'Points Converted',
+        'bonus': 'Bonus',
+        'conversion': 'Points Conversion',
+        'withdrawal': 'Withdrawal',
+        'adjustment': 'Adjustment',
         'transfer_in': 'Transfer In',
-        'transfer_out': 'Transfer Out'
+        'transfer_out': 'Transfer Out',
+        'voucher': 'Voucher',
+        'points': 'Points',
+        'purchase': 'Purchase',
+        'cashback': 'Cashback',
+        'reward': 'Reward',
+        'fee': 'Fee',
+        'subscription': 'Subscription',
+        'deposit': 'Deposit',
+        'credit': 'Credit',
+        'debit': 'Debit'
       };
       return titles[type] || 'Transaction';
     },
@@ -370,26 +380,27 @@ export default {
         return 'fas fa-exclamation-circle';
       }
 
-      // Unique icon for each transaction type
+      // Unique icon for each transaction type (using actual database values with underscores)
       const icons = {
-        'credit': 'fas fa-hand-holding-usd',
-        'debit': 'fas fa-credit-card',
+        'top_up': 'fas fa-wallet',
         'payment': 'fas fa-shopping-cart',
-        'topup': 'fas fa-wallet',
         'refund': 'fas fa-undo-alt',
-        'voucher': 'fas fa-ticket-alt',
-        'points': 'fas fa-star',
+        'bonus': 'fas fa-gift',
+        'conversion': 'fas fa-exchange-alt',
+        'withdrawal': 'fas fa-money-bill-wave',
+        'adjustment': 'fas fa-balance-scale',
         'transfer_in': 'fas fa-download',
         'transfer_out': 'fas fa-upload',
+        'voucher': 'fas fa-ticket-alt',
+        'points': 'fas fa-star',
         'purchase': 'fas fa-shopping-bag',
-        'withdrawal': 'fas fa-money-bill-wave',
         'cashback': 'fas fa-receipt',
         'reward': 'fas fa-award',
         'fee': 'fas fa-file-invoice-dollar',
-        'adjustment': 'fas fa-balance-scale',
-        'bonus': 'fas fa-gift',
         'subscription': 'fas fa-sync-alt',
-        'deposit': 'fas fa-piggy-bank'
+        'deposit': 'fas fa-piggy-bank',
+        'credit': 'fas fa-hand-holding-usd',
+        'debit': 'fas fa-credit-card'
       };
 
       // If specific type not found, use semantic fallback based on transaction category
@@ -406,9 +417,12 @@ export default {
         return 'failed';
       }
 
-      if (['credit', 'topup', 'refund', 'voucher', 'points', 'transfer_in'].includes(type)) {
+      // Credit transactions (incoming money)
+      if (['credit', 'top_up', 'topup', 'refund', 'bonus', 'conversion', 'voucher', 'points', 'transfer_in', 'cashback', 'reward', 'deposit'].includes(type)) {
         return 'credit';
       }
+
+      // Debit transactions (outgoing money)
       return 'debit';
     },
     getAmountSign(type) {
