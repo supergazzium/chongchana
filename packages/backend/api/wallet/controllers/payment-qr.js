@@ -330,8 +330,12 @@ module.exports = {
         // Extract and resolve branch from metadata
         let branch = null;
         if (metadata?.branch) {
+          // If branch is an object with name property (full branch data from staff app)
+          if (typeof metadata.branch === 'object' && metadata.branch.name) {
+            branch = metadata.branch.name;
+          }
           // If branch is a number (branch ID), look up the branch name
-          if (typeof metadata.branch === 'number' || !isNaN(metadata.branch)) {
+          else if (typeof metadata.branch === 'number' || !isNaN(metadata.branch)) {
             try {
               const branchResult = await knex('branches')
                 .select('name')
@@ -342,8 +346,9 @@ module.exports = {
               strapi.log.error('[Payment QR] Error looking up branch name:', err);
               branch = `Branch ${metadata.branch}`;
             }
-          } else {
-            // If it's already a string (branch name), use it directly
+          }
+          // If it's already a string (branch name), use it directly
+          else if (typeof metadata.branch === 'string') {
             branch = metadata.branch;
           }
         }
