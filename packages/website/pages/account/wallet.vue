@@ -39,21 +39,21 @@
                 :class="{ active: selectedFilter === 'all' }"
                 @click="setFilter('all')"
               >
-                All
+                <i class="fas fa-list"></i> All
               </button>
               <button
                 class="filter-chip"
                 :class="{ active: selectedFilter === 'topup' }"
                 @click="setFilter('topup')"
               >
-                <i class="fas fa-arrow-up"></i> Top-ups
+                <i class="fas fa-arrow-circle-down"></i> Top-ups
               </button>
               <button
                 class="filter-chip"
                 :class="{ active: selectedFilter === 'charge' }"
                 @click="setFilter('charge')"
               >
-                <i class="fas fa-arrow-down"></i> Charges
+                <i class="fas fa-shopping-bag"></i> Charges
               </button>
             </div>
 
@@ -157,21 +157,21 @@
                 :class="{ active: selectedFilter === 'all' }"
                 @click="setFilter('all')"
               >
-                All
+                <i class="fas fa-list"></i> All
               </button>
               <button
                 class="filter-chip"
                 :class="{ active: selectedFilter === 'topup' }"
                 @click="setFilter('topup')"
               >
-                <i class="fas fa-arrow-up"></i> Top-ups
+                <i class="fas fa-arrow-circle-down"></i> Top-ups
               </button>
               <button
                 class="filter-chip"
                 :class="{ active: selectedFilter === 'charge' }"
                 @click="setFilter('charge')"
               >
-                <i class="fas fa-arrow-down"></i> Charges
+                <i class="fas fa-shopping-bag"></i> Charges
               </button>
             </div>
 
@@ -367,21 +367,28 @@ export default {
     getTransactionIcon(type, status) {
       // Handle failed/cancelled transactions
       if (status && ['failed', 'cancelled', 'rejected'].includes(status.toLowerCase())) {
-        return 'fas fa-times-circle';
+        return 'fas fa-ban';
       }
 
       const icons = {
-        'credit': 'fas fa-arrow-up',
-        'debit': 'fas fa-arrow-down',
-        'payment': 'fas fa-arrow-down',
-        'topup': 'fas fa-plus',
-        'refund': 'fas fa-undo-alt',
-        'voucher': 'fas fa-plus',
-        'points': 'fas fa-plus',
-        'transfer_in': 'fas fa-arrow-up',
-        'transfer_out': 'fas fa-arrow-down'
+        'credit': 'fas fa-arrow-circle-down',
+        'debit': 'fas fa-shopping-bag',
+        'payment': 'fas fa-shopping-bag',
+        'topup': 'fas fa-wallet',
+        'refund': 'fas fa-redo-alt',
+        'voucher': 'fas fa-gift',
+        'points': 'fas fa-coins',
+        'transfer_in': 'fas fa-arrow-circle-down',
+        'transfer_out': 'fas fa-paper-plane'
       };
-      return icons[type] || 'fas fa-exchange-alt';
+
+      // If specific type not found, use semantic fallback based on transaction category
+      if (!icons[type]) {
+        const category = this.getTransactionType(type, status);
+        return category === 'credit' ? 'fas fa-arrow-circle-down' : 'fas fa-shopping-bag';
+      }
+
+      return icons[type];
     },
     getTransactionType(type, status) {
       // Failed/cancelled transactions get a special type
@@ -430,21 +437,24 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-// Dark Green Theme Colors
-$emerald-primary: #047857;
-$emerald-dark: #065f46;
-$forest-bg: #022c22;
-$forest-surface: #064e3b;
-$forest-surface-light: #065f46;
-$green-success: #10b981;
-$red-error: #ef4444;
-$teal-refund: #14b8a6;
-$gray-muted: #6b7280;
+// Starbucks-Inspired Bright Theme Colors
+$starbucks-green: #00704A;
+$starbucks-green-dark: #006241;
+$starbucks-green-light: #008C54;
+$cream-bg: #F7F5F2;
+$white: #FFFFFF;
+$off-white: #FAFAF8;
+$green-success: #00A862;
+$red-error: #D32F2F;
+$gold-accent: #CBA258;
+$gray-text: #4A5568;
+$gray-light: #A0AEC0;
+$gray-border: #E2E8F0;
 
 .wallet-page {
   max-width: 800px;
   margin: 0 auto;
-  background: $forest-bg;
+  background: $cream-bg;
   min-height: 100vh;
   padding: 24px;
 }
@@ -453,29 +463,30 @@ $gray-muted: #6b7280;
   margin-bottom: 32px;
 
   .page-title {
-    font-size: 28px;
+    font-size: 32px;
     font-weight: 700;
-    color: #e5e7eb;
+    color: $starbucks-green-dark;
     margin: 0 0 8px 0;
+    letter-spacing: -0.5px;
   }
 
   .page-subtitle {
-    font-size: 14px;
-    color: #9ca3af;
+    font-size: 15px;
+    color: $gray-light;
     margin: 0;
   }
 }
 
 .balance-card {
-  background: $emerald-primary;
-  background: -webkit-linear-gradient(135deg, $emerald-primary 0%, $emerald-dark 100%);
-  background: linear-gradient(135deg, $emerald-primary 0%, $emerald-dark 100%);
-  border-radius: 16px;
-  padding: 32px;
+  background: $white;
+  background: -webkit-linear-gradient(135deg, $starbucks-green 0%, $starbucks-green-dark 100%);
+  background: linear-gradient(135deg, $starbucks-green 0%, $starbucks-green-dark 100%);
+  border-radius: 20px;
+  padding: 36px;
   color: white;
-  -webkit-box-shadow: 0 10px 30px rgba(4, 120, 87, 0.3);
-  box-shadow: 0 10px 30px rgba(4, 120, 87, 0.3);
-  margin-bottom: 40px;
+  -webkit-box-shadow: 0 8px 24px rgba(0, 112, 74, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 112, 74, 0.15);
+  margin-bottom: 32px;
   position: relative;
   overflow: hidden;
 
@@ -486,7 +497,7 @@ $gray-muted: #6b7280;
     right: -20%;
     width: 300px;
     height: 300px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.08);
     border-radius: 50%;
   }
 
@@ -553,18 +564,21 @@ $gray-muted: #6b7280;
     margin-bottom: 20px;
 
     .section-title {
-      font-size: 20px;
-      font-weight: 600;
-      color: #e5e7eb;
+      font-size: 22px;
+      font-weight: 700;
+      color: $starbucks-green-dark;
       margin: 0;
+      letter-spacing: -0.3px;
     }
 
     .transaction-count {
       font-size: 13px;
-      color: #d1d5db;
-      background: $forest-surface;
-      padding: 4px 12px;
-      border-radius: 12px;
+      color: $gray-light;
+      background: $white;
+      padding: 6px 14px;
+      border-radius: 16px;
+      border: 1px solid $gray-border;
+      font-weight: 500;
     }
   }
 }
@@ -573,37 +587,43 @@ $gray-muted: #6b7280;
 .filter-chips {
   display: flex;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
   flex-wrap: wrap;
 
   .filter-chip {
-    padding: 10px 20px;
-    border: 2px solid $forest-surface-light;
-    border-radius: 24px;
-    background: $forest-surface;
-    color: #9ca3af;
+    padding: 12px 24px;
+    border: 2px solid $gray-border;
+    border-radius: 28px;
+    background: $white;
+    color: $gray-text;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.25s ease;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    -webkit-box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 
     i {
-      font-size: 12px;
+      font-size: 13px;
     }
 
     &:hover {
-      background: $forest-surface-light;
-      color: #d1d5db;
-      border-color: $emerald-primary;
+      background: $off-white;
+      border-color: $starbucks-green-light;
+      color: $starbucks-green;
+      -webkit-box-shadow: 0 4px 12px rgba(0, 112, 74, 0.1);
+      box-shadow: 0 4px 12px rgba(0, 112, 74, 0.1);
     }
 
     &.active {
-      background: $emerald-primary;
-      border-color: $emerald-primary;
+      background: $starbucks-green;
+      border-color: $starbucks-green;
       color: white;
+      -webkit-box-shadow: 0 4px 12px rgba(0, 112, 74, 0.2);
+      box-shadow: 0 4px 12px rgba(0, 112, 74, 0.2);
     }
   }
 }
@@ -614,33 +634,34 @@ $gray-muted: #6b7280;
 
   p {
     margin-top: 16px;
-    color: #9ca3af;
-    font-size: 14px;
+    color: $gray-light;
+    font-size: 15px;
   }
 }
 
 .empty-state {
   text-align: center;
   padding: 64px 32px;
-  background: $forest-surface;
-  border-radius: 16px;
+  background: $white;
+  border-radius: 20px;
+  border: 1px solid $gray-border;
 
   .empty-icon {
     font-size: 64px;
-    color: $forest-surface-light;
-    margin-bottom: 16px;
+    color: $gray-border;
+    margin-bottom: 20px;
   }
 
   h4 {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
-    color: #d1d5db;
+    color: $gray-text;
     margin: 0 0 8px 0;
   }
 
   p {
-    font-size: 14px;
-    color: #9ca3af;
+    font-size: 15px;
+    color: $gray-light;
     margin: 0;
   }
 }
@@ -648,47 +669,51 @@ $gray-muted: #6b7280;
 .transaction-list {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 28px;
 }
 
 // Date Groups
 .date-group {
   .date-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: #10b981;
-    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: $starbucks-green;
+    margin-bottom: 14px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
   }
 
   .date-group-card {
-    background: $forest-surface;
-    border-radius: 16px;
-    padding: 8px;
-    -webkit-box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    background: $white;
+    border-radius: 20px;
+    padding: 12px;
+    border: 1px solid $gray-border;
+    -webkit-box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   }
 }
 
 // Transaction Rows
 .transaction-row {
-  background: $forest-surface-light;
-  border-radius: 12px;
-  padding: 16px;
+  background: $off-white;
+  border-radius: 16px;
+  padding: 18px 20px;
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 8px;
-  transition: all 0.2s ease;
+  margin-bottom: 10px;
+  transition: all 0.25s ease;
+  border: 1px solid transparent;
 
   &:last-child {
     margin-bottom: 0;
   }
 
   &:hover {
-    -webkit-box-shadow: 0 4px 12px rgba(4, 120, 87, 0.2);
-    box-shadow: 0 4px 12px rgba(4, 120, 87, 0.2);
+    background: $white;
+    border-color: $starbucks-green-light;
+    -webkit-box-shadow: 0 4px 16px rgba(0, 112, 74, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 112, 74, 0.08);
     -webkit-transform: translateY(-2px);
     -ms-transform: translateY(-2px);
     transform: translateY(-2px);
@@ -696,33 +721,33 @@ $gray-muted: #6b7280;
 
   .transaction-icon-wrapper {
     .transaction-icon {
-      width: 48px;
-      height: 48px;
+      width: 52px;
+      height: 52px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
+      font-size: 22px;
 
       // Semantic Iconography with color logic
       &.icon-credit {
-        background: rgba(16, 185, 129, 0.15);
+        background: rgba(0, 168, 98, 0.12);
         color: $green-success;
       }
 
       &.icon-debit {
-        background: rgba(239, 68, 68, 0.15);
+        background: rgba(211, 47, 47, 0.12);
         color: $red-error;
       }
 
       &.icon-refund {
-        background: rgba(20, 184, 166, 0.15);
-        color: $teal-refund;
+        background: rgba(203, 162, 88, 0.12);
+        color: $gold-accent;
       }
 
       &.icon-failed {
-        background: rgba(107, 114, 128, 0.15);
-        color: $gray-muted;
+        background: rgba(160, 174, 192, 0.12);
+        color: $gray-light;
       }
     }
   }
@@ -734,19 +759,21 @@ $gray-muted: #6b7280;
     .transaction-title {
       font-size: 16px;
       font-weight: 600;
-      color: #e5e7eb;
-      margin: 0 0 4px 0;
+      color: $starbucks-green-dark;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.2px;
     }
 
     .transaction-date {
       font-size: 13px;
-      color: #9ca3af;
+      color: $gray-light;
       margin: 0 0 4px 0;
+      font-weight: 500;
     }
 
     .transaction-description {
       font-size: 13px;
-      color: #6b7280;
+      color: $gray-text;
       margin: 0;
       // Text truncation
       overflow: hidden;
@@ -769,6 +796,7 @@ $gray-muted: #6b7280;
 
     .amount-value {
       font-size: 20px;
+      letter-spacing: -0.3px;
     }
 
     &.amount-credit {
@@ -780,32 +808,36 @@ $gray-muted: #6b7280;
     }
 
     &.amount-failed {
-      color: $gray-muted;
+      color: $gray-light;
     }
   }
 }
 
 .btn-load-more {
   width: 100%;
-  padding: 14px 24px;
-  border: 2px solid $forest-surface-light;
-  border-radius: 12px;
-  background: $forest-surface;
-  color: #d1d5db;
-  font-size: 14px;
+  padding: 16px 24px;
+  border: 2px solid $gray-border;
+  border-radius: 16px;
+  background: $white;
+  color: $starbucks-green;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  margin-top: 12px;
+  transition: all 0.25s ease;
+  margin-top: 16px;
+  -webkit-box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 
   &:hover:not(:disabled) {
-    border-color: $emerald-primary;
+    border-color: $starbucks-green;
     color: white;
-    background: $emerald-dark;
+    background: $starbucks-green;
+    -webkit-box-shadow: 0 4px 12px rgba(0, 112, 74, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 112, 74, 0.15);
   }
 
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 
@@ -817,11 +849,23 @@ $gray-muted: #6b7280;
 @media (max-width: 768px) {
   .wallet-page {
     padding: 16px;
+    background: $cream-bg;
+  }
+
+  .page-header {
+    .page-title {
+      font-size: 26px;
+    }
+
+    .page-subtitle {
+      font-size: 14px;
+    }
   }
 
   .balance-card {
-    padding: 24px;
-    margin-bottom: 32px;
+    padding: 28px;
+    margin-bottom: 28px;
+    border-radius: 18px;
 
     .balance-amount-wrapper {
       .currency {
@@ -834,22 +878,40 @@ $gray-muted: #6b7280;
     }
   }
 
+  .transaction-section {
+    .section-header {
+      .section-title {
+        font-size: 20px;
+      }
+    }
+  }
+
   .filter-chips {
     gap: 8px;
 
     .filter-chip {
-      padding: 8px 16px;
+      padding: 10px 18px;
       font-size: 13px;
     }
   }
 
+  .transaction-list {
+    gap: 20px;
+  }
+
+  .date-group-card {
+    border-radius: 16px;
+    padding: 8px;
+  }
+
   .transaction-row {
-    padding: 14px;
-    gap: 12px;
+    padding: 16px;
+    gap: 14px;
+    border-radius: 14px;
 
     .transaction-icon-wrapper .transaction-icon {
-      width: 40px;
-      height: 40px;
+      width: 44px;
+      height: 44px;
       font-size: 18px;
     }
 
@@ -880,7 +942,8 @@ $gray-muted: #6b7280;
 
   .date-group {
     .date-label {
-      font-size: 13px;
+      font-size: 12px;
+      margin-bottom: 10px;
     }
   }
 }
