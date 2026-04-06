@@ -29,7 +29,32 @@
           <div class="transaction-section">
             <div class="section-header">
               <h3 class="section-title">Recent Transactions</h3>
-              <span class="transaction-count" v-if="!loadingTransactions">{{ transactions.length }} transactions</span>
+              <span class="transaction-count" v-if="!loadingTransactions">{{ filteredTransactions.length }} transactions</span>
+            </div>
+
+            <!-- Filter Chips -->
+            <div class="filter-chips">
+              <button
+                class="filter-chip"
+                :class="{ active: selectedFilter === 'all' }"
+                @click="setFilter('all')"
+              >
+                All
+              </button>
+              <button
+                class="filter-chip"
+                :class="{ active: selectedFilter === 'topup' }"
+                @click="setFilter('topup')"
+              >
+                <i class="fas fa-arrow-up"></i> Top-ups
+              </button>
+              <button
+                class="filter-chip"
+                :class="{ active: selectedFilter === 'charge' }"
+                @click="setFilter('charge')"
+              >
+                <i class="fas fa-arrow-down"></i> Charges
+              </button>
             </div>
 
             <!-- Loading State -->
@@ -41,7 +66,7 @@
             </div>
 
             <!-- Empty State -->
-            <div v-else-if="transactions.length === 0" class="empty-state">
+            <div v-else-if="filteredTransactions.length === 0" class="empty-state">
               <div class="empty-icon">
                 <i class="fas fa-receipt"></i>
               </div>
@@ -51,27 +76,32 @@
 
             <!-- Transaction List -->
             <div v-else class="transaction-list">
-              <div
-                v-for="transaction in transactions"
-                :key="transaction.id"
-                class="transaction-card"
-                :class="`transaction-${getTransactionType(transaction.type)}`"
-              >
-                <div class="transaction-icon-wrapper">
-                  <div class="transaction-icon" :class="`icon-${getTransactionType(transaction.type)}`">
-                    <i :class="getTransactionIcon(transaction.type)"></i>
+              <!-- Date Groups -->
+              <div v-for="(transactions, dateLabel) in groupedTransactions" :key="dateLabel" class="date-group">
+                <div class="date-label">{{ dateLabel }}</div>
+                <div class="date-group-card">
+                  <div
+                    v-for="transaction in transactions"
+                    :key="transaction.id"
+                    class="transaction-row"
+                  >
+                    <div class="transaction-icon-wrapper">
+                      <div class="transaction-icon" :class="`icon-${getTransactionType(transaction.type, transaction.status)}`">
+                        <i :class="getTransactionIcon(transaction.type, transaction.status)"></i>
+                      </div>
+                    </div>
+                    <div class="transaction-info">
+                      <h4 class="transaction-title">{{ getTransactionTitle(transaction.type) }}</h4>
+                      <p class="transaction-date">{{ formatDate(transaction.createdAt) }}</p>
+                      <p class="transaction-description" v-if="transaction.description">
+                        {{ transaction.description }}
+                      </p>
+                    </div>
+                    <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type, transaction.status)}`">
+                      <span class="amount-sign">{{ getAmountSign(transaction.type) }}</span>
+                      <span class="amount-value">฿{{ formatCurrency(transaction.amount) }}</span>
+                    </div>
                   </div>
-                </div>
-                <div class="transaction-info">
-                  <h4 class="transaction-title">{{ getTransactionTitle(transaction.type) }}</h4>
-                  <p class="transaction-date">{{ formatDate(transaction.createdAt) }}</p>
-                  <p class="transaction-description" v-if="transaction.description">
-                    {{ transaction.description }}
-                  </p>
-                </div>
-                <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type)}`">
-                  <span class="amount-sign">{{ getAmountSign(transaction.type) }}</span>
-                  <span class="amount-value">฿{{ formatCurrency(transaction.amount) }}</span>
                 </div>
               </div>
 
@@ -120,6 +150,31 @@
               <h3 class="section-title">Transactions</h3>
             </div>
 
+            <!-- Filter Chips -->
+            <div class="filter-chips">
+              <button
+                class="filter-chip"
+                :class="{ active: selectedFilter === 'all' }"
+                @click="setFilter('all')"
+              >
+                All
+              </button>
+              <button
+                class="filter-chip"
+                :class="{ active: selectedFilter === 'topup' }"
+                @click="setFilter('topup')"
+              >
+                <i class="fas fa-arrow-up"></i> Top-ups
+              </button>
+              <button
+                class="filter-chip"
+                :class="{ active: selectedFilter === 'charge' }"
+                @click="setFilter('charge')"
+              >
+                <i class="fas fa-arrow-down"></i> Charges
+              </button>
+            </div>
+
             <!-- Loading State -->
             <div v-if="loadingTransactions" class="loading-state">
               <div class="spinner-border text-primary" role="status">
@@ -129,7 +184,7 @@
             </div>
 
             <!-- Empty State -->
-            <div v-else-if="transactions.length === 0" class="empty-state">
+            <div v-else-if="filteredTransactions.length === 0" class="empty-state">
               <div class="empty-icon">
                 <i class="fas fa-receipt"></i>
               </div>
@@ -139,24 +194,29 @@
 
             <!-- Transaction List -->
             <div v-else class="transaction-list">
-              <div
-                v-for="transaction in transactions"
-                :key="transaction.id"
-                class="transaction-card"
-                :class="`transaction-${getTransactionType(transaction.type)}`"
-              >
-                <div class="transaction-icon-wrapper">
-                  <div class="transaction-icon" :class="`icon-${getTransactionType(transaction.type)}`">
-                    <i :class="getTransactionIcon(transaction.type)"></i>
+              <!-- Date Groups -->
+              <div v-for="(transactions, dateLabel) in groupedTransactions" :key="dateLabel" class="date-group">
+                <div class="date-label">{{ dateLabel }}</div>
+                <div class="date-group-card">
+                  <div
+                    v-for="transaction in transactions"
+                    :key="transaction.id"
+                    class="transaction-row"
+                  >
+                    <div class="transaction-icon-wrapper">
+                      <div class="transaction-icon" :class="`icon-${getTransactionType(transaction.type, transaction.status)}`">
+                        <i :class="getTransactionIcon(transaction.type, transaction.status)"></i>
+                      </div>
+                    </div>
+                    <div class="transaction-info">
+                      <h4 class="transaction-title">{{ getTransactionTitle(transaction.type) }}</h4>
+                      <p class="transaction-date">{{ formatDate(transaction.createdAt) }}</p>
+                    </div>
+                    <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type, transaction.status)}`">
+                      <span class="amount-sign">{{ getAmountSign(transaction.type) }}</span>
+                      <span class="amount-value">฿{{ formatCurrency(transaction.amount) }}</span>
+                    </div>
                   </div>
-                </div>
-                <div class="transaction-info">
-                  <h4 class="transaction-title">{{ getTransactionTitle(transaction.type) }}</h4>
-                  <p class="transaction-date">{{ formatDate(transaction.createdAt) }}</p>
-                </div>
-                <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type)}`">
-                  <span class="amount-sign">{{ getAmountSign(transaction.type) }}</span>
-                  <span class="amount-value">฿{{ formatCurrency(transaction.amount) }}</span>
                 </div>
               </div>
 
@@ -197,7 +257,28 @@ export default {
     pageSize: 10,
     hasMoreTransactions: false,
     lastUpdated: '',
+    selectedFilter: 'all', // all, topup, charge
   }),
+  computed: {
+    filteredTransactions() {
+      if (this.selectedFilter === 'all') {
+        return this.transactions;
+      }
+
+      return this.transactions.filter(transaction => {
+        const type = this.getTransactionType(transaction.type, transaction.status);
+        if (this.selectedFilter === 'topup') {
+          return type === 'credit';
+        } else if (this.selectedFilter === 'charge') {
+          return type === 'debit';
+        }
+        return true;
+      });
+    },
+    groupedTransactions() {
+      return this.groupTransactionsByDate(this.filteredTransactions);
+    }
+  },
   async mounted() {
     await this.fetchWalletBalance();
     await this.fetchTransactions();
@@ -283,21 +364,31 @@ export default {
       };
       return titles[type] || 'Transaction';
     },
-    getTransactionIcon(type) {
+    getTransactionIcon(type, status) {
+      // Handle failed/cancelled transactions
+      if (status && ['failed', 'cancelled', 'rejected'].includes(status.toLowerCase())) {
+        return 'fas fa-times-circle';
+      }
+
       const icons = {
-        'credit': 'fas fa-arrow-down',
-        'debit': 'fas fa-arrow-up',
-        'payment': 'fas fa-shopping-bag',
-        'topup': 'fas fa-plus-circle',
-        'refund': 'fas fa-undo',
-        'voucher': 'fas fa-ticket-alt',
-        'points': 'fas fa-star',
-        'transfer_in': 'fas fa-arrow-circle-down',
-        'transfer_out': 'fas fa-arrow-circle-up'
+        'credit': 'fas fa-arrow-up',
+        'debit': 'fas fa-arrow-down',
+        'payment': 'fas fa-arrow-down',
+        'topup': 'fas fa-plus',
+        'refund': 'fas fa-undo-alt',
+        'voucher': 'fas fa-plus',
+        'points': 'fas fa-plus',
+        'transfer_in': 'fas fa-arrow-up',
+        'transfer_out': 'fas fa-arrow-down'
       };
       return icons[type] || 'fas fa-exchange-alt';
     },
-    getTransactionType(type) {
+    getTransactionType(type, status) {
+      // Failed/cancelled transactions get a special type
+      if (status && ['failed', 'cancelled', 'rejected'].includes(status.toLowerCase())) {
+        return 'failed';
+      }
+
       if (['credit', 'topup', 'refund', 'voucher', 'points', 'transfer_in'].includes(type)) {
         return 'credit';
       }
@@ -305,15 +396,57 @@ export default {
     },
     getAmountSign(type) {
       return this.getTransactionType(type) === 'credit' ? '+' : '-';
+    },
+    setFilter(filter) {
+      this.selectedFilter = filter;
+    },
+    groupTransactionsByDate(transactions) {
+      const groups = {};
+      const today = this.$moment().startOf('day');
+      const yesterday = this.$moment().subtract(1, 'day').startOf('day');
+
+      transactions.forEach(transaction => {
+        const transactionDate = this.$moment(transaction.createdAt).startOf('day');
+        let dateLabel;
+
+        if (transactionDate.isSame(today, 'day')) {
+          dateLabel = 'Today';
+        } else if (transactionDate.isSame(yesterday, 'day')) {
+          dateLabel = 'Yesterday';
+        } else {
+          dateLabel = this.$moment(transaction.createdAt).format('MMMM DD, YYYY');
+        }
+
+        if (!groups[dateLabel]) {
+          groups[dateLabel] = [];
+        }
+        groups[dateLabel].push(transaction);
+      });
+
+      return groups;
     }
   },
 };
 </script>
 
 <style lang="scss" scoped>
+// Dark Green Theme Colors
+$emerald-primary: #047857;
+$emerald-dark: #065f46;
+$forest-bg: #022c22;
+$forest-surface: #064e3b;
+$forest-surface-light: #065f46;
+$green-success: #10b981;
+$red-error: #ef4444;
+$teal-refund: #14b8a6;
+$gray-muted: #6b7280;
+
 .wallet-page {
   max-width: 800px;
   margin: 0 auto;
+  background: $forest-bg;
+  min-height: 100vh;
+  padding: 24px;
 }
 
 .page-header {
@@ -322,26 +455,26 @@ export default {
   .page-title {
     font-size: 28px;
     font-weight: 700;
-    color: #2d3748;
+    color: #e5e7eb;
     margin: 0 0 8px 0;
   }
 
   .page-subtitle {
     font-size: 14px;
-    color: #718096;
+    color: #9ca3af;
     margin: 0;
   }
 }
 
 .balance-card {
-  background: #1797ad; /* Fallback */
-  background: -webkit-linear-gradient(135deg, #1797ad 0%, #14828e 100%); /* Safari 5.1-6 */
-  background: linear-gradient(135deg, #1797ad 0%, #14828e 100%);
+  background: $emerald-primary;
+  background: -webkit-linear-gradient(135deg, $emerald-primary 0%, $emerald-dark 100%);
+  background: linear-gradient(135deg, $emerald-primary 0%, $emerald-dark 100%);
   border-radius: 16px;
   padding: 32px;
   color: white;
-  -webkit-box-shadow: 0 10px 30px rgba(23, 151, 173, 0.2);
-  box-shadow: 0 10px 30px rgba(23, 151, 173, 0.2);
+  -webkit-box-shadow: 0 10px 30px rgba(4, 120, 87, 0.3);
+  box-shadow: 0 10px 30px rgba(4, 120, 87, 0.3);
   margin-bottom: 40px;
   position: relative;
   overflow: hidden;
@@ -417,21 +550,60 @@ export default {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
 
     .section-title {
       font-size: 20px;
       font-weight: 600;
-      color: #2d3748;
+      color: #e5e7eb;
       margin: 0;
     }
 
     .transaction-count {
       font-size: 13px;
-      color: #718096;
-      background: #f7fafc;
+      color: #d1d5db;
+      background: $forest-surface;
       padding: 4px 12px;
       border-radius: 12px;
+    }
+  }
+}
+
+// Filter Chips
+.filter-chips {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+
+  .filter-chip {
+    padding: 10px 20px;
+    border: 2px solid $forest-surface-light;
+    border-radius: 24px;
+    background: $forest-surface;
+    color: #9ca3af;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    i {
+      font-size: 12px;
+    }
+
+    &:hover {
+      background: $forest-surface-light;
+      color: #d1d5db;
+      border-color: $emerald-primary;
+    }
+
+    &.active {
+      background: $emerald-primary;
+      border-color: $emerald-primary;
+      color: white;
     }
   }
 }
@@ -442,7 +614,7 @@ export default {
 
   p {
     margin-top: 16px;
-    color: #718096;
+    color: #9ca3af;
     font-size: 14px;
   }
 }
@@ -450,23 +622,25 @@ export default {
 .empty-state {
   text-align: center;
   padding: 64px 32px;
+  background: $forest-surface;
+  border-radius: 16px;
 
   .empty-icon {
     font-size: 64px;
-    color: #e2e8f0;
+    color: $forest-surface-light;
     margin-bottom: 16px;
   }
 
   h4 {
     font-size: 18px;
     font-weight: 600;
-    color: #4a5568;
+    color: #d1d5db;
     margin: 0 0 8px 0;
   }
 
   p {
     font-size: 14px;
-    color: #a0aec0;
+    color: #9ca3af;
     margin: 0;
   }
 }
@@ -474,22 +648,47 @@ export default {
 .transaction-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 24px;
 }
 
-.transaction-card {
-  background: white;
-  border: 1px solid #e2e8f0;
+// Date Groups
+.date-group {
+  .date-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #10b981;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .date-group-card {
+    background: $forest-surface;
+    border-radius: 16px;
+    padding: 8px;
+    -webkit-box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+}
+
+// Transaction Rows
+.transaction-row {
+  background: $forest-surface-light;
   border-radius: 12px;
-  padding: 20px;
+  padding: 16px;
   display: flex;
   align-items: center;
   gap: 16px;
+  margin-bottom: 8px;
   transition: all 0.2s ease;
 
+  &:last-child {
+    margin-bottom: 0;
+  }
+
   &:hover {
-    -webkit-box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    -webkit-box-shadow: 0 4px 12px rgba(4, 120, 87, 0.2);
+    box-shadow: 0 4px 12px rgba(4, 120, 87, 0.2);
     -webkit-transform: translateY(-2px);
     -ms-transform: translateY(-2px);
     transform: translateY(-2px);
@@ -499,44 +698,61 @@ export default {
     .transaction-icon {
       width: 48px;
       height: 48px;
-      border-radius: 12px;
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 20px;
 
+      // Semantic Iconography with color logic
       &.icon-credit {
-        background: rgba(72, 187, 120, 0.1);
-        color: #38a169;
+        background: rgba(16, 185, 129, 0.15);
+        color: $green-success;
       }
 
       &.icon-debit {
-        background: rgba(245, 101, 101, 0.1);
-        color: #e53e3e;
+        background: rgba(239, 68, 68, 0.15);
+        color: $red-error;
+      }
+
+      &.icon-refund {
+        background: rgba(20, 184, 166, 0.15);
+        color: $teal-refund;
+      }
+
+      &.icon-failed {
+        background: rgba(107, 114, 128, 0.15);
+        color: $gray-muted;
       }
     }
   }
 
   .transaction-info {
     flex: 1;
+    min-width: 0; // Enable text truncation
 
     .transaction-title {
       font-size: 16px;
       font-weight: 600;
-      color: #2d3748;
+      color: #e5e7eb;
       margin: 0 0 4px 0;
     }
 
     .transaction-date {
       font-size: 13px;
-      color: #a0aec0;
-      margin: 0;
+      color: #9ca3af;
+      margin: 0 0 4px 0;
     }
 
     .transaction-description {
       font-size: 13px;
-      color: #718096;
-      margin: 4px 0 0 0;
+      color: #6b7280;
+      margin: 0;
+      // Text truncation
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
     }
   }
 
@@ -545,6 +761,7 @@ export default {
     align-items: baseline;
     gap: 4px;
     font-weight: 700;
+    flex-shrink: 0;
 
     .amount-sign {
       font-size: 18px;
@@ -555,11 +772,15 @@ export default {
     }
 
     &.amount-credit {
-      color: #38a169;
+      color: $green-success;
     }
 
     &.amount-debit {
-      color: #e53e3e;
+      color: $red-error;
+    }
+
+    &.amount-failed {
+      color: $gray-muted;
     }
   }
 }
@@ -567,10 +788,10 @@ export default {
 .btn-load-more {
   width: 100%;
   padding: 14px 24px;
-  border: 2px solid #e2e8f0;
+  border: 2px solid $forest-surface-light;
   border-radius: 12px;
-  background: white;
-  color: #4a5568;
+  background: $forest-surface;
+  color: #d1d5db;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -578,9 +799,9 @@ export default {
   margin-top: 12px;
 
   &:hover:not(:disabled) {
-    border-color: #1797ad;
-    color: #1797ad;
-    background: rgba(23, 151, 173, 0.05);
+    border-color: $emerald-primary;
+    color: white;
+    background: $emerald-dark;
   }
 
   &:disabled {
@@ -594,6 +815,10 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .wallet-page {
+    padding: 16px;
+  }
+
   .balance-card {
     padding: 24px;
     margin-bottom: 32px;
@@ -609,8 +834,18 @@ export default {
     }
   }
 
-  .transaction-card {
-    padding: 16px;
+  .filter-chips {
+    gap: 8px;
+
+    .filter-chip {
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+  }
+
+  .transaction-row {
+    padding: 14px;
+    gap: 12px;
 
     .transaction-icon-wrapper .transaction-icon {
       width: 40px;
@@ -626,6 +861,10 @@ export default {
       .transaction-date {
         font-size: 12px;
       }
+
+      .transaction-description {
+        font-size: 12px;
+      }
     }
 
     .transaction-amount {
@@ -636,6 +875,12 @@ export default {
       .amount-value {
         font-size: 18px;
       }
+    }
+  }
+
+  .date-group {
+    .date-label {
+      font-size: 13px;
     }
   }
 }
