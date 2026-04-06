@@ -46,14 +46,14 @@
                 :class="{ active: selectedFilter === 'topup' }"
                 @click="setFilter('topup')"
               >
-                <i class="fas fa-arrow-circle-down"></i> Top-ups
+                <i class="fas fa-wallet"></i> Top-ups
               </button>
               <button
                 class="filter-chip"
                 :class="{ active: selectedFilter === 'charge' }"
                 @click="setFilter('charge')"
               >
-                <i class="fas fa-shopping-bag"></i> Charges
+                <i class="fas fa-credit-card"></i> Charges
               </button>
             </div>
 
@@ -164,14 +164,14 @@
                 :class="{ active: selectedFilter === 'topup' }"
                 @click="setFilter('topup')"
               >
-                <i class="fas fa-arrow-circle-down"></i> Top-ups
+                <i class="fas fa-wallet"></i> Top-ups
               </button>
               <button
                 class="filter-chip"
                 :class="{ active: selectedFilter === 'charge' }"
                 @click="setFilter('charge')"
               >
-                <i class="fas fa-shopping-bag"></i> Charges
+                <i class="fas fa-credit-card"></i> Charges
               </button>
             </div>
 
@@ -367,25 +367,35 @@ export default {
     getTransactionIcon(type, status) {
       // Handle failed/cancelled transactions
       if (status && ['failed', 'cancelled', 'rejected'].includes(status.toLowerCase())) {
-        return 'fas fa-ban';
+        return 'fas fa-exclamation-circle';
       }
 
+      // Unique icon for each transaction type
       const icons = {
-        'credit': 'fas fa-arrow-circle-down',
-        'debit': 'fas fa-shopping-bag',
-        'payment': 'fas fa-shopping-bag',
+        'credit': 'fas fa-hand-holding-usd',
+        'debit': 'fas fa-credit-card',
+        'payment': 'fas fa-shopping-cart',
         'topup': 'fas fa-wallet',
-        'refund': 'fas fa-redo-alt',
-        'voucher': 'fas fa-gift',
-        'points': 'fas fa-coins',
-        'transfer_in': 'fas fa-arrow-circle-down',
-        'transfer_out': 'fas fa-paper-plane'
+        'refund': 'fas fa-undo-alt',
+        'voucher': 'fas fa-ticket-alt',
+        'points': 'fas fa-star',
+        'transfer_in': 'fas fa-download',
+        'transfer_out': 'fas fa-upload',
+        'purchase': 'fas fa-shopping-bag',
+        'withdrawal': 'fas fa-money-bill-wave',
+        'cashback': 'fas fa-receipt',
+        'reward': 'fas fa-award',
+        'fee': 'fas fa-file-invoice-dollar',
+        'adjustment': 'fas fa-balance-scale',
+        'bonus': 'fas fa-gift',
+        'subscription': 'fas fa-sync-alt',
+        'deposit': 'fas fa-piggy-bank'
       };
 
       // If specific type not found, use semantic fallback based on transaction category
       if (!icons[type]) {
         const category = this.getTransactionType(type, status);
-        return category === 'credit' ? 'fas fa-arrow-circle-down' : 'fas fa-shopping-bag';
+        return category === 'credit' ? 'fas fa-plus-circle' : 'fas fa-minus-circle';
       }
 
       return icons[type];
@@ -437,10 +447,11 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-// Starbucks-Inspired Bright Theme Colors
-$starbucks-green: #00704A;
-$starbucks-green-dark: #006241;
-$starbucks-green-light: #008C54;
+// Bright Theme Colors - Matching Application
+$teal-primary: #1797AD;
+$teal-dark: #14828E;
+$teal-light: #1BA4BC;
+$dark-green: #063F48;
 $cream-bg: #F7F5F2;
 $white: #FFFFFF;
 $off-white: #FAFAF8;
@@ -465,7 +476,7 @@ $gray-border: #E2E8F0;
   .page-title {
     font-size: 32px;
     font-weight: 700;
-    color: $starbucks-green-dark;
+    color: $dark-green;
     margin: 0 0 8px 0;
     letter-spacing: -0.5px;
   }
@@ -479,13 +490,13 @@ $gray-border: #E2E8F0;
 
 .balance-card {
   background: $white;
-  background: -webkit-linear-gradient(135deg, $starbucks-green 0%, $starbucks-green-dark 100%);
-  background: linear-gradient(135deg, $starbucks-green 0%, $starbucks-green-dark 100%);
+  background: -webkit-linear-gradient(135deg, $teal-primary 0%, $teal-dark 100%);
+  background: linear-gradient(135deg, $teal-primary 0%, $teal-dark 100%);
   border-radius: 20px;
   padding: 36px;
   color: white;
-  -webkit-box-shadow: 0 8px 24px rgba(0, 112, 74, 0.15);
-  box-shadow: 0 8px 24px rgba(0, 112, 74, 0.15);
+  -webkit-box-shadow: 0 8px 24px rgba(23, 151, 173, 0.2);
+  box-shadow: 0 8px 24px rgba(23, 151, 173, 0.2);
   margin-bottom: 32px;
   position: relative;
   overflow: hidden;
@@ -566,7 +577,7 @@ $gray-border: #E2E8F0;
     .section-title {
       font-size: 22px;
       font-weight: 700;
-      color: $starbucks-green-dark;
+      color: $dark-green;
       margin: 0;
       letter-spacing: -0.3px;
     }
@@ -612,18 +623,18 @@ $gray-border: #E2E8F0;
 
     &:hover {
       background: $off-white;
-      border-color: $starbucks-green-light;
-      color: $starbucks-green;
-      -webkit-box-shadow: 0 4px 12px rgba(0, 112, 74, 0.1);
-      box-shadow: 0 4px 12px rgba(0, 112, 74, 0.1);
+      border-color: $teal-light;
+      color: $teal-primary;
+      -webkit-box-shadow: 0 4px 12px rgba(23, 151, 173, 0.12);
+      box-shadow: 0 4px 12px rgba(23, 151, 173, 0.12);
     }
 
     &.active {
-      background: $starbucks-green;
-      border-color: $starbucks-green;
+      background: $teal-primary;
+      border-color: $teal-primary;
       color: white;
-      -webkit-box-shadow: 0 4px 12px rgba(0, 112, 74, 0.2);
-      box-shadow: 0 4px 12px rgba(0, 112, 74, 0.2);
+      -webkit-box-shadow: 0 4px 12px rgba(23, 151, 173, 0.25);
+      box-shadow: 0 4px 12px rgba(23, 151, 173, 0.25);
     }
   }
 }
@@ -677,7 +688,7 @@ $gray-border: #E2E8F0;
   .date-label {
     font-size: 13px;
     font-weight: 700;
-    color: $starbucks-green;
+    color: $teal-primary;
     margin-bottom: 14px;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -711,9 +722,9 @@ $gray-border: #E2E8F0;
 
   &:hover {
     background: $white;
-    border-color: $starbucks-green-light;
-    -webkit-box-shadow: 0 4px 16px rgba(0, 112, 74, 0.08);
-    box-shadow: 0 4px 16px rgba(0, 112, 74, 0.08);
+    border-color: $teal-light;
+    -webkit-box-shadow: 0 4px 16px rgba(23, 151, 173, 0.12);
+    box-shadow: 0 4px 16px rgba(23, 151, 173, 0.12);
     -webkit-transform: translateY(-2px);
     -ms-transform: translateY(-2px);
     transform: translateY(-2px);
@@ -759,7 +770,7 @@ $gray-border: #E2E8F0;
     .transaction-title {
       font-size: 16px;
       font-weight: 600;
-      color: $starbucks-green-dark;
+      color: $dark-green;
       margin: 0 0 6px 0;
       letter-spacing: -0.2px;
     }
@@ -819,7 +830,7 @@ $gray-border: #E2E8F0;
   border: 2px solid $gray-border;
   border-radius: 16px;
   background: $white;
-  color: $starbucks-green;
+  color: $teal-primary;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -829,11 +840,11 @@ $gray-border: #E2E8F0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 
   &:hover:not(:disabled) {
-    border-color: $starbucks-green;
+    border-color: $teal-primary;
     color: white;
-    background: $starbucks-green;
-    -webkit-box-shadow: 0 4px 12px rgba(0, 112, 74, 0.15);
-    box-shadow: 0 4px 12px rgba(0, 112, 74, 0.15);
+    background: $teal-primary;
+    -webkit-box-shadow: 0 4px 12px rgba(23, 151, 173, 0.2);
+    box-shadow: 0 4px 12px rgba(23, 151, 173, 0.2);
   }
 
   &:disabled {
