@@ -63,6 +63,15 @@
       </div>
       <div class="filter-group">
         <input
+          v-model="filters.branch"
+          type="text"
+          placeholder="Filter by Branch"
+          class="filter-input"
+          @change="loadTransactions"
+        />
+      </div>
+      <div class="filter-group">
+        <input
           v-model="filters.minAmount"
           type="number"
           placeholder="Min Amount"
@@ -92,6 +101,7 @@
             <th>Type</th>
             <th>Amount</th>
             <th>Status</th>
+            <th>Branch</th>
             <th>Processed By</th>
             <th>Date</th>
             <th>Actions</th>
@@ -99,10 +109,10 @@
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="8" class="loading-cell">Loading...</td>
+            <td colspan="9" class="loading-cell">Loading...</td>
           </tr>
           <tr v-else-if="transactions.length === 0">
-            <td colspan="8" class="empty-cell">No transactions found</td>
+            <td colspan="9" class="empty-cell">No transactions found</td>
           </tr>
           <tr v-else v-for="transaction in transactions" :key="transaction.id">
             <td class="mono">#{{ transaction.id }}</td>
@@ -124,6 +134,12 @@
               <span :class="['status-badge', transaction.status]">
                 {{ transaction.status }}
               </span>
+            </td>
+            <td>
+              <span v-if="transaction.branch" class="branch-badge">
+                {{ transaction.branch }}
+              </span>
+              <span v-else class="text-muted">-</span>
             </td>
             <td>
               <div v-if="transaction.processedBy" class="processed-by">
@@ -236,6 +252,10 @@
             <label>Description:</label>
             <span>{{ selectedTransaction.description }}</span>
           </div>
+          <div class="detail-row" v-if="selectedTransaction.branch">
+            <label>Branch:</label>
+            <span class="branch-badge">{{ selectedTransaction.branch }}</span>
+          </div>
           <div class="detail-row">
             <label>Created At:</label>
             <span>{{ formatDate(selectedTransaction.createdAt) }}</span>
@@ -278,6 +298,7 @@ export default {
         status: '',
         staffId: '',
         machineId: '',
+        branch: '',
         minAmount: '',
         maxAmount: '',
       },
@@ -338,6 +359,7 @@ export default {
         status: '',
         staffId: '',
         machineId: '',
+        branch: '',
         minAmount: '',
         maxAmount: '',
       };
@@ -776,5 +798,19 @@ export default {
   text-align: center;
   padding: 40px;
   color: #6b7280;
+}
+
+.branch-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #1f2937;
+  text-transform: capitalize;
+}
+
+.text-muted {
+  color: #9ca3af;
 }
 </style>

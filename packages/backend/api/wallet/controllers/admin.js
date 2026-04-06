@@ -323,6 +323,7 @@ module.exports = {
         referenceId,
         staffId,
         machineId,
+        branch,
       } = ctx.query;
 
       let query = `
@@ -391,6 +392,12 @@ module.exports = {
       if (machineId) {
         query += ` AND JSON_EXTRACT(t.metadata, '$.machineId') LIKE ?`;
         params.push(`%${machineId}%`);
+      }
+
+      // Filter by branch
+      if (branch) {
+        query += ` AND t.branch = ?`;
+        params.push(branch);
       }
 
       // Get total count
@@ -484,6 +491,7 @@ module.exports = {
             referenceId: t.reference_id,
             description: t.description,
             metadata,
+            branch: t.branch,
             processedBy,
             createdAt: t.created_at,
             completedAt: t.completed_at,

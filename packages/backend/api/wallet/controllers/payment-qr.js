@@ -327,6 +327,27 @@ module.exports = {
         // Determine transaction type
         const transactionType = purpose === 'beer_machine' ? 'beer_machine_payment' : 'store_payment';
 
+        // Extract and resolve branch from metadata
+        let branch = null;
+        if (metadata?.branch) {
+          // If branch is a number (branch ID), look up the branch name
+          if (typeof metadata.branch === 'number' || !isNaN(metadata.branch)) {
+            try {
+              const branchResult = await knex('branches')
+                .select('name')
+                .where({ id: metadata.branch })
+                .first();
+              branch = branchResult?.name || null;
+            } catch (err) {
+              strapi.log.error('[Payment QR] Error looking up branch name:', err);
+              branch = `Branch ${metadata.branch}`;
+            }
+          } else {
+            // If it's already a string (branch name), use it directly
+            branch = metadata.branch;
+          }
+        }
+
         // Create transaction record with precise decimal values
         await trx('wallet_transactions').insert({
           id: transactionId,
@@ -338,6 +359,7 @@ module.exports = {
           status: 'completed',
           description: description || `${purpose === 'beer_machine' ? 'Beer machine' : 'Store'} payment`,
           metadata: metadata ? JSON.stringify(metadata) : null,
+          branch: branch,
           created_at: new Date(),
         });
 
@@ -439,6 +461,7 @@ module.exports = {
           'status',
           'description',
           'metadata',
+          'branch',
           'created_at'
         )
         .where({ user_id: userId })
@@ -474,6 +497,7 @@ module.exports = {
         status: tx.status,
         description: tx.description,
         metadata: tx.metadata ? JSON.parse(tx.metadata) : null,
+        branch: tx.branch,
         createdAt: tx.created_at,
       }));
 
