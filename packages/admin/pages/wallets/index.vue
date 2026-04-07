@@ -1,159 +1,259 @@
 <template>
-  <div class="wallets-page">
+  <div class="wallet-page-container">
     <Breadcrumb :items="breadcrumbs" />
-    <div class="page-header">
-      <h1>Wallet Management</h1>
+
+    <!-- Page Header -->
+    <div class="wallet-page-header">
+      <div>
+        <h1>Wallet Management</h1>
+        <p class="subtitle">Manage user wallets, balances, and transactions</p>
+      </div>
       <div class="header-actions">
-        <button @click="exportData" class="btn-export">
-          Export to CSV
+        <button @click="exportData" class="wallet-btn secondary">
+          <i class="fas fa-download"></i>
+          Export CSV
         </button>
-        <nuxt-link to="/wallets/settings" class="btn-primary">
+        <nuxt-link to="/wallets/settings" class="wallet-btn secondary">
+          <i class="fas fa-cog"></i>
           Settings
         </nuxt-link>
-        <nuxt-link to="/wallets/transactions" class="btn-primary">
-          View All Transactions
+        <nuxt-link to="/wallets/transactions" class="wallet-btn primary">
+          <i class="fas fa-list"></i>
+          All Transactions
         </nuxt-link>
-        <nuxt-link to="/wallets/reports" class="btn-primary">
-          View Reports
+        <nuxt-link to="/wallets/reports" class="wallet-btn secondary">
+          <i class="fas fa-chart-bar"></i>
+          Reports
         </nuxt-link>
-        <nuxt-link to="/wallets/vouchers" class="btn-primary">
-          Manage Vouchers
+        <nuxt-link to="/wallets/vouchers" class="wallet-btn secondary">
+          <i class="fas fa-gift"></i>
+          Vouchers
         </nuxt-link>
       </div>
     </div>
 
     <!-- Statistics Cards -->
-    <div class="stats-grid">
-      <div class="stat-card">
+    <div class="wallet-stats-grid">
+      <div class="wallet-stat-card">
+        <div class="stat-header">
+          <div class="stat-icon info">
+            <i class="fas fa-wallet"></i>
+          </div>
+        </div>
         <div class="stat-label">Total Balance</div>
-        <div class="stat-value">฿ {{ formatNumber(stats.totalBalance) }}</div>
-        <div class="stat-change positive">↑ {{ stats.balanceChange }}%</div>
+        <div class="stat-value">฿{{ formatNumber(stats.totalBalance) }}</div>
+        <div class="stat-subtitle">↑ {{ stats.balanceChange }}% from last month</div>
       </div>
-      <div class="stat-card">
+
+      <div class="wallet-stat-card">
+        <div class="stat-header">
+          <div class="stat-icon success">
+            <i class="fas fa-users"></i>
+          </div>
+        </div>
         <div class="stat-label">Active Wallets</div>
         <div class="stat-value">{{ formatNumber(stats.activeWallets) }}</div>
-        <div class="stat-change positive">↑ {{ stats.newWallets }} new</div>
+        <div class="stat-subtitle">{{ stats.newWallets }} new this week</div>
       </div>
-      <div class="stat-card">
+
+      <div class="wallet-stat-card">
+        <div class="stat-header">
+          <div class="stat-icon info">
+            <i class="fas fa-chart-line"></i>
+          </div>
+        </div>
         <div class="stat-label">Today's Volume</div>
-        <div class="stat-value">฿ {{ formatNumber(stats.todayVolume) }}</div>
-        <div class="stat-change">{{ stats.todayTransactions }} trans</div>
+        <div class="stat-value">฿{{ formatNumber(stats.todayVolume) }}</div>
+        <div class="stat-subtitle">{{ stats.todayTransactions }} transactions</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Pending Transactions</div>
+
+      <div class="wallet-stat-card">
+        <div class="stat-header">
+          <div class="stat-icon warning">
+            <i class="fas fa-clock"></i>
+          </div>
+        </div>
+        <div class="stat-label">Pending</div>
         <div class="stat-value">{{ stats.pendingCount }}</div>
-        <div class="stat-change">฿ {{ formatNumber(stats.pendingAmount) }}</div>
+        <div class="stat-subtitle">฿{{ formatNumber(stats.pendingAmount) }} total</div>
       </div>
     </div>
 
-    <!-- Filters -->
-    <div class="filters-section">
-      <div class="filter-group">
-        <input
-          v-model="filters.search"
-          type="text"
-          placeholder="Search by name, email, phone..."
-          class="search-input"
-          @input="debouncedSearch"
-        />
+    <!-- Quick Filters -->
+    <div class="wallet-filter-chips">
+      <button
+        @click="filters.status = ''; loadWallets()"
+        :class="['wallet-filter-chip', { active: filters.status === '' }]"
+      >
+        <i class="fas fa-list"></i>
+        All Wallets
+      </button>
+      <button
+        @click="filters.status = 'active'; loadWallets()"
+        :class="['wallet-filter-chip', { active: filters.status === 'active' }]"
+      >
+        <i class="fas fa-check-circle"></i>
+        Active Only
+      </button>
+      <button
+        @click="filters.status = 'frozen'; loadWallets()"
+        :class="['wallet-filter-chip', { active: filters.status === 'frozen' }]"
+      >
+        <i class="fas fa-snowflake"></i>
+        Frozen
+      </button>
+      <button
+        @click="filters.status = 'suspended'; loadWallets()"
+        :class="['wallet-filter-chip', { active: filters.status === 'suspended' }]"
+      >
+        <i class="fas fa-ban"></i>
+        Suspended
+      </button>
+      <button @click="resetFilters" class="wallet-filter-chip">
+        <i class="fas fa-redo"></i>
+        Reset
+      </button>
+    </div>
+
+    <!-- Advanced Filters -->
+    <div class="wallet-filters-panel">
+      <div class="wallet-filters-grid">
+        <div class="wallet-filter-item">
+          <label>
+            <i class="fas fa-search"></i>
+            Search
+          </label>
+          <input
+            v-model="filters.search"
+            type="text"
+            placeholder="Name, email, phone, or user ID..."
+            @input="debouncedSearch"
+          />
+        </div>
+
+        <div class="wallet-filter-item">
+          <label>
+            <i class="fas fa-coins"></i>
+            Min Balance
+          </label>
+          <input
+            v-model="filters.minBalance"
+            type="number"
+            placeholder="0.00"
+            @change="loadWallets"
+          />
+        </div>
+
+        <div class="wallet-filter-item">
+          <label>
+            <i class="fas fa-coins"></i>
+            Max Balance
+          </label>
+          <input
+            v-model="filters.maxBalance"
+            type="number"
+            placeholder="1000000.00"
+            @change="loadWallets"
+          />
+        </div>
+
+        <div class="wallet-filter-item">
+          <label>
+            <i class="fas fa-sort"></i>
+            Sort By
+          </label>
+          <select v-model="filters.sortBy" @change="loadWallets">
+            <option value="created_at">Created Date</option>
+            <option value="balance">Balance</option>
+            <option value="last_transaction">Last Transaction</option>
+          </select>
+        </div>
+
+        <div class="wallet-filter-item">
+          <label>
+            <i class="fas fa-sort-amount-down"></i>
+            Order
+          </label>
+          <select v-model="filters.sortOrder" @change="loadWallets">
+            <option value="desc">Newest First</option>
+            <option value="asc">Oldest First</option>
+          </select>
+        </div>
       </div>
-      <div class="filter-group">
-        <select v-model="filters.status" @change="loadWallets" class="filter-select">
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="frozen">Frozen</option>
-          <option value="suspended">Suspended</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <input
-          v-model="filters.minBalance"
-          type="number"
-          placeholder="Min Balance"
-          class="filter-input"
-          @change="loadWallets"
-        />
-      </div>
-      <div class="filter-group">
-        <input
-          v-model="filters.maxBalance"
-          type="number"
-          placeholder="Max Balance"
-          class="filter-input"
-          @change="loadWallets"
-        />
-      </div>
-      <div class="filter-group">
-        <select v-model="filters.sortBy" @change="loadWallets" class="filter-select">
-          <option value="created_at">Created Date</option>
-          <option value="balance">Balance</option>
-          <option value="last_transaction">Last Transaction</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <select v-model="filters.sortOrder" @change="loadWallets" class="filter-select">
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
-      </div>
-      <button @click="resetFilters" class="btn-reset">Reset</button>
     </div>
 
     <!-- Wallets Table -->
-    <div class="table-container">
-      <table class="wallets-table">
+    <div class="wallet-table-container">
+      <table class="wallet-table">
         <thead>
           <tr>
-            <th>User ID</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Balance</th>
-            <th>Pending</th>
-            <th>Status</th>
-            <th>Last Transaction</th>
-            <th>Actions</th>
+            <th><i class="fas fa-hashtag"></i> User ID</th>
+            <th><i class="fas fa-user"></i> Name</th>
+            <th><i class="fas fa-envelope"></i> Email</th>
+            <th><i class="fas fa-wallet"></i> Balance</th>
+            <th><i class="fas fa-clock"></i> Pending</th>
+            <th><i class="fas fa-info-circle"></i> Status</th>
+            <th><i class="fas fa-calendar"></i> Last Transaction</th>
+            <th><i class="fas fa-tools"></i> Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="8" class="loading-cell">Loading...</td>
+            <td colspan="8" class="wallet-loading">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>Loading wallets...</p>
+            </td>
           </tr>
           <tr v-else-if="wallets.length === 0">
-            <td colspan="8" class="empty-cell">No wallets found</td>
+            <td colspan="8" class="wallet-empty">
+              <i class="fas fa-inbox"></i>
+              <p>No wallets found</p>
+            </td>
           </tr>
           <tr v-else v-for="wallet in wallets" :key="wallet.userId">
-            <td>#{{ wallet.userId }}</td>
+            <td><strong>#{{ wallet.userId }}</strong></td>
             <td>{{ wallet.user.firstName }} {{ wallet.user.lastName }}</td>
             <td>{{ wallet.user.email }}</td>
             <td class="amount">฿{{ formatNumber(wallet.balance) }}</td>
             <td class="amount">฿{{ formatNumber(wallet.pendingBalance) }}</td>
             <td>
-              <span :class="['status-badge', wallet.status]">
+              <span :class="['wallet-status-badge', wallet.status]">
+                <i v-if="wallet.status === 'active'" class="fas fa-check-circle"></i>
+                <i v-else-if="wallet.status === 'frozen'" class="fas fa-snowflake"></i>
+                <i v-else class="fas fa-ban"></i>
                 {{ wallet.status }}
               </span>
             </td>
             <td>{{ formatDate(wallet.lastTransaction) }}</td>
-            <td class="actions">
-              <nuxt-link :to="`/wallets/${wallet.userId}`" class="btn-action">
-                View
-              </nuxt-link>
-              <button @click="showAdjustModal(wallet)" class="btn-action">
-                Adjust
-              </button>
-              <button
-                v-if="wallet.status === 'active'"
-                @click="freezeWallet(wallet.userId)"
-                class="btn-action danger"
-              >
-                Freeze
-              </button>
-              <button
-                v-else
-                @click="unfreezeWallet(wallet.userId)"
-                class="btn-action success"
-              >
-                Unfreeze
-              </button>
+            <td>
+              <div class="actions">
+                <nuxt-link :to="`/wallets/${wallet.userId}`" class="wallet-btn secondary" style="padding: 6px 12px; font-size: 12px;">
+                  <i class="fas fa-eye"></i>
+                  View
+                </nuxt-link>
+                <button @click="showAdjustModal(wallet)" class="wallet-btn secondary" style="padding: 6px 12px; font-size: 12px;">
+                  <i class="fas fa-edit"></i>
+                  Adjust
+                </button>
+                <button
+                  v-if="wallet.status === 'active'"
+                  @click="freezeWallet(wallet.userId)"
+                  class="wallet-btn danger"
+                  style="padding: 6px 12px; font-size: 12px;"
+                >
+                  <i class="fas fa-snowflake"></i>
+                  Freeze
+                </button>
+                <button
+                  v-else
+                  @click="unfreezeWallet(wallet.userId)"
+                  class="wallet-btn success"
+                  style="padding: 6px 12px; font-size: 12px;"
+                >
+                  <i class="fas fa-check"></i>
+                  Unfreeze
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -161,15 +261,16 @@
     </div>
 
     <!-- Pagination -->
-    <div class="pagination">
+    <div style="display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 24px;">
       <button
         @click="prevPage"
         :disabled="pagination.offset === 0"
-        class="btn-page"
+        class="wallet-btn secondary"
       >
+        <i class="fas fa-chevron-left"></i>
         Previous
       </button>
-      <span class="page-info">
+      <span style="color: #6b7280; font-size: 14px;">
         Showing {{ pagination.offset + 1 }} -
         {{ Math.min(pagination.offset + pagination.limit, pagination.total) }}
         of {{ pagination.total }}
@@ -177,55 +278,61 @@
       <button
         @click="nextPage"
         :disabled="!pagination.hasMore"
-        class="btn-page"
+        class="wallet-btn secondary"
       >
         Next
+        <i class="fas fa-chevron-right"></i>
       </button>
     </div>
 
     <!-- Adjust Balance Modal -->
     <div v-if="showAdjustDialog" class="modal-overlay" @click="closeAdjustModal">
       <div class="modal-content" @click.stop>
-        <h2>Adjust Wallet Balance</h2>
+        <h2 style="font-size: 22px; color: #063F48; margin-bottom: 20px;">
+          <i class="fas fa-balance-scale"></i>
+          Adjust Wallet Balance
+        </h2>
         <div class="modal-body">
-          <p>
-            <strong>User:</strong> {{ adjustData.user?.firstName }}
-            {{ adjustData.user?.lastName }}
-          </p>
-          <p><strong>Current Balance:</strong> ฿{{ formatNumber(adjustData.balance) }}</p>
+          <div style="background: #F7FAFC; padding: 16px; border-radius: 12px; margin-bottom: 20px;">
+            <p style="margin: 4px 0;"><strong>User:</strong> {{ adjustData.user?.firstName }} {{ adjustData.user?.lastName }}</p>
+            <p style="margin: 4px 0;"><strong>Current Balance:</strong> <span style="color: #1797AD; font-weight: 600;">฿{{ formatNumber(adjustData.balance) }}</span></p>
+          </div>
 
-          <div class="form-group">
-            <label>Type</label>
-            <select v-model="adjustData.type" class="form-control">
-              <option value="credit">Credit (Add)</option>
-              <option value="debit">Debit (Deduct)</option>
+          <div class="wallet-filter-item" style="margin-bottom: 16px;">
+            <label>Adjustment Type</label>
+            <select v-model="adjustData.type">
+              <option value="credit">Credit (Add Money)</option>
+              <option value="debit">Debit (Deduct Money)</option>
             </select>
           </div>
 
-          <div class="form-group">
+          <div class="wallet-filter-item" style="margin-bottom: 16px;">
             <label>Amount (฿)</label>
             <input
               v-model="adjustData.amount"
               type="number"
               step="0.01"
-              class="form-control"
-              placeholder="Enter amount"
+              placeholder="Enter amount..."
             />
           </div>
 
-          <div class="form-group">
+          <div class="wallet-filter-item" style="margin-bottom: 20px;">
             <label>Reason (Required)</label>
             <textarea
               v-model="adjustData.reason"
-              class="form-control"
               rows="3"
               placeholder="Enter reason for adjustment..."
+              style="width: 100%; padding: 10px 14px; border: 2px solid #E2E8F0; border-radius: 12px; font-size: 14px; font-family: inherit; resize: vertical;"
             ></textarea>
           </div>
 
-          <div class="modal-actions">
-            <button @click="closeAdjustModal" class="btn-secondary">Cancel</button>
-            <button @click="submitAdjustment" class="btn-primary" :disabled="!canSubmitAdjustment">
+          <div style="display: flex; justify-content: flex-end; gap: 12px;">
+            <button @click="closeAdjustModal" class="wallet-btn secondary">
+              <i class="fas fa-times"></i>
+              Cancel
+            </button>
+            <button @click="submitAdjustment" class="wallet-btn success" :disabled="!canSubmitAdjustment">
+              <i class="fas fa-check"></i>
               Adjust Balance
             </button>
           </div>
@@ -312,13 +419,10 @@ export default {
         };
 
         const response = await this.$walletService.getWallets(params);
-        console.log('[WalletPage] API Response:', response);
-        console.log('[WalletPage] Wallets count:', response.data?.wallets?.length);
 
         if (response.success) {
           this.wallets = response.data.wallets;
           this.pagination = response.data.pagination;
-          console.log('[WalletPage] Wallets set:', this.wallets.length);
         }
       } catch (error) {
         console.error('Error loading wallets:', error);
@@ -334,8 +438,6 @@ export default {
 
     async loadStats() {
       try {
-        // In a real implementation, you'd have a dedicated endpoint for stats
-        // For now, we'll use the reports endpoint
         const response = await this.$walletService.getReports({
           reportType: 'summary',
         });
@@ -555,201 +657,10 @@ export default {
 </script>
 
 <style scoped>
-.wallets-page {
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-}
-
-.page-header h1 {
-  font-size: 28px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.stat-card {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #6b7280;
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 8px;
-}
-
-.stat-change {
-  font-size: 14px;
-  color: #6b7280;
-}
-
-.stat-change.positive {
-  color: #10b981;
-}
-
-.filters-section {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.filter-group {
-  flex: 1;
-  min-width: 150px;
-}
-
-.search-input,
-.filter-select,
-.filter-input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.table-container {
-  background: white;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.wallets-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.wallets-table thead {
-  background: #f9fafb;
-}
-
-.wallets-table th {
-  padding: 12px 16px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.wallets-table td {
-  padding: 12px 16px;
-  border-top: 1px solid #e5e7eb;
-  font-size: 14px;
-  color: #1f2937;
-}
-
-.amount {
-  font-family: monospace;
-  font-weight: 600;
-}
-
-.status-badge {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.status-badge.active {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.status-badge.frozen {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status-badge.suspended {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
 .actions {
   display: flex;
   gap: 8px;
-}
-
-.btn-action {
-  padding: 6px 12px;
-  font-size: 12px;
-  border-radius: 4px;
-  border: 1px solid #d1d5db;
-  background: white;
-  cursor: pointer;
-  text-decoration: none;
-  color: #1f2937;
-}
-
-.btn-action:hover {
-  background: #f3f4f6;
-}
-
-.btn-action.danger {
-  color: #dc2626;
-  border-color: #dc2626;
-}
-
-.btn-action.success {
-  color: #10b981;
-  border-color: #10b981;
-}
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  margin-top: 20px;
-}
-
-.btn-page {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: white;
-  cursor: pointer;
-}
-
-.btn-page:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  flex-wrap: wrap;
 }
 
 .modal-overlay {
@@ -767,87 +678,16 @@ export default {
 
 .modal-content {
   background: white;
-  border-radius: 8px;
-  padding: 24px;
-  max-width: 500px;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 600px;
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 .modal-body {
-  margin-top: 20px;
-}
-
-.form-group {
-  margin-bottom: 16px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #374151;
-}
-
-.form-control {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.btn-primary,
-.btn-secondary,
-.btn-export,
-.btn-reset {
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-  border: none;
-}
-
-.btn-primary {
-  background: #1a7a89;
-  color: white;
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: #f3f4f6;
-  color: #1f2937;
-}
-
-.btn-export {
-  background: #10b981;
-  color: white;
-}
-
-.btn-reset {
-  background: #6b7280;
-  color: white;
-}
-
-.loading-cell,
-.empty-cell {
-  text-align: center;
-  padding: 40px;
-  color: #6b7280;
+  margin-top: 0;
 }
 </style>
