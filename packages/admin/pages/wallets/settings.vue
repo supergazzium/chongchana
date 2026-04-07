@@ -1,19 +1,35 @@
 <template>
-  <div class="wallet-settings-page">
+  <div class="wallet-page-container">
     <Breadcrumb :items="breadcrumbs" />
 
-    <div class="page-header">
-      <h1>Wallet & Point Redemption Settings</h1>
-      <button
-        @click="saveSettings"
-        class="btn-primary"
-        :disabled="saving || !hasChanges"
-      >
-        {{ saving ? 'Saving...' : 'Save Changes' }}
-      </button>
+    <!-- Page Header -->
+    <div class="wallet-page-header">
+      <div>
+        <h1>Wallet & Point Settings</h1>
+        <p class="subtitle">Configure wallet operations, point redemption, and display settings</p>
+      </div>
+      <div class="header-actions">
+        <button
+          @click="resetChanges"
+          class="wallet-btn secondary"
+          :disabled="!hasChanges"
+        >
+          <i class="fas fa-undo"></i>
+          Reset
+        </button>
+        <button
+          @click="saveSettings"
+          class="wallet-btn primary"
+          :disabled="saving || !hasChanges"
+        >
+          <i :class="saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'"></i>
+          {{ saving ? 'Saving...' : 'Save Changes' }}
+        </button>
+      </div>
     </div>
 
-    <div v-if="loading" class="loading-container">
+    <div v-if="loading" class="wallet-loading">
+      <i class="fas fa-spinner fa-spin"></i>
       <p>Loading settings...</p>
     </div>
 
@@ -21,15 +37,22 @@
       <!-- Point Redemption Settings -->
       <div class="settings-section">
         <div class="section-header">
-          <h2>Point Redemption Settings</h2>
-          <p class="section-description">Configure how users can convert their points to wallet cash</p>
+          <div class="section-title">
+            <div class="section-icon info">
+              <i class="fas fa-coins"></i>
+            </div>
+            <div>
+              <h2>Point Redemption Settings</h2>
+              <p class="section-description">Configure how users can convert their points to wallet cash</p>
+            </div>
+          </div>
         </div>
 
         <div class="settings-grid">
           <div class="form-group">
             <label for="pointConversionRate">
+              <i class="fas fa-exchange-alt"></i>
               Point Conversion Rate
-              <span class="help-text">How many points equal ฿1</span>
             </label>
             <div class="input-with-unit">
               <input
@@ -43,15 +66,15 @@
               />
               <span class="unit">points = ฿1</span>
             </div>
-            <p class="help-text-detail">
+            <p class="help-text">
               Example: If set to 1.0, then 100 points = ฿100. If set to 2.0, then 200 points = ฿100
             </p>
           </div>
 
           <div class="form-group">
             <label for="pointMinRedemption">
+              <i class="fas fa-chart-line"></i>
               Minimum Points for Redemption
-              <span class="help-text">Minimum points required to redeem</span>
             </label>
             <div class="input-with-unit">
               <input
@@ -65,6 +88,7 @@
               />
               <span class="unit">points</span>
             </div>
+            <p class="help-text">Minimum points required to redeem</p>
           </div>
 
           <div class="form-group full-width">
@@ -74,19 +98,23 @@
                 type="checkbox"
                 class="checkbox-input"
               />
-              <span class="checkbox-text">
-                Require Admin Approval for Point Redemptions
-              </span>
+              <div class="checkbox-content">
+                <i class="fas fa-user-check"></i>
+                <div>
+                  <span class="checkbox-text">Require Admin Approval for Point Redemptions</span>
+                  <p class="help-text">When enabled, all point redemption requests will be pending until an admin approves them</p>
+                </div>
+              </div>
             </label>
-            <p class="help-text-detail">
-              When enabled, all point redemption requests will be pending until an admin approves them
-            </p>
           </div>
         </div>
 
         <!-- Preview Calculator -->
         <div class="calculator-preview">
-          <h3>Redemption Calculator Preview</h3>
+          <h3>
+            <i class="fas fa-calculator"></i>
+            Redemption Calculator Preview
+          </h3>
           <div class="calculator-content">
             <div class="calculator-input">
               <label>Points to Redeem:</label>
@@ -99,21 +127,25 @@
                 placeholder="Enter points"
               />
             </div>
+            <div class="calculator-arrow">
+              <i class="fas fa-arrow-right"></i>
+            </div>
             <div class="calculator-result">
-              <div class="arrow">→</div>
               <div class="result-box">
-                <span class="result-label">Wallet Cash:</span>
+                <span class="result-label">Wallet Cash</span>
                 <span class="result-value">฿{{ calculateCash(previewPoints) }}</span>
               </div>
             </div>
-            <div class="calculator-status">
-              <span v-if="previewPoints < settings.pointMinRedemption" class="status-error">
-                ⚠️ Below minimum requirement ({{ settings.pointMinRedemption }} points)
-              </span>
-              <span v-else class="status-success">
-                ✓ Valid redemption amount
-              </span>
-            </div>
+          </div>
+          <div class="calculator-status">
+            <span v-if="previewPoints < settings.pointMinRedemption" class="status-error">
+              <i class="fas fa-exclamation-triangle"></i>
+              Below minimum requirement ({{ settings.pointMinRedemption }} points)
+            </span>
+            <span v-else class="status-success">
+              <i class="fas fa-check-circle"></i>
+              Valid redemption amount
+            </span>
           </div>
         </div>
       </div>
@@ -121,15 +153,22 @@
       <!-- Transfer Settings -->
       <div class="settings-section">
         <div class="section-header">
-          <h2>Wallet Transfer Settings</h2>
-          <p class="section-description">Configure wallet-to-wallet transfer rules and fees</p>
+          <div class="section-title">
+            <div class="section-icon success">
+              <i class="fas fa-exchange-alt"></i>
+            </div>
+            <div>
+              <h2>Wallet Transfer Settings</h2>
+              <p class="section-description">Configure wallet-to-wallet transfer rules and fees</p>
+            </div>
+          </div>
         </div>
 
         <div class="settings-grid">
           <div class="form-group">
             <label for="transferFeePercentage">
+              <i class="fas fa-percentage"></i>
               Transfer Fee (%)
-              <span class="help-text">Percentage fee per transfer</span>
             </label>
             <div class="input-with-unit">
               <input
@@ -144,12 +183,13 @@
               />
               <span class="unit">%</span>
             </div>
+            <p class="help-text">Percentage fee per transfer</p>
           </div>
 
           <div class="form-group">
             <label for="transferFeeFixed">
+              <i class="fas fa-dollar-sign"></i>
               Fixed Transfer Fee
-              <span class="help-text">Fixed fee amount per transfer</span>
             </label>
             <div class="input-with-unit">
               <input
@@ -163,12 +203,13 @@
               />
               <span class="unit">฿</span>
             </div>
+            <p class="help-text">Fixed fee amount per transfer</p>
           </div>
 
           <div class="form-group">
             <label for="transferMinAmount">
+              <i class="fas fa-arrow-down"></i>
               Minimum Transfer Amount
-              <span class="help-text">Minimum amount per transfer</span>
             </label>
             <div class="input-with-unit">
               <input
@@ -182,12 +223,13 @@
               />
               <span class="unit">฿</span>
             </div>
+            <p class="help-text">Minimum amount per transfer</p>
           </div>
 
           <div class="form-group">
             <label for="transferMaxAmount">
+              <i class="fas fa-arrow-up"></i>
               Maximum Transfer Amount
-              <span class="help-text">Maximum amount per transfer</span>
             </label>
             <div class="input-with-unit">
               <input
@@ -201,12 +243,13 @@
               />
               <span class="unit">฿</span>
             </div>
+            <p class="help-text">Maximum amount per transfer</p>
           </div>
 
           <div class="form-group">
             <label for="transferDailyLimit">
+              <i class="fas fa-calendar-day"></i>
               Daily Transfer Limit
-              <span class="help-text">Maximum total amount per day per user</span>
             </label>
             <div class="input-with-unit">
               <input
@@ -220,12 +263,16 @@
               />
               <span class="unit">฿</span>
             </div>
+            <p class="help-text">Maximum total amount per day per user</p>
           </div>
         </div>
 
         <!-- Transfer Fee Calculator -->
         <div class="calculator-preview">
-          <h3>Transfer Fee Calculator</h3>
+          <h3>
+            <i class="fas fa-calculator"></i>
+            Transfer Fee Calculator
+          </h3>
           <div class="calculator-content">
             <div class="calculator-input">
               <label>Transfer Amount:</label>
@@ -238,23 +285,41 @@
                 placeholder="Enter amount"
               />
             </div>
-            <div class="calculator-result">
-              <div class="fee-breakdown">
-                <div class="fee-item">
-                  <span>Percentage Fee ({{ settings.transferFeePercentage }}%):</span>
-                  <span>฿{{ calculatePercentageFee(previewTransfer) }}</span>
+            <div class="fee-breakdown">
+              <div class="fee-item">
+                <div class="fee-icon info">
+                  <i class="fas fa-percentage"></i>
                 </div>
-                <div class="fee-item">
-                  <span>Fixed Fee:</span>
-                  <span>฿{{ settings.transferFeeFixed.toFixed(2) }}</span>
+                <div class="fee-details">
+                  <span class="fee-label">Percentage Fee ({{ settings.transferFeePercentage }}%)</span>
+                  <span class="fee-value">฿{{ calculatePercentageFee(previewTransfer) }}</span>
                 </div>
-                <div class="fee-item total">
-                  <span>Total Fee:</span>
-                  <span>฿{{ calculateTotalFee(previewTransfer) }}</span>
+              </div>
+              <div class="fee-item">
+                <div class="fee-icon info">
+                  <i class="fas fa-dollar-sign"></i>
                 </div>
-                <div class="fee-item recipient">
-                  <span>Recipient Receives:</span>
-                  <span>฿{{ calculateRecipientAmount(previewTransfer) }}</span>
+                <div class="fee-details">
+                  <span class="fee-label">Fixed Fee</span>
+                  <span class="fee-value">฿{{ settings.transferFeeFixed.toFixed(2) }}</span>
+                </div>
+              </div>
+              <div class="fee-item total">
+                <div class="fee-icon warning">
+                  <i class="fas fa-equals"></i>
+                </div>
+                <div class="fee-details">
+                  <span class="fee-label">Total Fee</span>
+                  <span class="fee-value">฿{{ calculateTotalFee(previewTransfer) }}</span>
+                </div>
+              </div>
+              <div class="fee-item recipient">
+                <div class="fee-icon success">
+                  <i class="fas fa-arrow-right"></i>
+                </div>
+                <div class="fee-details">
+                  <span class="fee-label">Recipient Receives</span>
+                  <span class="fee-value">฿{{ calculateRecipientAmount(previewTransfer) }}</span>
                 </div>
               </div>
             </div>
@@ -262,37 +327,61 @@
         </div>
       </div>
 
-      <!--Billboard Settings -->
+      <!-- Billboard Settings -->
       <div class="settings-section">
         <div class="section-header">
-          <h2>Wallet Billboard Settings</h2>
-          <p class="section-description">Configure billboard images displayed in the wallet screen (replaces card section)</p>
+          <div class="section-title">
+            <div class="section-icon warning">
+              <i class="fas fa-image"></i>
+            </div>
+            <div>
+              <h2>Wallet Billboard Settings</h2>
+              <p class="section-description">Configure billboard images displayed in the wallet screen (replaces card section)</p>
+            </div>
+          </div>
         </div>
 
         <!-- Current Billboard Status -->
         <div class="billboard-status">
-          <h3>Current Status</h3>
-          <div class="status-info">
-            <div class="status-item">
-              <span class="status-label">Billboard Status:</span>
-              <span :class="['status-badge', billboardSettings.enabled ? 'enabled' : 'disabled']">
-                {{ billboardSettings.enabled ? '✓ Enabled' : '✗ Disabled' }}
-              </span>
+          <div class="status-cards">
+            <div class="status-card">
+              <div class="status-card-icon" :class="billboardSettings.enabled ? 'success' : 'error'">
+                <i :class="billboardSettings.enabled ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
+              </div>
+              <div class="status-card-content">
+                <span class="status-card-label">Billboard Status</span>
+                <span class="status-card-value" :class="billboardSettings.enabled ? 'success' : 'error'">
+                  {{ billboardSettings.enabled ? 'Enabled' : 'Disabled' }}
+                </span>
+              </div>
             </div>
-            <div class="status-item">
-              <span class="status-label">Active Images:</span>
-              <span class="status-value">{{ billboardSettings.images.length }} image(s)</span>
+            <div class="status-card">
+              <div class="status-card-icon info">
+                <i class="fas fa-images"></i>
+              </div>
+              <div class="status-card-content">
+                <span class="status-card-label">Active Images</span>
+                <span class="status-card-value">{{ billboardSettings.images.length }}</span>
+              </div>
             </div>
-            <div v-if="billboardSettings.enabled && billboardSettings.images.length > 0" class="status-item">
-              <span class="status-label">Auto-play Interval:</span>
-              <span class="status-value">{{ billboardSettings.autoPlayInterval / 1000 }}s</span>
+            <div v-if="billboardSettings.enabled && billboardSettings.images.length > 0" class="status-card">
+              <div class="status-card-icon warning">
+                <i class="fas fa-clock"></i>
+              </div>
+              <div class="status-card-content">
+                <span class="status-card-label">Auto-play Interval</span>
+                <span class="status-card-value">{{ billboardSettings.autoPlayInterval / 1000 }}s</span>
+              </div>
             </div>
           </div>
         </div>
 
         <div class="billboard-controls">
           <div class="toggle-switch-group">
-            <label class="toggle-label">Enable Billboard</label>
+            <label class="toggle-label">
+              <i class="fas fa-power-off"></i>
+              Enable Billboard
+            </label>
             <div class="toggle-switch-wrapper">
               <label class="toggle-switch">
                 <input
@@ -302,7 +391,7 @@
                 />
                 <span class="toggle-slider"></span>
               </label>
-              <span class="toggle-status">
+              <span class="toggle-status" :class="billboardSettings.enabled ? 'enabled' : 'disabled'">
                 {{ billboardSettings.enabled ? 'Enabled' : 'Disabled' }}
               </span>
             </div>
@@ -311,8 +400,8 @@
           <div v-if="billboardSettings.enabled" class="billboard-settings-grid">
             <div class="form-group">
               <label for="autoPlayInterval">
-                Auto-play Interval (milliseconds)
-                <span class="help-text">Time between slide transitions</span>
+                <i class="fas fa-hourglass-half"></i>
+                Auto-play Interval
               </label>
               <div class="input-with-unit">
                 <input
@@ -325,15 +414,19 @@
                   class="form-control"
                   placeholder="5000"
                 />
-                <span class="unit">ms (2000-10000)</span>
+                <span class="unit">ms</span>
               </div>
+              <p class="help-text">Time between slide transitions (2000-10000ms)</p>
             </div>
           </div>
         </div>
 
         <!-- Billboard Images -->
         <div v-if="billboardSettings.enabled" class="billboard-images-section">
-          <h3>Billboard Images</h3>
+          <h3>
+            <i class="fas fa-images"></i>
+            Billboard Images
+          </h3>
           <p class="help-text-detail">
             <strong>Image Requirements:</strong> 800x450px (min) to 2400x1350px (max).
             <strong>Recommended:</strong> 1200x675px or 1600x900px (16:9 aspect ratio).
@@ -351,11 +444,11 @@
             />
             <button
               @click="$refs.imageUpload.click()"
-              class="btn-upload"
+              class="wallet-btn primary"
               :disabled="uploadingImage"
             >
-              <span v-if="!uploadingImage">📤 Upload New Image</span>
-              <span v-else>⏳ Uploading...</span>
+              <i :class="uploadingImage ? 'fas fa-spinner fa-spin' : 'fas fa-upload'"></i>
+              {{ uploadingImage ? 'Uploading...' : 'Upload New Image' }}
             </button>
             <span v-if="uploadProgress" class="upload-progress">{{ uploadProgress }}</span>
           </div>
@@ -368,7 +461,9 @@
                 :key="index"
                 class="image-item"
               >
-                <div class="drag-handle">☰</div>
+                <div class="drag-handle">
+                  <i class="fas fa-grip-vertical"></i>
+                </div>
                 <div class="image-preview">
                   <img :src="image.imageUrl" alt="Billboard" />
                   <div class="image-info">
@@ -379,48 +474,43 @@
                   </div>
                 </div>
                 <div class="image-actions">
-                  <input
-                    v-model="image.linkUrl"
-                    type="url"
-                    class="form-control link-input"
-                    placeholder="Optional: Link URL (e.g., https://example.com/promo)"
-                  />
-                  <button @click="removeImage(index)" class="btn-remove">
-                    🗑️ Remove
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label>
+                      <i class="fas fa-link"></i>
+                      Link URL (Optional)
+                    </label>
+                    <input
+                      v-model="image.linkUrl"
+                      type="url"
+                      class="form-control"
+                      placeholder="e.g., https://example.com/promo"
+                    />
+                  </div>
+                  <button @click="removeImage(index)" class="wallet-btn danger" style="padding: 8px 16px; font-size: 13px;">
+                    <i class="fas fa-trash-alt"></i>
+                    Remove
                   </button>
                 </div>
               </div>
             </draggable>
           </div>
-          <div v-else class="no-images">
+          <div v-else class="wallet-empty">
+            <i class="fas fa-images"></i>
             <p>No images uploaded yet. Click "Upload New Image" to add billboard images.</p>
           </div>
         </div>
 
-        <!-- Save Billboard Button - Always visible -->
+        <!-- Save Billboard Button -->
         <div class="billboard-save-section">
           <button
             @click="saveBillboardSettings"
-            class="btn-primary"
+            class="wallet-btn success"
             :disabled="savingBillboard"
           >
+            <i :class="savingBillboard ? 'fas fa-spinner fa-spin' : 'fas fa-save'"></i>
             {{ savingBillboard ? 'Saving Billboard...' : 'Save Billboard Settings' }}
           </button>
         </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="action-buttons">
-        <button @click="resetChanges" class="btn-secondary" :disabled="!hasChanges">
-          Reset Changes
-        </button>
-        <button
-          @click="saveSettings"
-          class="btn-primary"
-          :disabled="saving || !hasChanges"
-        >
-          {{ saving ? 'Saving...' : 'Save All Settings' }}
-        </button>
       </div>
     </div>
   </div>
@@ -765,79 +855,68 @@ export default {
 </script>
 
 <style scoped>
-.wallet-settings-page {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-@media (max-width: 768px) {
-  .wallet-settings-page {
-    padding: 12px;
-  }
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-@media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .page-header h1 {
-    font-size: 22px !important;
-  }
-}
-
-.page-header h1 {
-  font-size: 28px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.loading-container {
-  text-align: center;
-  padding: 60px 20px;
-  color: #6b7280;
-}
-
 .settings-container {
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 24px;
 }
 
 .settings-section {
   background: white;
-  border-radius: 8px;
-  padding: 30px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid #E2E8F0;
 }
 
 .section-header {
   margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #E2E8F0;
+}
+
+.section-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.section-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.section-icon.success {
+  background: rgba(0, 168, 98, 0.12);
+  color: #00A862;
+}
+
+.section-icon.warning {
+  background: rgba(255, 184, 0, 0.12);
+  color: #FFB800;
+}
+
+.section-icon.info {
+  background: rgba(23, 151, 173, 0.12);
+  color: #1797AD;
 }
 
 .section-header h2 {
   font-size: 20px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 8px;
+  font-weight: 700;
+  color: #063F48;
+  margin: 0 0 8px 0;
 }
 
 .section-description {
   font-size: 14px;
-  color: #6b7280;
+  color: #A0AEC0;
   margin: 0;
 }
 
@@ -845,13 +924,7 @@ export default {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
-  margin-bottom: 30px;
-}
-
-@media (max-width: 768px) {
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
+  margin-bottom: 24px;
 }
 
 .form-group {
@@ -866,24 +939,18 @@ export default {
 .form-group label {
   font-weight: 600;
   font-size: 14px;
-  color: #374151;
+  color: #063F48;
   margin-bottom: 8px;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.help-text {
-  font-weight: 400;
-  font-size: 12px;
-  color: #6b7280;
-  margin-top: 2px;
-}
-
+.help-text,
 .help-text-detail {
   font-size: 12px;
-  color: #6b7280;
-  margin: 8px 0 0 0;
-  font-style: italic;
+  color: #A0AEC0;
+  margin-top: 6px;
 }
 
 .input-with-unit {
@@ -898,30 +965,41 @@ export default {
 
 .unit {
   font-size: 14px;
-  color: #6b7280;
+  color: #6B7280;
   white-space: nowrap;
-  min-width: fit-content;
+  font-weight: 500;
 }
 
 .form-control {
-  padding: 10px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  padding: 10px 14px;
+  border: 2px solid #E2E8F0;
+  border-radius: 12px;
   font-size: 14px;
-  transition: border-color 0.2s;
+  transition: all 0.15s ease;
+  background: white;
 }
 
 .form-control:focus {
   outline: none;
-  border-color: #1a7a89;
-  box-shadow: 0 0 0 3px rgba(26, 122, 137, 0.1);
+  border-color: #1797AD;
+  box-shadow: 0 0 0 3px rgba(23, 151, 173, 0.1);
 }
 
 .checkbox-label {
   display: flex;
   align-items: flex-start;
   cursor: pointer;
-  gap: 10px;
+  gap: 12px;
+  padding: 16px;
+  background: #F7FAFC;
+  border-radius: 12px;
+  border: 2px solid #E2E8F0;
+  transition: all 0.15s ease;
+}
+
+.checkbox-label:hover {
+  border-color: #1797AD;
+  background: rgba(23, 151, 173, 0.05);
 }
 
 .checkbox-input {
@@ -929,61 +1007,52 @@ export default {
   height: 20px;
   cursor: pointer;
   margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.checkbox-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.checkbox-content i {
+  color: #1797AD;
+  font-size: 18px;
+  margin-top: 2px;
 }
 
 .checkbox-text {
   font-weight: 600;
   font-size: 14px;
-  color: #374151;
+  color: #063F48;
 }
 
 .calculator-preview {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  background: #F7FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
   padding: 20px;
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
 .calculator-preview h3 {
   font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
+  font-weight: 700;
+  color: #063F48;
   margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .calculator-content {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 16px;
-}
-
-@media (max-width: 640px) {
-  .calculator-input {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-  }
-
-  .calculator-input label {
-    min-width: auto !important;
-  }
-
-  .calculator-input .form-control {
-    max-width: 100% !important;
-  }
-
-  .calculator-result {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-  }
-
-  .arrow {
-    transform: rotate(90deg);
-  }
-
-  .fee-breakdown {
-    font-size: 13px;
-  }
+  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
 .calculator-input {
@@ -995,7 +1064,7 @@ export default {
 .calculator-input label {
   font-weight: 500;
   font-size: 14px;
-  color: #374151;
+  color: #063F48;
   min-width: 140px;
 }
 
@@ -1003,379 +1072,236 @@ export default {
   max-width: 200px;
 }
 
-.calculator-result {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.calculator-arrow {
+  font-size: 24px;
+  color: #1797AD;
 }
 
-.arrow {
-  font-size: 24px;
-  color: #1a7a89;
+.calculator-result {
+  flex: 1;
+  min-width: 200px;
 }
 
 .result-box {
   background: white;
-  border: 2px solid #1a7a89;
-  border-radius: 6px;
-  padding: 12px 20px;
+  border: 2px solid #1797AD;
+  border-radius: 12px;
+  padding: 16px 20px;
   display: flex;
-  gap: 12px;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .result-label {
-  font-size: 14px;
-  color: #6b7280;
+  font-size: 12px;
+  color: #A0AEC0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
 }
 
 .result-value {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 700;
-  color: #1a7a89;
+  color: #1797AD;
 }
 
 .calculator-status {
   font-size: 14px;
+  font-weight: 600;
 }
 
 .status-error {
-  color: #dc2626;
+  color: #D32F2F;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .status-success {
-  color: #10b981;
+  color: #00A862;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .fee-breakdown {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
+  margin-top: 16px;
 }
 
 .fee-item {
   display: flex;
-  justify-content: space-between;
-  padding: 8px 12px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
   background: white;
-  border-radius: 4px;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+}
+
+.fee-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 14px;
+  flex-shrink: 0;
+}
+
+.fee-icon.success {
+  background: rgba(0, 168, 98, 0.12);
+  color: #00A862;
+}
+
+.fee-icon.warning {
+  background: rgba(255, 184, 0, 0.12);
+  color: #FFB800;
+}
+
+.fee-icon.info {
+  background: rgba(23, 151, 173, 0.12);
+  color: #1797AD;
+}
+
+.fee-details {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fee-label {
+  font-size: 14px;
+  color: #4A5568;
+  font-weight: 500;
+}
+
+.fee-value {
+  font-size: 16px;
+  color: #063F48;
+  font-weight: 700;
 }
 
 .fee-item.total {
-  border-top: 2px solid #e5e7eb;
-  font-weight: 600;
-  color: #dc2626;
+  border: 2px solid #FFB800;
+  background: rgba(255, 184, 0, 0.05);
 }
 
 .fee-item.recipient {
-  background: #1a7a89;
-  color: white;
-  font-weight: 600;
+  border: 2px solid #00A862;
+  background: rgba(0, 168, 98, 0.05);
 }
 
-.action-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 20px;
-  background: #f9fafb;
-  border-radius: 8px;
-}
-
-.btn-primary,
-.btn-secondary {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: #1a7a89;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #156371;
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: #f3f4f6;
-  color: #1f2937;
-  border: 1px solid #d1d5db;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #e5e7eb;
-}
-
-.btn-secondary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Billboard Settings Styles */
+/* Billboard Settings */
 .billboard-status {
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  border-radius: 8px;
+  background: #F7FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
   padding: 20px;
   margin-bottom: 24px;
 }
 
-.billboard-status h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #0c4a6e;
-  margin: 0 0 16px 0;
+.status-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
 }
 
-.status-info {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-
-.status-item {
+.status-card {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
 }
 
-.status-label {
-  font-size: 14px;
-  color: #475569;
+.status-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.status-card-icon.success {
+  background: rgba(0, 168, 98, 0.12);
+  color: #00A862;
+}
+
+.status-card-icon.error {
+  background: rgba(211, 47, 47, 0.12);
+  color: #D32F2F;
+}
+
+.status-card-icon.info {
+  background: rgba(23, 151, 173, 0.12);
+  color: #1797AD;
+}
+
+.status-card-icon.warning {
+  background: rgba(255, 184, 0, 0.12);
+  color: #FFB800;
+}
+
+.status-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.status-card-label {
+  font-size: 12px;
+  color: #A0AEC0;
   font-weight: 500;
 }
 
-.status-value {
-  font-size: 14px;
-  color: #0c4a6e;
-  font-weight: 600;
+.status-card-value {
+  font-size: 16px;
+  color: #063F48;
+  font-weight: 700;
 }
 
-.status-badge {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 600;
+.status-card-value.success {
+  color: #00A862;
 }
 
-.status-badge.enabled {
-  background: #10b981;
-  color: white;
-}
-
-.status-badge.disabled {
-  background: #ef4444;
-  color: white;
+.status-card-value.error {
+  color: #D32F2F;
 }
 
 .billboard-controls {
   margin-bottom: 24px;
 }
 
-.billboard-settings-grid {
-  margin-top: 16px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
-}
-
-.billboard-images-section {
-  margin-top: 30px;
-  padding-top: 24px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.billboard-images-section h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-  margin: 0 0 12px 0;
-}
-
-.image-upload-area {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 20px 0;
-}
-
-.btn-upload {
-  padding: 10px 20px;
-  background: #1a7a89;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-upload:hover:not(:disabled) {
-  background: #156371;
-}
-
-.btn-upload:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.upload-progress {
-  font-size: 13px;
-  color: #6b7280;
-  font-style: italic;
-}
-
-.images-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 20px;
-}
-
-.image-item {
-  display: flex;
-  gap: 16px;
-  padding: 16px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  align-items: center;
-}
-
-@media (max-width: 768px) {
-  .image-item {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
-.drag-handle {
-  cursor: grab;
-  font-size: 20px;
-  color: #6b7280;
-  padding: 8px;
-  user-select: none;
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-.image-preview {
-  flex-shrink: 0;
-  position: relative;
-}
-
-.image-preview img {
-  width: 200px;
-  height: auto;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  display: block;
-}
-
-@media (max-width: 768px) {
-  .image-preview img {
-    width: 100%;
-    max-width: 400px;
-  }
-}
-
-.image-info {
-  position: absolute;
-  bottom: 4px;
-  left: 4px;
-  right: 4px;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  display: flex;
-  justify-content: space-between;
-}
-
-.image-order {
-  font-weight: 600;
-}
-
-.image-dimensions {
-  font-size: 10px;
-  opacity: 0.9;
-}
-
-.image-actions {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.link-input {
-  font-size: 13px;
-}
-
-.btn-remove {
-  align-self: flex-start;
-  padding: 8px 16px;
-  background: #dc2626;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-remove:hover {
-  background: #b91c1c;
-}
-
-.no-images {
-  text-align: center;
-  padding: 40px 20px;
-  background: #f9fafb;
-  border: 2px dashed #d1d5db;
-  border-radius: 8px;
-  color: #6b7280;
-  margin-top: 20px;
-}
-
-.billboard-save-section {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* Toggle Switch Styles */
 .toggle-switch-group {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: #F7FAFC;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
   margin-bottom: 20px;
 }
 
 .toggle-label {
   font-size: 14px;
   font-weight: 600;
-  color: #374151;
+  color: #063F48;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .toggle-switch-wrapper {
@@ -1404,7 +1330,7 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #cbd5e1;
+  background-color: #E2E8F0;
   transition: 0.3s;
   border-radius: 28px;
 }
@@ -1422,11 +1348,11 @@ export default {
 }
 
 .toggle-input:checked + .toggle-slider {
-  background-color: #10b981;
+  background-color: #00A862;
 }
 
 .toggle-input:focus + .toggle-slider {
-  box-shadow: 0 0 1px #10b981;
+  box-shadow: 0 0 1px #00A862;
 }
 
 .toggle-input:checked + .toggle-slider:before {
@@ -1436,17 +1362,165 @@ export default {
 .toggle-status {
   font-size: 14px;
   font-weight: 600;
-  color: #6b7280;
+}
+
+.toggle-status.enabled {
+  color: #00A862;
+}
+
+.toggle-status.disabled {
+  color: #6B7280;
+}
+
+.billboard-settings-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.billboard-images-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #E2E8F0;
+}
+
+.billboard-images-section h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #063F48;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-upload-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.upload-progress {
+  font-size: 13px;
+  color: #6B7280;
+  font-style: italic;
+}
+
+.images-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.image-item {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: #F7FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  align-items: center;
+}
+
+.drag-handle {
+  cursor: grab;
+  font-size: 20px;
+  color: #6B7280;
+  padding: 8px;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.image-preview {
+  flex-shrink: 0;
+  position: relative;
+}
+
+.image-preview img {
+  width: 200px;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
+  display: block;
+}
+
+.image-info {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  background: rgba(6, 63, 72, 0.8);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.image-order {
+  font-weight: 600;
+}
+
+.image-dimensions {
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.image-actions {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.billboard-save-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #E2E8F0;
+  display: flex;
+  justify-content: flex-end;
 }
 
 @media (max-width: 768px) {
-  .toggle-switch-group {
-    gap: 8px;
+  .settings-grid {
+    grid-template-columns: 1fr;
   }
 
-  .toggle-switch-wrapper {
+  .section-title {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .calculator-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .calculator-arrow {
+    transform: rotate(90deg);
+  }
+
+  .image-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .image-preview img {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .toggle-switch-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
   }
 }
 </style>

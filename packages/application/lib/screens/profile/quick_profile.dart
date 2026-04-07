@@ -124,18 +124,26 @@ class QuickProfileWidgets extends StatelessWidget {
                         child: Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(6),
                               ),
-                              child: const Icon(
-                                Icons.money,
-                                size: 13,
-                                color: ChongjaroenColors.whiteColors,
+                              child: SvgPicture.asset(
+                                'assets/images/money.svg',
+                                width: 24,
+                                height: 12,
+                                fit: BoxFit.contain,
+                                colorFilter: const ColorFilter.mode(
+                                  ChongjaroenColors.whiteColors,
+                                  BlendMode.srcIn,
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
                             Flexible(
                               child: walletService.isLoading
                                   ? const SizedBox(

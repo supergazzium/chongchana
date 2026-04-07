@@ -1,6 +1,7 @@
 
 import 'dart:async';
 import 'package:chongchana/constants/colors.dart';
+import 'package:chongchana/services/inbox.dart';
 import 'package:chongchana/services/wallet.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -28,12 +29,211 @@ class _PayScreenState extends State<PayScreen> {
   void initState() {
     super.initState();
     _initializeQR();
+    _setupWalletNotificationListener();
+  }
+
+  void _setupWalletNotificationListener() {
+    // Delay to ensure context is available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final inboxService = Provider.of<InboxService>(context, listen: false);
+      inboxService.onWalletNotification = _handleWalletNotification;
+    });
+  }
+
+  void _handleWalletNotification(Map<String, dynamic> data) {
+    print('[PayScreen] Wallet notification received: $data');
+
+    // Check if it's a QR payment notification
+    if (data['type'] == 'wallet_qr_payment') {
+      final amount = data['amount'];
+      final merchantName = data['merchantName'] ?? 'Store';
+
+      if (mounted) {
+        _showPaymentSuccessDialog(amount, merchantName);
+      }
+    }
+  }
+
+  void _showPaymentSuccessDialog(dynamic amount, String merchantName) {
+    // Refresh wallet balance
+    final walletService = Provider.of<WalletService>(context, listen: false);
+    walletService.getBalance();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success Icon
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.green.shade600,
+                  size: 56,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Title
+              const Text(
+                'Payment Successful!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+
+              // Subtitle
+              Text(
+                'Paid at $merchantName',
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Colors.black54,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+
+              // Payment Details Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.grey.shade200,
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Amount
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Amount',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        Text(
+                          '฿${_formatAmount(amount is double ? amount : double.tryParse(amount.toString()) ?? 0.0)}',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Divider(color: Colors.grey.shade300, height: 1),
+                    const SizedBox(height: 12),
+
+                    // Payment Method
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Method',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.qr_code_2,
+                              size: 18,
+                              color: Colors.blue.shade700,
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Wallet QR',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // Done Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(); // Close dialog
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ChongjaroenColors.secondaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
     _countdownTimer?.cancel();
+    // Clean up notification listener
+    final inboxService = Provider.of<InboxService>(context, listen: false);
+    inboxService.onWalletNotification = null;
     super.dispose();
   }
 

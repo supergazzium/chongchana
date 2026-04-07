@@ -168,6 +168,14 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> {
     OneSignal.Notifications.addForegroundWillDisplayListener((event) {
       event.preventDefault();
       inboxService.setNewItemFromNotification(event.notification);
+
+      // Trigger wallet notification callback if it's a wallet event
+      Map<String, dynamic>? data = event.notification.additionalData;
+      String? type = data?["type"];
+
+      if (type == "wallet_qr_payment" && inboxService.onWalletNotification != null) {
+        inboxService.onWalletNotification!(data ?? {});
+      }
     });
   }
 

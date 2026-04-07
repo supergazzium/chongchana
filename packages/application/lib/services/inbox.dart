@@ -16,6 +16,9 @@ class InboxService extends ChangeNotifier {
   int limit = 20;
   int page = 0;
 
+  // Callback for wallet notifications
+  Function(Map<String, dynamic>)? onWalletNotification;
+
   Future<void> fetchInboxList(bool fetchNew) async {
     if (fetchNew) {
       list = [];
