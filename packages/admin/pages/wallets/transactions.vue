@@ -808,29 +808,31 @@ export default {
 </script>
 
 <style scoped>
-/* Modern Design System Variables */
+/* Wallet Design System Variables - Teal Theme */
 :root {
-  --primary: #3b82f6;
-  --primary-dark: #2563eb;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --primary: #1797AD;
+  --primary-dark: #14828E;
+  --primary-light: #1BA4BC;
+  --dark-green: #063F48;
+  --success: #00A862;
+  --warning: #FFB800;
+  --danger: #D32F2F;
+  --gray-50: #F7FAFC;
+  --gray-100: #F7F5F2;
+  --gray-200: #E2E8F0;
+  --gray-300: #D1D5DB;
+  --gray-400: #9CA3AF;
+  --gray-500: #6B7280;
+  --gray-600: #4B5563;
+  --gray-700: #4A5568;
+  --gray-800: #2D3748;
+  --gray-900: #063F48;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(23, 151, 173, 0.12);
+  --shadow-lg: 0 8px 24px rgba(23, 151, 173, 0.15);
 }
 
 /* Page Layout */
@@ -838,7 +840,7 @@ export default {
   padding: 24px;
   max-width: 1600px;
   margin: 0 auto;
-  background: var(--gray-50);
+  background: #F7F5F2;
   min-height: 100vh;
 }
 
