@@ -97,15 +97,28 @@ module.exports = {
       const qs = require('querystring');
       const message = `Your Chongjaroen wallet PIN reset code is: ${otp}. Valid for 10 minutes. Do not share this code.`;
 
+      // Get SMS sender name from environment (must be pre-approved by ThaiBulkSMS)
+      const senderName = process.env.THAIBULK_SMS_SENDER_NAME;
+
+      // Build SMS payload
+      const smsPayload = {
+        msisdn: phone,
+        message: message,
+        force: 'standard', // SMS type: standard or premium
+      };
+
+      // Only include sender if it's configured
+      if (senderName) {
+        smsPayload.sender = senderName;
+        strapi.log.info(`[PIN Reset] Using SMS sender name: ${senderName}`);
+      } else {
+        strapi.log.warn('[PIN Reset] No SMS sender name configured - using ThaiBulkSMS default');
+      }
+
       // ThaiBulkSMS SMS API v2 - uses Basic Auth + form-urlencoded body
       const response = await axios.post(
         'https://api-v2.thaibulksms.com/sms',
-        qs.stringify({
-          msisdn: phone,
-          message: message,
-          // sender: 'Chongjaroen', // Omit sender to use default (needs pre-approval)
-          force: 'standard', // SMS type: standard or premium
-        }),
+        qs.stringify(smsPayload),
         {
           auth: {
             username: apiKey,
