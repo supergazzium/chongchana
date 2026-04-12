@@ -211,6 +211,9 @@
                     <div class="transaction-info">
                       <h4 class="transaction-title">{{ getTransactionTitle(transaction.type) }}</h4>
                       <p class="transaction-date">{{ formatDate(transaction.createdAt) }}</p>
+                      <p class="transaction-description" v-if="transaction.description">
+                        {{ transaction.description }}
+                      </p>
                     </div>
                     <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type, transaction.status)}`">
                       <span class="amount-sign">{{ getAmountSign(transaction.type) }}</span>
@@ -780,6 +783,7 @@ $gray-border: #E2E8F0;
   .transaction-info {
     flex: 1;
     min-width: 0; // Enable text truncation
+    overflow: hidden; // Prevent overflow
 
     .transaction-title {
       font-size: 16px;
@@ -787,6 +791,7 @@ $gray-border: #E2E8F0;
       color: $dark-green;
       margin: 0 0 6px 0;
       letter-spacing: -0.2px;
+      word-break: break-word; // Break long words
     }
 
     .transaction-date {
@@ -794,16 +799,18 @@ $gray-border: #E2E8F0;
       color: $gray-light;
       margin: 0 0 4px 0;
       font-weight: 500;
+      word-break: break-word; // Break long words
     }
 
     .transaction-description {
       font-size: 13px;
       color: $gray-text;
       margin: 0;
-      // Text truncation
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      // Wrap text instead of truncating to show full content
+      word-break: break-word; // Break long URLs
+      overflow-wrap: break-word; // Break long words
+      white-space: normal; // Allow wrapping
+      line-height: 1.4;
       max-width: 100%;
     }
   }
@@ -943,14 +950,20 @@ $gray-border: #E2E8F0;
     .transaction-info {
       .transaction-title {
         font-size: 15px;
+        word-break: break-word;
       }
 
       .transaction-date {
         font-size: 12px;
+        word-break: break-word;
       }
 
       .transaction-description {
         font-size: 12px;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        white-space: normal;
+        line-height: 1.4;
       }
     }
 
