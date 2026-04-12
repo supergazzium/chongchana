@@ -93,8 +93,8 @@
                     <div class="transaction-info">
                       <h4 class="transaction-title">{{ getTransactionTitle(transaction.type) }}</h4>
                       <p class="transaction-date">{{ formatDate(transaction.createdAt) }}</p>
-                      <p class="transaction-description" v-if="transaction.description">
-                        {{ transaction.description }}
+                      <p class="transaction-description" v-if="getTransactionDetails(transaction)">
+                        {{ getTransactionDetails(transaction) }}
                       </p>
                     </div>
                     <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type, transaction.status)}`">
@@ -211,8 +211,8 @@
                     <div class="transaction-info">
                       <h4 class="transaction-title">{{ getTransactionTitle(transaction.type) }}</h4>
                       <p class="transaction-date">{{ formatDate(transaction.createdAt) }}</p>
-                      <p class="transaction-description" v-if="transaction.description">
-                        {{ transaction.description }}
+                      <p class="transaction-description" v-if="getTransactionDetails(transaction)">
+                        {{ getTransactionDetails(transaction) }}
                       </p>
                     </div>
                     <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type, transaction.status)}`">
@@ -356,14 +356,14 @@ export default {
     getTransactionTitle(type) {
       const titles = {
         'top_up': 'Top Up',
-        'payment': 'Payment',
+        'payment': 'Store Payment',
         'refund': 'Refund',
         'bonus': 'Bonus',
         'conversion': 'Points Conversion',
         'withdrawal': 'Withdrawal',
         'adjustment': 'Adjustment',
-        'transfer_in': 'Transfer In',
-        'transfer_out': 'Transfer Out',
+        'transfer_in': 'Transfer',
+        'transfer_out': 'Transfer',
         'voucher': 'Voucher',
         'points': 'Points',
         'purchase': 'Purchase',
@@ -458,6 +458,36 @@ export default {
       });
 
       return groups;
+    },
+    getTransactionDetails(transaction) {
+      // For transfer transactions, show recipient/sender name
+      if (transaction.type === 'transfer_in' || transaction.type === 'transfer_out') {
+        if (transaction.type === 'transfer_in' && transaction.senderName) {
+          return `Transfer from ${transaction.senderName}`;
+        } else if (transaction.type === 'transfer_out' && transaction.recipientName) {
+          return `Transfer to ${transaction.recipientName}`;
+        } else if (transaction.metadata?.recipientName) {
+          return `Transfer to ${transaction.metadata.recipientName}`;
+        } else if (transaction.metadata?.senderName) {
+          return `Transfer from ${transaction.metadata.senderName}`;
+        }
+      }
+
+      // For store payment, show branch
+      if (transaction.type === 'payment') {
+        if (transaction.branch) {
+          return transaction.branch;
+        } else if (transaction.metadata?.branch) {
+          return transaction.metadata.branch;
+        } else if (transaction.storeName) {
+          return transaction.storeName;
+        } else if (transaction.metadata?.storeName) {
+          return transaction.metadata.storeName;
+        }
+      }
+
+      // Return description if available
+      return transaction.description || '';
     }
   },
 };
