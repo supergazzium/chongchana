@@ -42,12 +42,33 @@ module.exports = {
         return ctx.unauthorized('Authentication required');
       }
 
-      const { limit, offset, type, status, fromDate, toDate } = ctx.query;
+      // Support both Strapi-style (_limit, _start) and standard (limit, offset) parameters
+      const {
+        _limit,
+        _start,
+        limit,
+        offset,
+        type,
+        status,
+        fromDate,
+        toDate,
+      } = ctx.query;
+
+      const finalLimit = _limit || limit || 20;
+      const finalOffset = _start || offset || 0;
+
+      strapi.log.debug('[Wallet] getTransactions:', {
+        userId,
+        limit: finalLimit,
+        offset: finalOffset,
+        type,
+        status,
+      });
 
       const result = await walletService.getTransactions({
         userId,
-        limit: limit || 20,
-        offset: offset || 0,
+        limit: finalLimit,
+        offset: finalOffset,
         type,
         status,
         fromDate,
@@ -56,7 +77,11 @@ module.exports = {
 
       ctx.send(utils.successResponse(result));
     } catch (error) {
-      strapi.log.error('[Wallet] getTransactions error:', error);
+      strapi.log.error('[Wallet] getTransactions error:', {
+        message: error.message,
+        stack: error.stack,
+        userId,
+      });
       ctx.badRequest(utils.errorResponse('WALLET_ERROR', error.message));
     }
   },

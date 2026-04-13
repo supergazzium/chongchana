@@ -318,45 +318,59 @@ module.exports = {
 
     } catch (enhancedQueryError) {
       // Fallback to simple query if enhanced query fails
-      strapi.log.warn('[Wallet] Enhanced transaction query failed, using fallback:', enhancedQueryError.message);
+      strapi.log.warn('[Wallet] Enhanced transaction query failed, using fallback:', {
+        error: enhancedQueryError.message,
+        userId,
+      });
 
-      let simpleQuery = `
-        SELECT * FROM wallet_transactions
-        WHERE user_id = ?
-      `;
-      const queryParams = [userId];
+      try {
+        let simpleQuery = `
+          SELECT * FROM wallet_transactions
+          WHERE user_id = ?
+        `;
+        const queryParams = [userId];
 
-      if (type) {
-        simpleQuery += ` AND type = ?`;
-        queryParams.push(type);
+        if (type) {
+          simpleQuery += ` AND type = ?`;
+          queryParams.push(type);
+        }
+
+        if (status) {
+          simpleQuery += ` AND status = ?`;
+          queryParams.push(status);
+        }
+
+        if (fromDate) {
+          simpleQuery += ` AND created_at >= ?`;
+          queryParams.push(fromDate);
+        }
+
+        if (toDate) {
+          simpleQuery += ` AND created_at <= ?`;
+          queryParams.push(toDate);
+        }
+
+        // Get total count
+        const countQuery = simpleQuery.replace('*', 'COUNT(*) as total');
+        const countResult = await strapi.connections.default.raw(countQuery, queryParams);
+        total = countResult[0][0].total;
+
+        // Get transactions with pagination
+        simpleQuery += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+        queryParams.push(parseInt(limit), parseInt(offset));
+
+        const result = await strapi.connections.default.raw(simpleQuery, queryParams);
+        transactions = result[0];
+      } catch (fallbackError) {
+        strapi.log.error('[Wallet] Both transaction queries failed:', {
+          enhancedError: enhancedQueryError.message,
+          fallbackError: fallbackError.message,
+          userId,
+        });
+        // Return empty result instead of throwing
+        transactions = [];
+        total = 0;
       }
-
-      if (status) {
-        simpleQuery += ` AND status = ?`;
-        queryParams.push(status);
-      }
-
-      if (fromDate) {
-        simpleQuery += ` AND created_at >= ?`;
-        queryParams.push(fromDate);
-      }
-
-      if (toDate) {
-        simpleQuery += ` AND created_at <= ?`;
-        queryParams.push(toDate);
-      }
-
-      // Get total count
-      const countQuery = simpleQuery.replace('*', 'COUNT(*) as total');
-      const countResult = await strapi.connections.default.raw(countQuery, queryParams);
-      total = countResult[0][0].total;
-
-      // Get transactions with pagination
-      simpleQuery += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
-      queryParams.push(parseInt(limit), parseInt(offset));
-
-      const result = await strapi.connections.default.raw(simpleQuery, queryParams);
-      transactions = result[0];
     }
 
     return {
