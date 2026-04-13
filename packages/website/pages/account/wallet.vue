@@ -99,7 +99,7 @@
                     </div>
                     <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type, transaction.status, transaction.amount)}`">
                       <span class="amount-sign">{{ getAmountSign(transaction.type, transaction.amount) }}</span>
-                      <span class="amount-value">฿{{ formatCurrency(transaction.amount) }}</span>
+                      <span class="amount-value">฿{{ formatCurrency(Math.abs(transaction.amount)) }}</span>
                     </div>
                   </div>
                 </div>
@@ -217,7 +217,7 @@
                     </div>
                     <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type, transaction.status, transaction.amount)}`">
                       <span class="amount-sign">{{ getAmountSign(transaction.type, transaction.amount) }}</span>
-                      <span class="amount-value">฿{{ formatCurrency(transaction.amount) }}</span>
+                      <span class="amount-value">฿{{ formatCurrency(Math.abs(transaction.amount)) }}</span>
                     </div>
                   </div>
                 </div>
