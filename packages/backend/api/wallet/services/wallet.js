@@ -251,56 +251,108 @@ module.exports = {
     } = params;
 
     let query = `
-      SELECT * FROM wallet_transactions
-      WHERE user_id = ?
+      SELECT
+        wt.*,
+        CASE
+          WHEN wt.type = 'transfer_in' THEN sender_user.username
+          WHEN wt.type = 'transfer_out' THEN recipient_user.username
+          ELSE NULL
+        END as transfer_user_name,
+        CASE
+          WHEN wt.type = 'transfer_in' THEN CONCAT(COALESCE(sender_user.firstname, ''), ' ', COALESCE(sender_user.lastname, ''))
+          WHEN wt.type = 'transfer_out' THEN CONCAT(COALESCE(recipient_user.firstname, ''), ' ', COALESCE(recipient_user.lastname, ''))
+          ELSE NULL
+        END as transfer_full_name
+      FROM wallet_transactions wt
+      LEFT JOIN wallet_transfers wtr ON wt.reference_id = wtr.id
+      LEFT JOIN \`users-permissions_user\` sender_user ON wtr.sender_id = sender_user.id AND wt.type = 'transfer_in'
+      LEFT JOIN \`users-permissions_user\` recipient_user ON wtr.recipient_id = recipient_user.id AND wt.type = 'transfer_out'
+      WHERE wt.user_id = ?
     `;
     const queryParams = [userId];
 
     if (type) {
-      query += ` AND type = ?`;
+      query += ` AND wt.type = ?`;
       queryParams.push(type);
     }
 
     if (status) {
-      query += ` AND status = ?`;
+      query += ` AND wt.status = ?`;
       queryParams.push(status);
     }
 
     if (fromDate) {
-      query += ` AND created_at >= ?`;
+      query += ` AND wt.created_at >= ?`;
       queryParams.push(fromDate);
     }
 
     if (toDate) {
-      query += ` AND created_at <= ?`;
+      query += ` AND wt.created_at <= ?`;
       queryParams.push(toDate);
     }
 
     // Get total count
-    const countQuery = query.replace('*', 'COUNT(*) as total');
+    const countQuery = `
+      SELECT COUNT(*) as total FROM wallet_transactions wt
+      WHERE wt.user_id = ?
+      ${type ? 'AND wt.type = ?' : ''}
+      ${status ? 'AND wt.status = ?' : ''}
+      ${fromDate ? 'AND wt.created_at >= ?' : ''}
+      ${toDate ? 'AND wt.created_at <= ?' : ''}
+    `;
     const countResult = await strapi.connections.default.raw(countQuery, queryParams);
     const total = countResult[0][0].total;
 
     // Get transactions with pagination
-    query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+    query += ` ORDER BY wt.created_at DESC LIMIT ? OFFSET ?`;
     queryParams.push(parseInt(limit), parseInt(offset));
 
     const transactions = await strapi.connections.default.raw(query, queryParams);
 
     return {
-      transactions: transactions[0].map(t => ({
-        id: t.id,
-        type: t.type,
-        amount: parseFloat(t.amount),
-        balanceBefore: parseFloat(t.balance_before),
-        balanceAfter: parseFloat(t.balance_after),
-        status: t.status,
-        paymentMethod: t.payment_method,
-        referenceId: t.reference_id,
-        description: t.description,
-        createdAt: t.created_at,
-        completedAt: t.completed_at,
-      })),
+      transactions: transactions[0].map(t => {
+        // Parse metadata if it exists
+        let metadata = null;
+        try {
+          if (t.metadata) {
+            metadata = typeof t.metadata === 'string' ? JSON.parse(t.metadata) : t.metadata;
+          }
+        } catch (e) {
+          strapi.log.error('Error parsing transaction metadata:', e);
+        }
+
+        // Build transaction object
+        const transaction = {
+          id: t.id,
+          type: t.type,
+          amount: parseFloat(t.amount),
+          balanceBefore: parseFloat(t.balance_before),
+          balanceAfter: parseFloat(t.balance_after),
+          status: t.status,
+          paymentMethod: t.payment_method,
+          referenceId: t.reference_id,
+          description: t.description,
+          branch: t.branch || null,
+          metadata: metadata,
+          createdAt: t.created_at,
+          completedAt: t.completed_at,
+        };
+
+        // Add transfer-specific fields
+        if (t.type === 'transfer_in' || t.type === 'transfer_out') {
+          // Use full name if available, otherwise use username
+          const fullName = t.transfer_full_name?.trim();
+          const displayName = fullName && fullName !== ' ' ? fullName : t.transfer_user_name;
+
+          if (t.type === 'transfer_in') {
+            transaction.senderName = displayName || 'Unknown User';
+          } else {
+            transaction.recipientName = displayName || 'Unknown User';
+          }
+        }
+
+        return transaction;
+      }),
       pagination: {
         total: total,
         limit: parseInt(limit),

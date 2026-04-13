@@ -462,31 +462,52 @@ export default {
     getTransactionDetails(transaction) {
       // For transfer transactions, show recipient/sender name
       if (transaction.type === 'transfer_in' || transaction.type === 'transfer_out') {
-        if (transaction.type === 'transfer_in' && transaction.senderName) {
-          return `Transfer from ${transaction.senderName}`;
-        } else if (transaction.type === 'transfer_out' && transaction.recipientName) {
-          return `Transfer to ${transaction.recipientName}`;
-        } else if (transaction.metadata?.recipientName) {
-          return `Transfer to ${transaction.metadata.recipientName}`;
-        } else if (transaction.metadata?.senderName) {
-          return `Transfer from ${transaction.metadata.senderName}`;
+        let name = null;
+
+        if (transaction.type === 'transfer_in') {
+          name = transaction.senderName || transaction.metadata?.senderName;
+          return name ? `From ${name}` : '';
+        } else {
+          name = transaction.recipientName || transaction.metadata?.recipientName;
+          return name ? `To ${name}` : '';
         }
       }
 
-      // For store payment, show branch
-      if (transaction.type === 'payment') {
+      // For store payment and beer machine payment, show branch
+      if (transaction.type === 'payment' || transaction.type === 'store_payment' || transaction.type === 'beer_machine_payment') {
+        // First try branch field
         if (transaction.branch) {
           return transaction.branch;
-        } else if (transaction.metadata?.branch) {
-          return transaction.metadata.branch;
-        } else if (transaction.storeName) {
-          return transaction.storeName;
-        } else if (transaction.metadata?.storeName) {
-          return transaction.metadata.storeName;
         }
+
+        // Then try metadata
+        if (transaction.metadata) {
+          // Check for branch object or name
+          if (transaction.metadata.branch) {
+            if (typeof transaction.metadata.branch === 'object' && transaction.metadata.branch.name) {
+              return transaction.metadata.branch.name;
+            }
+            if (typeof transaction.metadata.branch === 'string') {
+              return transaction.metadata.branch;
+            }
+          }
+
+          // Check for storeName
+          if (transaction.metadata.storeName) {
+            return transaction.metadata.storeName;
+          }
+
+          // Check for location
+          if (transaction.metadata.location) {
+            return transaction.metadata.location;
+          }
+        }
+
+        // Fallback to description for store payments
+        return transaction.description || '';
       }
 
-      // Return description if available
+      // Return description for other transaction types
       return transaction.description || '';
     }
   },
