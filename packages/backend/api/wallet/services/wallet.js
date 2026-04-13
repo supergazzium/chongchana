@@ -486,6 +486,15 @@ module.exports = {
           const fullName = t.transfer_full_name?.trim();
           const displayName = fullName && fullName !== ' ' ? fullName : t.transfer_user_name;
 
+          // Debug logging
+          strapi.log.debug('[Wallet] Transfer transaction:', {
+            id: t.id,
+            amount: t.amount,
+            transfer_full_name: t.transfer_full_name,
+            transfer_user_name: t.transfer_user_name,
+            displayName: displayName,
+          });
+
           // For incoming transfers (positive amount), show sender name
           // For outgoing transfers (negative amount), show receiver name
           if (t.amount > 0) {
