@@ -324,52 +324,123 @@ module.exports = {
       });
 
       try {
+        // Try simple query with basic user lookup
         let simpleQuery = `
-          SELECT * FROM wallet_transactions
-          WHERE user_id = ?
+          SELECT
+            wt.*,
+            CASE
+              WHEN wt.type = 'transfer_in' AND wtr.sender_id IS NOT NULL THEN sender_user.username
+              WHEN wt.type = 'transfer_out' AND wtr.recipient_id IS NOT NULL THEN recipient_user.username
+              ELSE NULL
+            END as transfer_user_name,
+            CASE
+              WHEN wt.type = 'transfer_in' AND wtr.sender_id IS NOT NULL THEN TRIM(CONCAT(COALESCE(sender_user.firstname, sender_user.first_name, ''), ' ', COALESCE(sender_user.lastname, sender_user.last_name, '')))
+              WHEN wt.type = 'transfer_out' AND wtr.recipient_id IS NOT NULL THEN TRIM(CONCAT(COALESCE(recipient_user.firstname, recipient_user.first_name, ''), ' ', COALESCE(recipient_user.lastname, recipient_user.last_name, '')))
+              ELSE NULL
+            END as transfer_full_name
+          FROM wallet_transactions wt
+          LEFT JOIN wallet_transfers wtr ON wt.reference_id = wtr.id
+          LEFT JOIN \`users-permissions_user\` sender_user ON wtr.sender_id = sender_user.id
+          LEFT JOIN \`users-permissions_user\` recipient_user ON wtr.recipient_id = recipient_user.id
+          WHERE wt.user_id = ?
         `;
         const queryParams = [userId];
 
         if (type) {
-          simpleQuery += ` AND type = ?`;
+          simpleQuery += ` AND wt.type = ?`;
           queryParams.push(type);
         }
 
         if (status) {
-          simpleQuery += ` AND status = ?`;
+          simpleQuery += ` AND wt.status = ?`;
           queryParams.push(status);
         }
 
         if (fromDate) {
-          simpleQuery += ` AND created_at >= ?`;
+          simpleQuery += ` AND wt.created_at >= ?`;
           queryParams.push(fromDate);
         }
 
         if (toDate) {
-          simpleQuery += ` AND created_at <= ?`;
+          simpleQuery += ` AND wt.created_at <= ?`;
           queryParams.push(toDate);
         }
 
         // Get total count
-        const countQuery = simpleQuery.replace('*', 'COUNT(*) as total');
+        const countQuery = `
+          SELECT COUNT(*) as total FROM wallet_transactions
+          WHERE user_id = ?
+          ${type ? 'AND type = ?' : ''}
+          ${status ? 'AND status = ?' : ''}
+          ${fromDate ? 'AND created_at >= ?' : ''}
+          ${toDate ? 'AND created_at <= ?' : ''}
+        `;
         const countResult = await strapi.connections.default.raw(countQuery, queryParams);
         total = countResult[0][0].total;
 
         // Get transactions with pagination
-        simpleQuery += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+        simpleQuery += ` ORDER BY wt.created_at DESC LIMIT ? OFFSET ?`;
         queryParams.push(parseInt(limit), parseInt(offset));
 
         const result = await strapi.connections.default.raw(simpleQuery, queryParams);
         transactions = result[0];
       } catch (fallbackError) {
-        strapi.log.error('[Wallet] Both transaction queries failed:', {
+        strapi.log.error('[Wallet] Fallback query also failed, trying ultra-simple query:', {
           enhancedError: enhancedQueryError.message,
           fallbackError: fallbackError.message,
           userId,
         });
-        // Return empty result instead of throwing
-        transactions = [];
-        total = 0;
+
+        // Last resort: absolute simplest query
+        try {
+          let ultraSimpleQuery = `
+            SELECT * FROM wallet_transactions
+            WHERE user_id = ?
+          `;
+          const queryParams = [userId];
+
+          if (type) {
+            ultraSimpleQuery += ` AND type = ?`;
+            queryParams.push(type);
+          }
+
+          if (status) {
+            ultraSimpleQuery += ` AND status = ?`;
+            queryParams.push(status);
+          }
+
+          if (fromDate) {
+            ultraSimpleQuery += ` AND created_at >= ?`;
+            queryParams.push(fromDate);
+          }
+
+          if (toDate) {
+            ultraSimpleQuery += ` AND created_at <= ?`;
+            queryParams.push(toDate);
+          }
+
+          // Get total count
+          const countQuery = ultraSimpleQuery.replace('*', 'COUNT(*) as total');
+          const countResult = await strapi.connections.default.raw(countQuery, queryParams);
+          total = countResult[0][0].total;
+
+          // Get transactions with pagination
+          ultraSimpleQuery += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+          queryParams.push(parseInt(limit), parseInt(offset));
+
+          const result = await strapi.connections.default.raw(ultraSimpleQuery, queryParams);
+          transactions = result[0];
+        } catch (ultraSimpleError) {
+          strapi.log.error('[Wallet] All transaction queries failed:', {
+            enhancedError: enhancedQueryError.message,
+            fallbackError: fallbackError.message,
+            ultraSimpleError: ultraSimpleError.message,
+            userId,
+          });
+          // Return empty result instead of throwing
+          transactions = [];
+          total = 0;
+        }
       }
     }
 
