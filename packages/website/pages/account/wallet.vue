@@ -86,7 +86,7 @@
                     class="transaction-row"
                   >
                     <div class="transaction-icon-wrapper">
-                      <div class="transaction-icon" :class="`icon-${getTransactionType(transaction.type, transaction.status)}`">
+                      <div class="transaction-icon" :class="`icon-${getTransactionType(transaction.type, transaction.status, transaction.amount)}`">
                         <i :class="getTransactionIcon(transaction.type, transaction.status)"></i>
                       </div>
                     </div>
@@ -97,8 +97,8 @@
                         {{ getTransactionDetails(transaction) }}
                       </p>
                     </div>
-                    <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type, transaction.status)}`">
-                      <span class="amount-sign">{{ getAmountSign(transaction.type) }}</span>
+                    <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type, transaction.status, transaction.amount)}`">
+                      <span class="amount-sign">{{ getAmountSign(transaction.type, transaction.amount) }}</span>
                       <span class="amount-value">฿{{ formatCurrency(transaction.amount) }}</span>
                     </div>
                   </div>
@@ -204,7 +204,7 @@
                     class="transaction-row"
                   >
                     <div class="transaction-icon-wrapper">
-                      <div class="transaction-icon" :class="`icon-${getTransactionType(transaction.type, transaction.status)}`">
+                      <div class="transaction-icon" :class="`icon-${getTransactionType(transaction.type, transaction.status, transaction.amount)}`">
                         <i :class="getTransactionIcon(transaction.type, transaction.status)"></i>
                       </div>
                     </div>
@@ -215,8 +215,8 @@
                         {{ getTransactionDetails(transaction) }}
                       </p>
                     </div>
-                    <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type, transaction.status)}`">
-                      <span class="amount-sign">{{ getAmountSign(transaction.type) }}</span>
+                    <div class="transaction-amount" :class="`amount-${getTransactionType(transaction.type, transaction.status, transaction.amount)}`">
+                      <span class="amount-sign">{{ getAmountSign(transaction.type, transaction.amount) }}</span>
                       <span class="amount-value">฿{{ formatCurrency(transaction.amount) }}</span>
                     </div>
                   </div>
@@ -269,7 +269,7 @@ export default {
       }
 
       return this.transactions.filter(transaction => {
-        const type = this.getTransactionType(transaction.type, transaction.status);
+        const type = this.getTransactionType(transaction.type, transaction.status, transaction.amount);
         if (this.selectedFilter === 'topup') {
           return type === 'credit';
         } else if (this.selectedFilter === 'charge') {
@@ -362,6 +362,7 @@ export default {
         'conversion': 'Points Conversion',
         'withdrawal': 'Withdrawal',
         'adjustment': 'Adjustment',
+        'transfer': 'Transfer',
         'transfer_in': 'Transfer',
         'transfer_out': 'Transfer',
         'voucher': 'Voucher',
@@ -392,6 +393,7 @@ export default {
         'conversion': 'fas fa-exchange-alt',
         'withdrawal': 'fas fa-money-bill-wave',
         'adjustment': 'fas fa-balance-scale',
+        'transfer': 'fas fa-exchange-alt',
         'transfer_in': 'fas fa-download',
         'transfer_out': 'fas fa-upload',
         'voucher': 'fas fa-ticket-alt',
@@ -414,10 +416,15 @@ export default {
 
       return icons[type];
     },
-    getTransactionType(type, status) {
+    getTransactionType(type, status, amount) {
       // Failed/cancelled transactions get a special type
       if (status && ['failed', 'cancelled', 'rejected'].includes(status.toLowerCase())) {
         return 'failed';
+      }
+
+      // For 'transfer' type, determine based on amount
+      if (type === 'transfer') {
+        return amount >= 0 ? 'credit' : 'debit';
       }
 
       // Credit transactions (incoming money)
@@ -428,8 +435,8 @@ export default {
       // Debit transactions (outgoing money)
       return 'debit';
     },
-    getAmountSign(type) {
-      return this.getTransactionType(type) === 'credit' ? '+' : '-';
+    getAmountSign(type, amount) {
+      return this.getTransactionType(type, null, amount) === 'credit' ? '+' : '-';
     },
     setFilter(filter) {
       this.selectedFilter = filter;
@@ -461,16 +468,33 @@ export default {
     },
     getTransactionDetails(transaction) {
       // For transfer transactions, show recipient/sender name
-      if (transaction.type === 'transfer_in' || transaction.type === 'transfer_out') {
+      if (transaction.type === 'transfer' || transaction.type === 'transfer_in' || transaction.type === 'transfer_out') {
         let name = null;
 
+        // Check for customerName first (new format)
+        if (transaction.customerName) {
+          name = transaction.customerName;
+          // For transfer type, determine direction based on amount
+          if (transaction.type === 'transfer') {
+            return transaction.amount > 0 ? `From ${name}` : `To ${name}`;
+          }
+        }
+
+        // Fallback to old format
         if (transaction.type === 'transfer_in') {
-          name = transaction.senderName || transaction.metadata?.senderName;
+          name = name || transaction.senderName || transaction.metadata?.senderName;
           return name ? `From ${name}` : '';
-        } else {
-          name = transaction.recipientName || transaction.metadata?.recipientName;
+        } else if (transaction.type === 'transfer_out') {
+          name = name || transaction.recipientName || transaction.metadata?.recipientName;
           return name ? `To ${name}` : '';
         }
+
+        // If we have a name but type is just 'transfer', use amount to determine direction
+        if (name) {
+          return transaction.amount > 0 ? `From ${name}` : `To ${name}`;
+        }
+
+        return '';
       }
 
       // For store payment and beer machine payment, show branch
