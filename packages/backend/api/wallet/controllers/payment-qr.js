@@ -194,7 +194,17 @@ module.exports = {
         return ctx.badRequest(utils.errorResponse('WALLET_002', 'Wallet is frozen'));
       }
 
-      ctx.send(utils.successResponse({
+      // Calculate available balance (balance - reserved)
+      const balance = new Decimal(wallet.balance || 0);
+      const reservedBalance = new Decimal(wallet.reserved_balance || 0);
+      const availableBalance = balance.minus(reservedBalance);
+
+      // For beer machines, check minimum balance requirement
+      const VENDING_MINIMUM_BALANCE = 500;
+      const meetsVendingMinimum = availableBalance.greaterThanOrEqualTo(VENDING_MINIMUM_BALANCE);
+
+      // Prepare response
+      const response = {
         valid: true,
         nonce, // Return nonce for use in payment request
         user: {
@@ -204,11 +214,28 @@ module.exports = {
         },
         wallet: {
           walletId: wallet.id,
-          balance: parseFloat(wallet.balance),
+          balance: parseFloat(balance.toFixed(2)),
+          reservedBalance: parseFloat(reservedBalance.toFixed(2)),
+          availableBalance: parseFloat(availableBalance.toFixed(2)),
           status: wallet.status,
         },
         purpose,
-      }));
+      };
+
+      // Add vending-specific info if purpose is beer_machine
+      if (purpose === 'beer_machine') {
+        response.vending = {
+          meetsMinimumBalance: meetsVendingMinimum,
+          minimumRequired: VENDING_MINIMUM_BALANCE,
+          canProceed: meetsVendingMinimum,
+        };
+
+        if (!meetsVendingMinimum) {
+          response.vending.message = `Minimum balance of ฿${VENDING_MINIMUM_BALANCE} required. Available: ฿${availableBalance.toFixed(2)}`;
+        }
+      }
+
+      ctx.send(utils.successResponse(response));
 
     } catch (error) {
       strapi.log.error('[Payment QR] validatePaymentQR error:', {

@@ -346,6 +346,38 @@
         "policies": [],
         "auth": false
       }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/vending/reserve",
+      "handler": "vending.reserve",
+      "config": {
+        "policies": ["isPublicPaymentQR"]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/vending/finalize",
+      "handler": "vending.finalize",
+      "config": {
+        "policies": ["isPublicPaymentQR"]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wallet/vending/end-session",
+      "handler": "vending.endSession",
+      "config": {
+        "policies": ["isPublicPaymentQR"]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/wallet/vending/session/:sessionId",
+      "handler": "vending.getSession",
+      "config": {
+        "policies": ["isPublicPaymentQR"]
+      }
     }
   ]
 }
