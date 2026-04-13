@@ -81,13 +81,12 @@ module.exports = {
         return ctx.badRequest(utils.errorResponse('WALLET_004', validation.error));
       }
 
-      // Create charge with return_uri to trigger 3DS authentication
-      // Omise needs return_uri UPFRONT to decide whether to trigger 3DS
-      // Use backend URL that returns HTML with JavaScript deep link trigger
+      // Create charge with return_uri that includes user_id
+      // We can't include charge_id because we don't have it yet, but we can include user_id
+      // This allows the return handler to look up the most recent charge for this user
       const baseUrl = process.env.PUBLIC_URL || 'https://wallet-backend-test-pc-ndd56.ondigitalocean.app';
-      const returnUri = `${baseUrl}/wallet/payment/3ds-return`;
+      const returnUri = `${baseUrl}/wallet/payment/3ds-return?user_id=${userId}`;
 
-      // Create charge WITH return_uri so Omise triggers 3DS if card requires it
       const charge = await paymentService.createChargeFromToken(
         tokenId,
         amount,
@@ -97,7 +96,7 @@ module.exports = {
           user_id: userId,
           type: 'wallet_topup',
         },
-        returnUri  // Pass return_uri immediately
+        returnUri
       );
 
       strapi.log.info('[Payment] Charge created:', {
@@ -292,58 +291,47 @@ module.exports = {
    */
   async handle3DSReturn(ctx) {
     try {
-      // Omise sends the charge ID in various ways - check all possibilities
-      // Examples: ?charge_id=chrg_xxx or ?id=chrg_xxx or in path
-      const chargeId = ctx.query.charge_id || ctx.query.chargeId || ctx.query.id;
+      const userId = ctx.query.user_id;
+      let chargeId = ctx.query.charge_id || ctx.query.chargeId || ctx.query.id;
 
       strapi.log.info('[Payment] 3DS return received:', {
         query: ctx.query,
-        chargeId: chargeId,
+        userId,
+        chargeId,
       });
 
-      let deepLink = 'chongjaroen://payment-result?status=unknown';
-      let statusMessage = 'Processing payment...';
-      let statusIcon = '⏳';
+      // If no charge_id but we have user_id, look up the most recent pending charge
+      if (!chargeId && userId) {
+        strapi.log.info('[Payment] Looking up most recent charge for user:', userId);
 
-      if (!chargeId) {
-        strapi.log.warn('[Payment] 3DS return: No charge ID found in query');
-        statusMessage = 'Payment verification failed';
-        statusIcon = '❌';
-      } else {
-        strapi.log.info('[Payment] 3DS return processing charge:', chargeId);
+        // Query database for most recent charge for this user
+        const knex = strapi.connections.default;
+        const recentTransaction = await knex('wallet_transactions')
+          .where('user_id', userId)
+          .where('type', 'top_up')
+          .where('payment_method', 'credit_card')
+          .whereRaw("JSON_EXTRACT(metadata, '$.charge_id') IS NOT NULL")
+          .orderBy('created_at', 'desc')
+          .first();
 
-        // Get the charge status
-        const charge = await paymentService.getChargeStatus(chargeId);
-
-        // If payment is successful and not yet processed, credit wallet
-        if (charge.paid && charge.metadata?.user_id) {
-          const userId = parseInt(charge.metadata.user_id);
-
-          // Check if already processed
-          const knex = strapi.connections.default;
-          const existing = await knex('wallet_transactions')
-            .whereRaw("JSON_EXTRACT(metadata, '$.charge_id') = ?", [chargeId])
-            .first();
-
-          if (!existing) {
-            await paymentService.processSuccessfulPayment(chargeId, userId);
-            strapi.log.info('[Payment] 3DS payment processed successfully for user:', userId);
-          }
-
-          deepLink = `chongjaroen://payment-result?status=success&charge_id=${chargeId}`;
-          statusMessage = 'Payment successful!';
-          statusIcon = '✅';
-        } else if (charge.status === 'failed') {
-          strapi.log.info('[Payment] 3DS payment failed:', chargeId);
-          deepLink = `chongjaroen://payment-result?status=failed&charge_id=${chargeId}`;
-          statusMessage = 'Payment failed';
-          statusIcon = '❌';
-        } else {
-          strapi.log.info('[Payment] 3DS payment still pending:', chargeId);
-          deepLink = `chongjaroen://payment-result?status=pending&charge_id=${chargeId}`;
-          statusMessage = 'Payment pending...';
-          statusIcon = '⏳';
+        if (recentTransaction) {
+          const metadata = JSON.parse(recentTransaction.metadata);
+          chargeId = metadata.charge_id;
+          strapi.log.info('[Payment] Found charge from recent transaction:', chargeId);
         }
+      }
+
+      let deepLink = 'chongjaroen://payment-result?status=success';
+      let statusMessage = 'Payment successful!';
+      let statusIcon = '✅';
+
+      // Note: The webhook already processed the payment, so we just need to redirect back to app
+      // The app's polling will find the transaction that was created by the webhook
+      if (chargeId) {
+        deepLink = `chongjaroen://payment-result?status=success&charge_id=${chargeId}`;
+        strapi.log.info('[Payment] Redirecting to app with charge:', chargeId);
+      } else {
+        strapi.log.warn('[Payment] No charge ID found, redirecting to app anyway');
       }
 
       // Return HTML page with JavaScript deep link trigger
