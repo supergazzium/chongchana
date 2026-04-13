@@ -250,67 +250,117 @@ module.exports = {
       toDate = null,
     } = params;
 
-    let query = `
-      SELECT
-        wt.*,
-        CASE
-          WHEN wt.type = 'transfer_in' THEN sender_user.username
-          WHEN wt.type = 'transfer_out' THEN recipient_user.username
-          ELSE NULL
-        END as transfer_user_name,
-        CASE
-          WHEN wt.type = 'transfer_in' THEN CONCAT(COALESCE(sender_user.firstname, ''), ' ', COALESCE(sender_user.lastname, ''))
-          WHEN wt.type = 'transfer_out' THEN CONCAT(COALESCE(recipient_user.firstname, ''), ' ', COALESCE(recipient_user.lastname, ''))
-          ELSE NULL
-        END as transfer_full_name
-      FROM wallet_transactions wt
-      LEFT JOIN wallet_transfers wtr ON wt.reference_id = wtr.id
-      LEFT JOIN \`users-permissions_user\` sender_user ON wtr.sender_id = sender_user.id AND wt.type = 'transfer_in'
-      LEFT JOIN \`users-permissions_user\` recipient_user ON wtr.recipient_id = recipient_user.id AND wt.type = 'transfer_out'
-      WHERE wt.user_id = ?
-    `;
-    const queryParams = [userId];
+    // Try enhanced query with JOINs first, fallback to simple query if it fails
+    let transactions;
+    let total;
 
-    if (type) {
-      query += ` AND wt.type = ?`;
-      queryParams.push(type);
+    try {
+      // Enhanced query with user name lookups
+      let query = `
+        SELECT
+          wt.*,
+          CASE
+            WHEN wt.type = 'transfer_in' THEN sender_user.username
+            WHEN wt.type = 'transfer_out' THEN recipient_user.username
+            ELSE NULL
+          END as transfer_user_name,
+          CASE
+            WHEN wt.type = 'transfer_in' THEN TRIM(CONCAT(COALESCE(sender_user.firstname, sender_user.first_name, ''), ' ', COALESCE(sender_user.lastname, sender_user.last_name, '')))
+            WHEN wt.type = 'transfer_out' THEN TRIM(CONCAT(COALESCE(recipient_user.firstname, recipient_user.first_name, ''), ' ', COALESCE(recipient_user.lastname, recipient_user.last_name, '')))
+            ELSE NULL
+          END as transfer_full_name
+        FROM wallet_transactions wt
+        LEFT JOIN wallet_transfers wtr ON wt.reference_id = wtr.id AND (wt.type = 'transfer_in' OR wt.type = 'transfer_out')
+        LEFT JOIN \`users-permissions_user\` sender_user ON wtr.sender_id = sender_user.id AND wt.type = 'transfer_in'
+        LEFT JOIN \`users-permissions_user\` recipient_user ON wtr.recipient_id = recipient_user.id AND wt.type = 'transfer_out'
+        WHERE wt.user_id = ?
+      `;
+      const queryParams = [userId];
+
+      if (type) {
+        query += ` AND wt.type = ?`;
+        queryParams.push(type);
+      }
+
+      if (status) {
+        query += ` AND wt.status = ?`;
+        queryParams.push(status);
+      }
+
+      if (fromDate) {
+        query += ` AND wt.created_at >= ?`;
+        queryParams.push(fromDate);
+      }
+
+      if (toDate) {
+        query += ` AND wt.created_at <= ?`;
+        queryParams.push(toDate);
+      }
+
+      // Get total count
+      const countQuery = `
+        SELECT COUNT(*) as total FROM wallet_transactions wt
+        WHERE wt.user_id = ?
+        ${type ? 'AND wt.type = ?' : ''}
+        ${status ? 'AND wt.status = ?' : ''}
+        ${fromDate ? 'AND wt.created_at >= ?' : ''}
+        ${toDate ? 'AND wt.created_at <= ?' : ''}
+      `;
+      const countResult = await strapi.connections.default.raw(countQuery, queryParams);
+      total = countResult[0][0].total;
+
+      // Get transactions with pagination
+      query += ` ORDER BY wt.created_at DESC LIMIT ? OFFSET ?`;
+      queryParams.push(parseInt(limit), parseInt(offset));
+
+      const result = await strapi.connections.default.raw(query, queryParams);
+      transactions = result[0];
+
+    } catch (enhancedQueryError) {
+      // Fallback to simple query if enhanced query fails
+      strapi.log.warn('[Wallet] Enhanced transaction query failed, using fallback:', enhancedQueryError.message);
+
+      let simpleQuery = `
+        SELECT * FROM wallet_transactions
+        WHERE user_id = ?
+      `;
+      const queryParams = [userId];
+
+      if (type) {
+        simpleQuery += ` AND type = ?`;
+        queryParams.push(type);
+      }
+
+      if (status) {
+        simpleQuery += ` AND status = ?`;
+        queryParams.push(status);
+      }
+
+      if (fromDate) {
+        simpleQuery += ` AND created_at >= ?`;
+        queryParams.push(fromDate);
+      }
+
+      if (toDate) {
+        simpleQuery += ` AND created_at <= ?`;
+        queryParams.push(toDate);
+      }
+
+      // Get total count
+      const countQuery = simpleQuery.replace('*', 'COUNT(*) as total');
+      const countResult = await strapi.connections.default.raw(countQuery, queryParams);
+      total = countResult[0][0].total;
+
+      // Get transactions with pagination
+      simpleQuery += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+      queryParams.push(parseInt(limit), parseInt(offset));
+
+      const result = await strapi.connections.default.raw(simpleQuery, queryParams);
+      transactions = result[0];
     }
-
-    if (status) {
-      query += ` AND wt.status = ?`;
-      queryParams.push(status);
-    }
-
-    if (fromDate) {
-      query += ` AND wt.created_at >= ?`;
-      queryParams.push(fromDate);
-    }
-
-    if (toDate) {
-      query += ` AND wt.created_at <= ?`;
-      queryParams.push(toDate);
-    }
-
-    // Get total count
-    const countQuery = `
-      SELECT COUNT(*) as total FROM wallet_transactions wt
-      WHERE wt.user_id = ?
-      ${type ? 'AND wt.type = ?' : ''}
-      ${status ? 'AND wt.status = ?' : ''}
-      ${fromDate ? 'AND wt.created_at >= ?' : ''}
-      ${toDate ? 'AND wt.created_at <= ?' : ''}
-    `;
-    const countResult = await strapi.connections.default.raw(countQuery, queryParams);
-    const total = countResult[0][0].total;
-
-    // Get transactions with pagination
-    query += ` ORDER BY wt.created_at DESC LIMIT ? OFFSET ?`;
-    queryParams.push(parseInt(limit), parseInt(offset));
-
-    const transactions = await strapi.connections.default.raw(query, queryParams);
 
     return {
-      transactions: transactions[0].map(t => {
+      transactions: transactions.map(t => {
         // Parse metadata if it exists
         let metadata = null;
         try {
@@ -338,16 +388,16 @@ module.exports = {
           completedAt: t.completed_at,
         };
 
-        // Add transfer-specific fields
+        // Add transfer-specific fields if available
         if (t.type === 'transfer_in' || t.type === 'transfer_out') {
           // Use full name if available, otherwise use username
           const fullName = t.transfer_full_name?.trim();
           const displayName = fullName && fullName !== ' ' ? fullName : t.transfer_user_name;
 
           if (t.type === 'transfer_in') {
-            transaction.senderName = displayName || 'Unknown User';
+            transaction.senderName = displayName || null;
           } else {
-            transaction.recipientName = displayName || 'Unknown User';
+            transaction.recipientName = displayName || null;
           }
         }
 
