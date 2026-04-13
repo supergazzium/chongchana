@@ -83,8 +83,9 @@ module.exports = {
 
       // Create charge with return_uri to trigger 3DS authentication
       // Omise needs return_uri UPFRONT to decide whether to trigger 3DS
-      // Use deep link directly to avoid Safari blocking cross-protocol redirects
-      const returnUri = 'chongjaroen://payment-result';
+      // Use backend URL that returns HTML with JavaScript deep link trigger
+      const baseUrl = process.env.PUBLIC_URL || 'https://wallet-backend-test-pc-ndd56.ondigitalocean.app';
+      const returnUri = `${baseUrl}/wallet/payment/3ds-return`;
 
       // Create charge WITH return_uri so Omise triggers 3DS if card requires it
       const charge = await paymentService.createChargeFromToken(
@@ -287,6 +288,7 @@ module.exports = {
    * GET /api/wallet/payment/3ds-return
    * Handle 3D Secure return redirect
    * User is redirected here after completing 3DS authentication at their bank
+   * Returns HTML page with JavaScript deep link trigger to avoid Safari blocking redirects
    */
   async handle3DSReturn(ctx) {
     try {
@@ -299,47 +301,191 @@ module.exports = {
         chargeId: chargeId,
       });
 
+      let deepLink = 'chongjaroen://payment-result?status=unknown';
+      let statusMessage = 'Processing payment...';
+      let statusIcon = '⏳';
+
       if (!chargeId) {
         strapi.log.warn('[Payment] 3DS return: No charge ID found in query');
-        // Redirect to app with unknown status
-        ctx.redirect('chongjaroen://payment-result?status=unknown');
-        return;
-      }
-
-      strapi.log.info('[Payment] 3DS return processing charge:', chargeId);
-
-      // Get the charge status
-      const charge = await paymentService.getChargeStatus(chargeId);
-
-      // If payment is successful and not yet processed, credit wallet
-      if (charge.paid && charge.metadata?.user_id) {
-        const userId = parseInt(charge.metadata.user_id);
-
-        // Check if already processed
-        const knex = strapi.connections.default;
-        const existing = await knex('wallet_transactions')
-          .whereRaw("JSON_EXTRACT(metadata, '$.charge_id') = ?", [chargeId])
-          .first();
-
-        if (!existing) {
-          await paymentService.processSuccessfulPayment(chargeId, userId);
-          strapi.log.info('[Payment] 3DS payment processed successfully for user:', userId);
-        }
-
-        // Redirect to app with success
-        ctx.redirect(`chongjaroen://payment-result?status=success&charge_id=${chargeId}`);
-      } else if (charge.status === 'failed') {
-        // Payment failed
-        strapi.log.info('[Payment] 3DS payment failed:', chargeId);
-        ctx.redirect(`chongjaroen://payment-result?status=failed&charge_id=${chargeId}`);
+        statusMessage = 'Payment verification failed';
+        statusIcon = '❌';
       } else {
-        // Payment still pending (authentication might not be complete)
-        strapi.log.info('[Payment] 3DS payment still pending:', chargeId);
-        ctx.redirect(`chongjaroen://payment-result?status=pending&charge_id=${chargeId}`);
+        strapi.log.info('[Payment] 3DS return processing charge:', chargeId);
+
+        // Get the charge status
+        const charge = await paymentService.getChargeStatus(chargeId);
+
+        // If payment is successful and not yet processed, credit wallet
+        if (charge.paid && charge.metadata?.user_id) {
+          const userId = parseInt(charge.metadata.user_id);
+
+          // Check if already processed
+          const knex = strapi.connections.default;
+          const existing = await knex('wallet_transactions')
+            .whereRaw("JSON_EXTRACT(metadata, '$.charge_id') = ?", [chargeId])
+            .first();
+
+          if (!existing) {
+            await paymentService.processSuccessfulPayment(chargeId, userId);
+            strapi.log.info('[Payment] 3DS payment processed successfully for user:', userId);
+          }
+
+          deepLink = `chongjaroen://payment-result?status=success&charge_id=${chargeId}`;
+          statusMessage = 'Payment successful!';
+          statusIcon = '✅';
+        } else if (charge.status === 'failed') {
+          strapi.log.info('[Payment] 3DS payment failed:', chargeId);
+          deepLink = `chongjaroen://payment-result?status=failed&charge_id=${chargeId}`;
+          statusMessage = 'Payment failed';
+          statusIcon = '❌';
+        } else {
+          strapi.log.info('[Payment] 3DS payment still pending:', chargeId);
+          deepLink = `chongjaroen://payment-result?status=pending&charge_id=${chargeId}`;
+          statusMessage = 'Payment pending...';
+          statusIcon = '⏳';
+        }
       }
+
+      // Return HTML page with JavaScript deep link trigger
+      // This avoids Safari blocking cross-protocol redirects
+      ctx.type = 'text/html';
+      ctx.body = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redirecting to Chongjaroen...</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #1797AD 0%, #14828E 100%);
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    .container {
+      max-width: 400px;
+    }
+    .icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+    h1 {
+      font-size: 24px;
+      margin: 20px 0;
+      font-weight: 600;
+    }
+    p {
+      font-size: 16px;
+      opacity: 0.9;
+      margin: 10px 0;
+    }
+    .button {
+      display: inline-block;
+      margin-top: 30px;
+      padding: 15px 40px;
+      background: white;
+      color: #1797AD;
+      border-radius: 30px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transition: transform 0.2s;
+    }
+    .button:hover {
+      transform: translateY(-2px);
+    }
+    .button:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">${statusIcon}</div>
+    <h1>${statusMessage}</h1>
+    <p>Redirecting to Chongjaroen app...</p>
+    <p style="font-size: 14px; opacity: 0.7;">If not redirected automatically:</p>
+    <a href="${deepLink}" class="button">Open Chongjaroen App</a>
+  </div>
+  <script>
+    // Auto-redirect to app after a short delay
+    setTimeout(function() {
+      window.location.href = '${deepLink}';
+    }, 1000);
+
+    // Fallback: Try to open app immediately on page load
+    window.location.href = '${deepLink}';
+  </script>
+</body>
+</html>
+      `;
     } catch (error) {
       strapi.log.error('[Payment] 3DS return handler error:', error);
-      ctx.redirect('chongjaroen://payment-result?status=error');
+      ctx.type = 'text/html';
+      ctx.body = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Error</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #f44336;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    .container { max-width: 400px; }
+    .icon { font-size: 64px; margin-bottom: 20px; }
+    h1 { font-size: 24px; margin: 20px 0; }
+    p { font-size: 16px; opacity: 0.9; }
+    .button {
+      display: inline-block;
+      margin-top: 30px;
+      padding: 15px 40px;
+      background: white;
+      color: #f44336;
+      border-radius: 30px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">❌</div>
+    <h1>Payment Error</h1>
+    <p>Something went wrong processing your payment.</p>
+    <a href="chongjaroen://payment-result?status=error" class="button">Return to App</a>
+  </div>
+  <script>
+    setTimeout(function() {
+      window.location.href = 'chongjaroen://payment-result?status=error';
+    }, 2000);
+  </script>
+</body>
+</html>
+      `;
     }
   },
 
