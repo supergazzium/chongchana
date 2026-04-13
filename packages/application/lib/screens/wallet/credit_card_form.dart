@@ -587,6 +587,9 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
   }
 
   void _showSuccessDialog(String transactionId) {
+    // Stop polling when success dialog is shown
+    _stopPaymentPolling();
+
     showDialog(
       context: context,
       barrierDismissible: false,
