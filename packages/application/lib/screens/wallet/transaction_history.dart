@@ -305,7 +305,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                           fontSize: 13,
                         ),
                       ),
-                      if (transaction.description != null || transaction.paymentMethod != null) ...[
+                      if (_getTransactionSubtitle(transaction).isNotEmpty) ...[
                         Text(
                           '  •  ',
                           style: TextStyle(
@@ -315,7 +315,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                         ),
                         Expanded(
                           child: Text(
-                            transaction.description ?? transaction.paymentMethod ?? '',
+                            _getTransactionSubtitle(transaction),
                             style: TextStyle(
                               color: Colors.grey.shade600,
                               fontSize: 13,
@@ -532,5 +532,14 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
   String _formatAmount(double amount) {
     return NumberFormat('#,##0.00').format(amount);
+  }
+
+  String _getTransactionSubtitle(WalletTransaction transaction) {
+    // For transfers, show customer name if available
+    if (transaction.type == 'transfer' && transaction.customerName != null && transaction.customerName!.isNotEmpty) {
+      return transaction.customerName!;
+    }
+    // Otherwise fall back to description or payment method
+    return transaction.description ?? transaction.paymentMethod ?? '';
   }
 }

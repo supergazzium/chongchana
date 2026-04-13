@@ -256,23 +256,27 @@ module.exports = {
 
     try {
       // Enhanced query with user name lookups
+      // For transfers, extract sender_user_id/receiver_user_id from metadata JSON
       let query = `
         SELECT
           wt.*,
           CASE
-            WHEN wt.type = 'transfer_in' THEN sender_user.username
-            WHEN wt.type = 'transfer_out' THEN recipient_user.username
+            WHEN wt.type = 'transfer' AND wt.amount > 0 THEN sender_user.username
+            WHEN wt.type = 'transfer' AND wt.amount < 0 THEN receiver_user.username
             ELSE NULL
           END as transfer_user_name,
           CASE
-            WHEN wt.type = 'transfer_in' THEN TRIM(CONCAT(COALESCE(sender_user.firstname, sender_user.first_name, ''), ' ', COALESCE(sender_user.lastname, sender_user.last_name, '')))
-            WHEN wt.type = 'transfer_out' THEN TRIM(CONCAT(COALESCE(recipient_user.firstname, recipient_user.first_name, ''), ' ', COALESCE(recipient_user.lastname, recipient_user.last_name, '')))
+            WHEN wt.type = 'transfer' AND wt.amount > 0 THEN TRIM(CONCAT(COALESCE(sender_user.first_name, ''), ' ', COALESCE(sender_user.last_name, '')))
+            WHEN wt.type = 'transfer' AND wt.amount < 0 THEN TRIM(CONCAT(COALESCE(receiver_user.first_name, ''), ' ', COALESCE(receiver_user.last_name, '')))
             ELSE NULL
           END as transfer_full_name
         FROM wallet_transactions wt
-        LEFT JOIN wallet_transfers wtr ON wt.reference_id = wtr.id AND (wt.type = 'transfer_in' OR wt.type = 'transfer_out')
-        LEFT JOIN \`users-permissions_user\` sender_user ON wtr.sender_id = sender_user.id AND wt.type = 'transfer_in'
-        LEFT JOIN \`users-permissions_user\` recipient_user ON wtr.recipient_id = recipient_user.id AND wt.type = 'transfer_out'
+        LEFT JOIN \`users-permissions_user\` sender_user ON
+          wt.type = 'transfer' AND wt.amount > 0 AND
+          JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.sender_user_id')) = sender_user.id
+        LEFT JOIN \`users-permissions_user\` receiver_user ON
+          wt.type = 'transfer' AND wt.amount < 0 AND
+          JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.receiver_user_id')) = receiver_user.id
         WHERE wt.user_id = ?
       `;
       const queryParams = [userId];
@@ -324,24 +328,27 @@ module.exports = {
       });
 
       try {
-        // Try simple query with basic user lookup
+        // Try simple query with basic user lookup from metadata JSON
         let simpleQuery = `
           SELECT
             wt.*,
             CASE
-              WHEN wt.type = 'transfer_in' AND wtr.sender_id IS NOT NULL THEN sender_user.username
-              WHEN wt.type = 'transfer_out' AND wtr.recipient_id IS NOT NULL THEN recipient_user.username
+              WHEN wt.type = 'transfer' AND wt.amount > 0 THEN sender_user.username
+              WHEN wt.type = 'transfer' AND wt.amount < 0 THEN receiver_user.username
               ELSE NULL
             END as transfer_user_name,
             CASE
-              WHEN wt.type = 'transfer_in' AND wtr.sender_id IS NOT NULL THEN TRIM(CONCAT(COALESCE(sender_user.firstname, sender_user.first_name, ''), ' ', COALESCE(sender_user.lastname, sender_user.last_name, '')))
-              WHEN wt.type = 'transfer_out' AND wtr.recipient_id IS NOT NULL THEN TRIM(CONCAT(COALESCE(recipient_user.firstname, recipient_user.first_name, ''), ' ', COALESCE(recipient_user.lastname, recipient_user.last_name, '')))
+              WHEN wt.type = 'transfer' AND wt.amount > 0 THEN TRIM(CONCAT(COALESCE(sender_user.first_name, ''), ' ', COALESCE(sender_user.last_name, '')))
+              WHEN wt.type = 'transfer' AND wt.amount < 0 THEN TRIM(CONCAT(COALESCE(receiver_user.first_name, ''), ' ', COALESCE(receiver_user.last_name, '')))
               ELSE NULL
             END as transfer_full_name
           FROM wallet_transactions wt
-          LEFT JOIN wallet_transfers wtr ON wt.reference_id = wtr.id
-          LEFT JOIN \`users-permissions_user\` sender_user ON wtr.sender_id = sender_user.id
-          LEFT JOIN \`users-permissions_user\` recipient_user ON wtr.recipient_id = recipient_user.id
+          LEFT JOIN \`users-permissions_user\` sender_user ON
+            wt.type = 'transfer' AND wt.amount > 0 AND
+            JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.sender_user_id')) = sender_user.id
+          LEFT JOIN \`users-permissions_user\` receiver_user ON
+            wt.type = 'transfer' AND wt.amount < 0 AND
+            JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.receiver_user_id')) = receiver_user.id
           WHERE wt.user_id = ?
         `;
         const queryParams = [userId];
@@ -474,16 +481,21 @@ module.exports = {
         };
 
         // Add transfer-specific fields if available
-        if (t.type === 'transfer_in' || t.type === 'transfer_out') {
+        if (t.type === 'transfer') {
           // Use full name if available, otherwise use username
           const fullName = t.transfer_full_name?.trim();
           const displayName = fullName && fullName !== ' ' ? fullName : t.transfer_user_name;
 
-          if (t.type === 'transfer_in') {
+          // For incoming transfers (positive amount), show sender name
+          // For outgoing transfers (negative amount), show receiver name
+          if (t.amount > 0) {
             transaction.senderName = displayName || null;
           } else {
-            transaction.recipientName = displayName || null;
+            transaction.receiverName = displayName || null;
           }
+
+          // Also add as customerName for easier access in UI
+          transaction.customerName = displayName || null;
         }
 
         return transaction;

@@ -10,6 +10,7 @@ class WalletTransaction {
   late String? paymentMethod;
   late String? referenceId;
   late String? description;
+  late String? customerName;
   late DateTime createdAt;
   late DateTime? completedAt;
 
@@ -23,6 +24,7 @@ class WalletTransaction {
     String? paymentMethod,
     String? referenceId,
     String? description,
+    String? customerName,
     DateTime? createdAt,
     DateTime? completedAt,
   }) {
@@ -35,6 +37,7 @@ class WalletTransaction {
     this.paymentMethod = paymentMethod;
     this.referenceId = referenceId;
     this.description = description;
+    this.customerName = customerName;
     this.createdAt = createdAt ?? DateTime.now();
     this.completedAt = completedAt;
   }
@@ -49,6 +52,7 @@ class WalletTransaction {
     paymentMethod = json['paymentMethod'];
     referenceId = json['referenceId'];
     description = json['description'];
+    customerName = json['customerName'];
     createdAt = json['createdAt'] != null
         ? DateTime.parse(json['createdAt'])
         : DateTime.now();
@@ -68,6 +72,7 @@ class WalletTransaction {
     data['paymentMethod'] = paymentMethod;
     data['referenceId'] = referenceId;
     data['description'] = description;
+    data['customerName'] = customerName;
     data['createdAt'] = createdAt.toIso8601String();
     data['completedAt'] = completedAt?.toIso8601String();
     return data;
@@ -106,6 +111,8 @@ class WalletTransaction {
         return 'Adjustment';
       case 'withdrawal':
         return 'Withdrawal';
+      case 'transfer':
+        return 'Transfer';
       default:
         return type;
     }

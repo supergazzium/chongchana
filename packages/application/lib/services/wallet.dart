@@ -142,6 +142,7 @@ class WalletService extends ChangeNotifier {
             paymentMethod: tx['paymentMethod'],
             description: tx['description'],
             referenceId: tx['referenceId'],
+            customerName: tx['customerName'],
             createdAt: tx['createdAt'] != null
                 ? DateTime.parse(tx['createdAt'])
                 : DateTime.now(),

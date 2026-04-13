@@ -207,13 +207,28 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
               _buildTopAction(
                 icon: Icons.qr_code_scanner,
                 label: 'Pay in store',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const PayScreen(),
-                    ),
+                onTap: () async {
+                  // Require authentication before showing payment QR
+                  final authService = Provider.of<WalletAuthService>(context, listen: false);
+
+                  final authenticated = await authService.authenticate(
+                    context: context,
+                    reason: 'Authenticate to generate payment QR code',
                   );
+
+                  if (authenticated) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PayScreen(),
+                      ),
+                    );
+                  } else {
+                    Fluttertoast.showToast(
+                      msg: 'Authentication required to generate payment QR',
+                      backgroundColor: Colors.red,
+                    );
+                  }
                 },
               ),
             ],
@@ -748,7 +763,7 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${_formatDate(transaction.createdAt)}  •  ${transaction.description ?? transaction.paymentMethod ?? ''}',
+                    '${_formatDate(transaction.createdAt)}  •  ${_getTransactionSubtitle(transaction)}',
                     style: TextStyle(
                       color: Colors.grey.shade600,
                       fontSize: 12,
@@ -902,5 +917,14 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
 
   String _formatDate(DateTime date) {
     return DateFormat('MMM d, HH:mm').format(date);
+  }
+
+  String _getTransactionSubtitle(WalletTransaction transaction) {
+    // For transfers, show customer name if available
+    if (transaction.type == 'transfer' && transaction.customerName != null && transaction.customerName!.isNotEmpty) {
+      return transaction.customerName!;
+    }
+    // Otherwise fall back to description or payment method
+    return transaction.description ?? transaction.paymentMethod ?? '';
   }
 }

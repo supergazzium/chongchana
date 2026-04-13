@@ -123,6 +123,13 @@ class TransactionDetailScreen extends StatelessWidget {
     return _buildInfoSection(
       title: 'Payment Details',
       children: [
+        if (transaction.type == 'transfer' && transaction.customerName != null && transaction.customerName!.isNotEmpty) ...[
+          _buildDetailRow(
+            transaction.amount > 0 ? 'From' : 'To',
+            transaction.customerName!,
+          ),
+          _buildDivider(),
+        ],
         if (transaction.paymentMethod != null) ...[
           _buildDetailRow('Payment Method', transaction.paymentMethod!),
           _buildDivider(),
