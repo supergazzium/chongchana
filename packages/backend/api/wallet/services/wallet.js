@@ -273,10 +273,10 @@ module.exports = {
         FROM wallet_transactions wt
         LEFT JOIN \`users-permissions_user\` sender_user ON
           wt.type = 'transfer' AND wt.amount > 0 AND
-          JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.sender_user_id')) = sender_user.id
+          CAST(JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.sender_user_id')) AS UNSIGNED) = sender_user.id
         LEFT JOIN \`users-permissions_user\` receiver_user ON
           wt.type = 'transfer' AND wt.amount < 0 AND
-          JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.receiver_user_id')) = receiver_user.id
+          CAST(JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.receiver_user_id')) AS UNSIGNED) = receiver_user.id
         WHERE wt.user_id = ?
       `;
       const queryParams = [userId];
@@ -345,10 +345,10 @@ module.exports = {
           FROM wallet_transactions wt
           LEFT JOIN \`users-permissions_user\` sender_user ON
             wt.type = 'transfer' AND wt.amount > 0 AND
-            JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.sender_user_id')) = sender_user.id
+            CAST(JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.sender_user_id')) AS UNSIGNED) = sender_user.id
           LEFT JOIN \`users-permissions_user\` receiver_user ON
             wt.type = 'transfer' AND wt.amount < 0 AND
-            JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.receiver_user_id')) = receiver_user.id
+            CAST(JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.receiver_user_id')) AS UNSIGNED) = receiver_user.id
           WHERE wt.user_id = ?
         `;
         const queryParams = [userId];
