@@ -306,18 +306,27 @@ module.exports = {
 
         // Query database for most recent charge for this user
         const knex = strapi.connections.default;
-        const recentTransaction = await knex('wallet_transactions')
+        const recentTransactions = await knex('wallet_transactions')
           .where('user_id', userId)
           .where('type', 'top_up')
           .where('payment_method', 'credit_card')
-          .whereRaw("JSON_EXTRACT(metadata, '$.charge_id') IS NOT NULL")
+          .whereNotNull('metadata')
           .orderBy('created_at', 'desc')
-          .first();
+          .limit(5);
 
-        if (recentTransaction) {
-          const metadata = JSON.parse(recentTransaction.metadata);
-          chargeId = metadata.charge_id;
-          strapi.log.info('[Payment] Found charge from recent transaction:', chargeId);
+        // Find the most recent transaction with a charge_id in metadata
+        for (const transaction of recentTransactions) {
+          try {
+            const metadata = JSON.parse(transaction.metadata);
+            if (metadata.charge_id) {
+              chargeId = metadata.charge_id;
+              strapi.log.info('[Payment] Found charge from recent transaction:', chargeId);
+              break;
+            }
+          } catch (e) {
+            // Skip transactions with invalid JSON
+            continue;
+          }
         }
       }
 
