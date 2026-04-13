@@ -67,6 +67,13 @@ export default {
    */
   buildModules: ['@nuxtjs/moment'],
   /*
+   ** Moment.js configuration
+   */
+  moment: {
+    defaultTimezone: 'Asia/Bangkok',
+    timezone: true,
+  },
+  /*
    ** Nuxt.js modules
    */
   modules: [

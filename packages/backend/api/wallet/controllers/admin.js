@@ -33,12 +33,22 @@ module.exports = {
           u.first_name as firstName,
           u.last_name as lastName,
           u.phone,
-          (SELECT COUNT(*) FROM wallet_transactions WHERE user_id = w.user_id) as total_transactions,
-          (SELECT SUM(amount) FROM wallet_transactions WHERE user_id = w.user_id AND type IN ('top_up', 'bonus', 'refund', 'conversion')) as lifetime_deposits,
-          (SELECT SUM(amount) FROM wallet_transactions WHERE user_id = w.user_id AND type IN ('payment', 'withdrawal')) as lifetime_spending,
-          (SELECT created_at FROM wallet_transactions WHERE user_id = w.user_id ORDER BY created_at DESC LIMIT 1) as last_transaction
+          COALESCE(stats.total_transactions, 0) as total_transactions,
+          COALESCE(stats.lifetime_deposits, 0) as lifetime_deposits,
+          COALESCE(stats.lifetime_spending, 0) as lifetime_spending,
+          stats.last_transaction
         FROM wallets w
         LEFT JOIN \`users-permissions_user\` u ON w.user_id = u.id
+        LEFT JOIN (
+          SELECT
+            user_id,
+            COUNT(*) as total_transactions,
+            SUM(CASE WHEN type IN ('top_up', 'bonus', 'refund', 'conversion') THEN amount ELSE 0 END) as lifetime_deposits,
+            SUM(CASE WHEN type IN ('payment', 'withdrawal') THEN amount ELSE 0 END) as lifetime_spending,
+            MAX(created_at) as last_transaction
+          FROM wallet_transactions
+          GROUP BY user_id
+        ) stats ON w.user_id = stats.user_id
         WHERE 1=1
       `;
       const params = [];
@@ -384,13 +394,14 @@ module.exports = {
       }
 
       // Filter by staffId or machineId in metadata JSON
+      // Note: JSON queries are slow but unavoidable without schema changes
       if (staffId) {
-        query += ` AND JSON_EXTRACT(t.metadata, '$.staffId') = ?`;
-        params.push(staffId);
+        query += ` AND (JSON_EXTRACT(t.metadata, '$.staffId') = ? OR JSON_UNQUOTE(JSON_EXTRACT(t.metadata, '$.staffId')) = ?)`;
+        params.push(staffId, staffId);
       }
 
       if (machineId) {
-        query += ` AND JSON_EXTRACT(t.metadata, '$.machineId') LIKE ?`;
+        query += ` AND JSON_UNQUOTE(JSON_EXTRACT(t.metadata, '$.machineId')) LIKE ?`;
         params.push(`%${machineId}%`);
       }
 
@@ -411,12 +422,15 @@ module.exports = {
 
       const transactions = await strapi.connections.default.raw(query, params);
 
-      // Extract unique staff IDs to lookup names
+      // Extract unique staff IDs to lookup names - optimize by parsing JSON once
       const staffIds = new Set();
+      const parsedMetadata = new Map(); // Cache parsed metadata to avoid re-parsing
+
       transactions[0].forEach(t => {
         if (t.metadata) {
           try {
             const metadata = typeof t.metadata === 'string' ? JSON.parse(t.metadata) : t.metadata;
+            parsedMetadata.set(t.id, metadata); // Cache for later use
             if (metadata.staffId) {
               staffIds.add(metadata.staffId);
             }
@@ -445,58 +459,58 @@ module.exports = {
         });
       }
 
-      ctx.send(utils.successResponse({
-        transactions: transactions[0].map(t => {
-          let metadata = null;
-          let processedBy = null;
+      // Optimize response mapping - use cached parsed metadata
+      const mappedTransactions = transactions[0].map(t => {
+        let metadata = null;
+        let processedBy = null;
 
-          if (t.metadata) {
-            try {
-              metadata = typeof t.metadata === 'string' ? JSON.parse(t.metadata) : t.metadata;
+        // Use cached metadata to avoid re-parsing JSON
+        if (parsedMetadata.has(t.id)) {
+          metadata = parsedMetadata.get(t.id);
 
-              // Determine who processed the transaction
-              if (metadata.staffId) {
-                processedBy = {
-                  type: 'staff',
-                  staffId: metadata.staffId,
-                  staff: staffMap[metadata.staffId] || { id: metadata.staffId, name: 'Unknown Staff' },
-                };
-              } else if (metadata.machineId) {
-                processedBy = {
-                  type: 'machine',
-                  machineId: metadata.machineId,
-                  machineName: metadata.machineName || metadata.machineId,
-                };
-              }
-            } catch (e) {
-              // Ignore JSON parse errors
-            }
+          // Determine who processed the transaction
+          if (metadata.staffId) {
+            processedBy = {
+              type: 'staff',
+              staffId: metadata.staffId,
+              staff: staffMap[metadata.staffId] || { id: metadata.staffId, name: 'Unknown Staff' },
+            };
+          } else if (metadata.machineId) {
+            processedBy = {
+              type: 'machine',
+              machineId: metadata.machineId,
+              machineName: metadata.machineName || metadata.machineId,
+            };
           }
+        }
 
-          return {
-            id: t.id,
-            userId: t.user_id,
-            user: {
-              firstName: t.firstName,
-              lastName: t.lastName,
-              email: t.email,
-            },
-            type: t.type,
-            amount: parseFloat(t.amount),
-            balanceBefore: parseFloat(t.balance_before),
-            balanceAfter: parseFloat(t.balance_after),
-            status: t.status,
-            paymentMethod: t.payment_method,
-            paymentTransactionId: t.payment_transaction_id,
-            referenceId: t.reference_id,
-            description: t.description,
-            metadata,
-            branch: t.branch,
-            processedBy,
-            createdAt: t.created_at,
-            completedAt: t.completed_at,
-          };
-        }),
+        return {
+          id: t.id,
+          userId: t.user_id,
+          user: {
+            firstName: t.firstName,
+            lastName: t.lastName,
+            email: t.email,
+          },
+          type: t.type,
+          amount: parseFloat(t.amount),
+          balanceBefore: parseFloat(t.balance_before),
+          balanceAfter: parseFloat(t.balance_after),
+          status: t.status,
+          paymentMethod: t.payment_method,
+          paymentTransactionId: t.payment_transaction_id,
+          referenceId: t.reference_id,
+          description: t.description,
+          metadata,
+          branch: t.branch,
+          processedBy,
+          createdAt: t.created_at,
+          completedAt: t.completed_at,
+        };
+      });
+
+      ctx.send(utils.successResponse({
+        transactions: mappedTransactions,
         pagination: {
           total,
           limit: parseInt(limit),
@@ -590,7 +604,7 @@ module.exports = {
         reportType = 'summary',
         fromDate,
         toDate,
-        groupBy = 'day',
+        // groupBy = 'day', // Reserved for future time-series grouping
       } = ctx.query;
 
       const from = fromDate || new Date(new Date().setDate(1)).toISOString();
@@ -1261,7 +1275,6 @@ module.exports = {
             endpoint = `https://${endpoint}`;
           }
           // Construct full URL: https://bucket.endpoint/path
-          const endpointBase = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
           const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
           imageUrl = `https://${space}.${endpoint.replace('https://', '')}${path}`;
         } else {
