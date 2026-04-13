@@ -181,7 +181,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     final Map<String, List<WalletTransaction>> grouped = {};
 
     for (var transaction in filteredTransactions) {
-      final dateKey = DateFormat('yyyy-MM-dd').format(transaction.createdAt);
+      final dateKey = DateFormat('yyyy-MM-dd').format(transaction.createdAt.toLocal());
       if (!grouped.containsKey(dateKey)) {
         grouped[dateKey] = [];
       }
@@ -299,7 +299,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   Row(
                     children: [
                       Text(
-                        DateFormat('HH:mm').format(transaction.createdAt),
+                        DateFormat('HH:mm').format(transaction.createdAt.toLocal()),
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 13,

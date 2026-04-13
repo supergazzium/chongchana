@@ -945,8 +945,7 @@ export default {
     },
 
     formatDate(dateStr) {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return this.$moment(dateStr).tz('Asia/Bangkok').format('MMM D, YYYY');
     },
 
     formatNumber(value) {

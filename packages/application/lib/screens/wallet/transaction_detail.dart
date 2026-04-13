@@ -109,7 +109,7 @@ class TransactionDetailScreen extends StatelessWidget {
         _buildDivider(),
         _buildDetailRow(
           'Date & Time',
-          DateFormat('MMM d, yyyy, HH:mm').format(transaction.createdAt),
+          DateFormat('MMM d, yyyy, HH:mm').format(transaction.createdAt.toLocal()),
         ),
         if (transaction.referenceId != null) ...[
           _buildDivider(),

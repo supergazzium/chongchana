@@ -358,7 +358,7 @@ export default {
 
     formatDate(date) {
       if (!date) return 'N/A';
-      return this.$moment(date).format('MMM D, YYYY HH:mm');
+      return this.$moment(date).tz('Asia/Bangkok').format('MMM D, YYYY HH:mm');
     },
   },
 };

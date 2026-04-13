@@ -791,17 +791,17 @@ export default {
 
     formatDate(date) {
       if (!date) return 'N/A';
-      return this.$moment(date).format('MMM D, YYYY');
+      return this.$moment(date).tz('Asia/Bangkok').format('MMM D, YYYY');
     },
 
     formatTime(date) {
       if (!date) return '';
-      return this.$moment(date).format('HH:mm');
+      return this.$moment(date).tz('Asia/Bangkok').format('HH:mm');
     },
 
     formatDateTime(date) {
       if (!date) return 'N/A';
-      return this.$moment(date).format('MMM D, YYYY [at] HH:mm');
+      return this.$moment(date).tz('Asia/Bangkok').format('MMM D, YYYY [at] HH:mm');
     },
   },
 };

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:chongchana/constants/colors.dart';
 import 'package:chongchana/services/omise_payment.dart';
 import 'package:chongchana/services/wallet.dart';
@@ -30,12 +31,13 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
 
   bool _isProcessing = false;
   String? _pendingChargeId;
-  bool _isPollingPayment = false;
+  Timer? _pollingTimer;
   int _pollCount = 0;
   static const int _maxPolls = 40; // 40 polls × 3 seconds = 2 minutes
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _cardNumberController.dispose();
     _cardHolderController.dispose();
     _expiryDateController.dispose();
@@ -112,11 +114,7 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
           // Check if payment is completed (has transactionId) or pending
           if (result['paid'] == true && result['transactionId'] != null) {
             // Payment completed immediately (cards without 3D Secure)
-            Navigator.pop(context); // Close credit card form
-            // Call callback with delay to ensure navigation completes
-            Future.delayed(const Duration(milliseconds: 100), () {
-              widget.onPaymentSuccess(result['transactionId']);
-            });
+            _showSuccessDialog(result['transactionId']);
           } else if (result['authorizeUri'] != null &&
                      result['authorizeUri'] != 'none' &&
                      result['authorizeUri'].toString().isNotEmpty &&
@@ -234,8 +232,7 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              _isPollingPayment = false;
-              _pendingChargeId = null;
+              _stopPaymentPolling();
               Navigator.pop(context);
             },
             child: const Text(
@@ -261,77 +258,129 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
   }
 
   void _startPaymentPolling() {
-    _isPollingPayment = true;
-    _pollPaymentStatus();
+    print('[CreditCard] 🔵 _startPaymentPolling called');
+    print('[CreditCard]   _pendingChargeId = $_pendingChargeId');
+
+    // Cancel any existing timer
+    _pollingTimer?.cancel();
+    _pollCount = 0;
+
+    // Start Timer.periodic for robust polling (works even when app is in background)
+    print('[CreditCard] ⏱️ Starting Timer.periodic (3 seconds interval)');
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      print('[CreditCard] ⏰ Timer tick - checking payment status');
+      if (!mounted || _pendingChargeId == null) {
+        print('[CreditCard] ⚠️ Stopping timer: mounted=$mounted, chargeId=$_pendingChargeId');
+        timer.cancel();
+        _pollingTimer = null;
+        return;
+      }
+      _checkPendingPaymentStatus(_pendingChargeId!);
+    });
   }
 
-  Future<void> _pollPaymentStatus() async {
-    if (!_isPollingPayment || _pendingChargeId == null) return;
-
-    await Future.delayed(const Duration(seconds: 3));
-
-    if (!mounted || !_isPollingPayment || _pendingChargeId == null) return;
-
-    await _checkPendingPaymentStatus(_pendingChargeId!);
-
-    // Continue polling if still pending
-    if (_isPollingPayment && _pendingChargeId != null) {
-      _pollPaymentStatus();
-    }
+  void _stopPaymentPolling() {
+    print('[CreditCard] 🛑 _stopPaymentPolling called');
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+    _pendingChargeId = null;
+    _pollCount = 0;
   }
 
   Future<void> _checkPendingPaymentStatus(String chargeId) async {
+    _pollCount++;
+    print('[CreditCard] Poll #${_pollCount}/${_maxPolls}');
+
+    // Safety check: stop after max attempts
+    if (_pollCount >= _maxPolls) {
+      print('[CreditCard] Max polls reached, stopping');
+      _stopPaymentPolling();
+      if (mounted) {
+        Navigator.pop(context);
+        _showErrorDialog('Verification timed out. Check transaction history.');
+      }
+      return;
+    }
+
     try {
-      // Instead of checking payment status endpoint (DNS issues),
-      // check wallet transactions for the completed transaction
       final walletService = Provider.of<WalletService>(context, listen: false);
-      await walletService.getTransactions(limit: 5);
+      await walletService.getTransactions(limit: 10);
 
       if (!mounted) return;
 
       final transactions = walletService.transactions;
 
-      // Look for a recent transaction matching our payment amount
-      // Created within last 2 minutes
-      final cutoffTime = DateTime.now().subtract(const Duration(minutes: 2));
+      // DEBUG: Log all transactions
+      print('[CreditCard] Checking ${transactions.length} transactions:');
+      for (var tx in transactions) {
+        print('[CreditCard]   TX: [${tx.id}] type="${tx.type}" amount=${tx.amount} method="${tx.paymentMethod ?? "NULL"}" time=${tx.createdAt}');
+      }
+      print('[CreditCard]   Looking for: type=top_up, amount=${widget.amount}, method=credit_card');
+
+      // Match with relaxed criteria (30 minutes window for testing, allow null paymentMethod)
+      final cutoffTime = DateTime.now().subtract(const Duration(minutes: 30));
+      print('[CreditCard]   Cutoff time: $cutoffTime');
 
       final matchingTransaction = transactions.cast<dynamic>().firstWhere(
-        (tx) =>
-          tx.type == 'top_up' &&
-          tx.amount == widget.amount &&
-          tx.paymentMethod == 'credit_card' &&
-          DateTime.parse(tx.createdAt).isAfter(cutoffTime),
+        (tx) {
+          // Must be recent
+          // Parse as UTC and convert to local for comparison
+          final txTime = DateTime.parse(tx.createdAt.toString()).toLocal();
+          final isRecent = txTime.isAfter(cutoffTime);
+          print('[CreditCard]   Checking ${tx.id}: isRecent=$isRecent (txTime=$txTime vs cutoff=$cutoffTime)');
+          if (!isRecent) {
+            print('[CreditCard]     ❌ TOO OLD');
+            return false;
+          }
+
+          // Must be top_up
+          final isTopUp = tx.type == 'top_up';
+          print('[CreditCard]     type check: "${tx.type}" == "top_up" ? $isTopUp');
+          if (!isTopUp) {
+            print('[CreditCard]     ❌ WRONG TYPE');
+            return false;
+          }
+
+          // Amount must match (±0.01 tolerance)
+          final amountDiff = (tx.amount - widget.amount).abs();
+          final amountMatches = amountDiff <= 0.01;
+          print('[CreditCard]     amount check: ${tx.amount} vs ${widget.amount}, diff=$amountDiff, matches=$amountMatches');
+          if (!amountMatches) {
+            print('[CreditCard]     ❌ AMOUNT MISMATCH');
+            return false;
+          }
+
+          // Payment method: accept credit_card or null (might be null briefly)
+          final methodOk = tx.paymentMethod == null || tx.paymentMethod == 'credit_card';
+          print('[CreditCard]     method check: "${tx.paymentMethod}" is null or credit_card ? $methodOk');
+          if (!methodOk) {
+            print('[CreditCard]     ❌ WRONG METHOD');
+            return false;
+          }
+
+          print('[CreditCard]     ✅ ALL CHECKS PASSED!');
+          return true;
+        },
         orElse: () => null,
       );
 
       if (matchingTransaction != null) {
-        // Payment successful - transaction found!
-        print('[CreditCard] Found matching transaction: ${matchingTransaction.id}');
+        print('[CreditCard] ✓ Match found: ${matchingTransaction.id}');
 
-        _isPollingPayment = false;
-        _pendingChargeId = null;
-
-        // Close pending dialog
+        _stopPaymentPolling();
         Navigator.pop(context);
-
-        // Close the credit card form
-        Navigator.pop(context);
-
-        // Call success callback AFTER all navigation is complete
-        Future.delayed(const Duration(milliseconds: 100), () {
-          widget.onPaymentSuccess(matchingTransaction.id);
-        });
+        _showSuccessDialog(matchingTransaction.id);
       } else {
-        // No matching transaction yet - keep polling
-        print('[CreditCard] No matching transaction found yet, will retry...');
+        print('[CreditCard] No match yet, will retry...');
       }
     } catch (e) {
-      // Continue polling on error - don't let network issues stop us
-      print('[CreditCard] Error checking transactions: $e');
+      print('[CreditCard] Error: $e');
     }
   }
 
   Future<void> _handle3DSecureAuth(String authorizeUri, String chargeId) async {
+    print('[CreditCard] 🔵 _handle3DSecureAuth called with chargeId: $chargeId');
+
     // Show dialog with instructions
     final proceed = await showDialog<bool>(
       context: context,
@@ -404,14 +453,22 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
     );
 
     if (proceed == true) {
+      print('[CreditCard] 🟢 User clicked "Verify Now"');
+
       // Open authorize_uri in browser
       final uri = Uri.parse(authorizeUri);
       if (await canLaunchUrl(uri)) {
+        print('[CreditCard] 🌐 Launching browser for 3DS: $authorizeUri');
         await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+        print('[CreditCard] 🔙 Browser launched, user should return now...');
 
         // Show dialog to check payment status after user returns
         if (mounted) {
+          print('[CreditCard] 📞 Calling _showCheckPaymentDialog');
           _showCheckPaymentDialog(chargeId);
+        } else {
+          print('[CreditCard] ⚠️ Widget not mounted after browser launch');
         }
       } else {
         if (mounted) {
@@ -422,10 +479,14 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
   }
 
   void _showCheckPaymentDialog(String chargeId) {
+    print('[CreditCard] 🔵 _showCheckPaymentDialog called with chargeId: $chargeId');
+
     // Start automatic polling instead of asking user
     _pendingChargeId = chargeId;
+    print('[CreditCard] 📞 Calling _startPaymentPolling');
     _startPaymentPolling();
 
+    print('[CreditCard] 💬 Showing Verifying Payment dialog');
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -474,8 +535,7 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              _isPollingPayment = false;
-              _pendingChargeId = null;
+              _stopPaymentPolling();
               Navigator.pop(context);
             },
             child: const Text(
@@ -522,6 +582,177 @@ class _CreditCardFormScreenState extends State<CreditCardFormScreen> {
             child: const Text('Try Again', style: TextStyle(color: Colors.white)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String transactionId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success Icon
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.green.shade600,
+                  size: 56,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Title
+              const Text(
+                'Payment Successful!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+
+              // Subtitle
+              const Text(
+                'Your wallet has been topped up',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.black54,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+
+              // Payment Details Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.grey.shade200,
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Amount
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Amount',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        Text(
+                          '฿${NumberFormat('#,##0.00').format(widget.amount)}',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Divider(color: Colors.grey.shade300, height: 1),
+                    const SizedBox(height: 12),
+
+                    // Payment Method
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Method',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.credit_card,
+                              size: 18,
+                              color: Colors.blue.shade700,
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Credit Card',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // Done Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(); // Close success dialog
+                    Navigator.of(context).pop(); // Close credit card form
+                    Navigator.of(context).pop(); // Go back to wallet overview
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ChongjaroenColors.secondaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:chongchana/services/api/authentication.dart';
 import 'package:chongchana/models/user.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Authentication service
 class ChongjaroenAuth extends ChangeNotifier {
@@ -181,8 +182,16 @@ class ChongjaroenAuth extends ChangeNotifier {
       ServiceResponse resp = await apiResetPinWithToken(resetToken, newPin);
 
       if (resp.isSuccess) {
-        // PIN reset successful - update local storage
-        // The backend should handle storing the new PIN
+        // PIN reset successful - update local storage to match backend
+        // Import WalletAuthService to update the local PIN
+        final storage = const FlutterSecureStorage();
+        await storage.write(key: 'wallet_pin', value: newPin);
+
+        // Also update the hasPinSetup flag
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('has_pin_setup', true);
+        await prefs.setBool('pin_enabled', true);
+
         return {
           'success': true,
           'message': resp.data['message'] ?? 'PIN reset successfully',

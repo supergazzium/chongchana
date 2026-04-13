@@ -83,8 +83,8 @@ module.exports = {
 
       // Create charge with return_uri to trigger 3DS authentication
       // Omise needs return_uri UPFRONT to decide whether to trigger 3DS
-      const baseUrl = process.env.PUBLIC_URL || 'https://wallet-backend-test-pc-ndd56.ondigitalocean.app';
-      const returnUri = `${baseUrl}/wallet/payment/3ds-return`;
+      // Use deep link directly to avoid Safari blocking cross-protocol redirects
+      const returnUri = 'chongjaroen://payment-result';
 
       // Create charge WITH return_uri so Omise triggers 3DS if card requires it
       const charge = await paymentService.createChargeFromToken(

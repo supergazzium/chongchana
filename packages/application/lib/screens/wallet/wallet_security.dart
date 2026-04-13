@@ -16,16 +16,6 @@ class WalletSecurityScreen extends StatefulWidget {
 }
 
 class _WalletSecurityScreenState extends State<WalletSecurityScreen> {
-  bool notifyTopUp = true;
-  bool notifyPayment = true;
-  bool notifyRefund = true;
-  bool notifyLowBalance = true;
-  bool notifySuspicious = true;
-
-  final double lowBalanceThreshold = 100.00;
-  final DateTime lastLogin = DateTime(2025, 3, 8, 14, 30);
-  final String lastDevice = 'iPhone 13 Pro';
-  final String lastLocation = 'Bangkok, Thailand';
 
   void _changePin() async {
     final result = await Navigator.push(
@@ -41,15 +31,6 @@ class _WalletSecurityScreenState extends State<WalletSecurityScreen> {
         backgroundColor: Colors.green,
       );
     }
-  }
-
-  void _viewLoginHistory() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const LoginHistoryScreen(),
-      ),
-    );
   }
 
   @override
@@ -187,10 +168,6 @@ class _WalletSecurityScreenState extends State<WalletSecurityScreen> {
                       _buildPaymentAuthorization(),
                       const SizedBox(height: 12),
                       _buildAuthenticationMethod(),
-                      const SizedBox(height: 12),
-                      _buildNotifications(),
-                      const SizedBox(height: 12),
-                      _buildActivityLog(),
                       const SizedBox(height: 16),
                     ],
                   ),
@@ -393,87 +370,6 @@ class _WalletSecurityScreenState extends State<WalletSecurityScreen> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildNotifications() {
-    return _buildSection(
-      icon: Icons.notifications_outlined,
-      title: 'Notifications',
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          _buildSwitchTile(
-            icon: Icons.add_circle_outline,
-            title: 'Top-up confirmation',
-            value: notifyTopUp,
-            onChanged: (v) => setState(() => notifyTopUp = v),
-          ),
-          const SizedBox(height: 8),
-          _buildSwitchTile(
-            icon: Icons.payment,
-            title: 'Payment confirmation',
-            value: notifyPayment,
-            onChanged: (v) => setState(() => notifyPayment = v),
-          ),
-          const SizedBox(height: 8),
-          _buildSwitchTile(
-            icon: Icons.arrow_circle_down,
-            title: 'Refund received',
-            value: notifyRefund,
-            onChanged: (v) => setState(() => notifyRefund = v),
-          ),
-          const SizedBox(height: 8),
-          _buildSwitchTile(
-            icon: Icons.warning_amber_outlined,
-            title: 'Low balance (฿${_formatAmount(lowBalanceThreshold)})',
-            value: notifyLowBalance,
-            onChanged: (v) => setState(() => notifyLowBalance = v),
-          ),
-          const SizedBox(height: 8),
-          _buildSwitchTile(
-            icon: Icons.shield_outlined,
-            title: 'Suspicious activity',
-            value: notifySuspicious,
-            onChanged: (v) => setState(() => notifySuspicious = v),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActivityLog() {
-    return _buildSection(
-      icon: Icons.history,
-      title: 'Activity Log',
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          _buildInfoRow(
-            Icons.access_time,
-            'Last login',
-            DateFormat('MMM d, HH:mm').format(lastLogin),
-          ),
-          const SizedBox(height: 8),
-          _buildInfoRow(Icons.phone_android, 'Device', lastDevice),
-          const SizedBox(height: 8),
-          _buildInfoRow(Icons.location_on, 'Location', lastLocation),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _viewLoginHistory,
-            icon: const Icon(Icons.list_alt, size: 18),
-            label: const Text('View History'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: ChongjaroenColors.primaryColors,
-              side: BorderSide(color: ChongjaroenColors.primaryColors),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -723,41 +619,6 @@ class _WalletSecurityScreenState extends State<WalletSecurityScreen> {
             onChanged: onChanged,
             activeColor: ChongjaroenColors.primaryColors,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: ChongjaroenColors.secondaryColors, size: 16),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
