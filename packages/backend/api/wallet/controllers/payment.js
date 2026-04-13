@@ -304,29 +304,42 @@ module.exports = {
       if (!chargeId && userId) {
         strapi.log.info('[Payment] Looking up most recent charge for user:', userId);
 
-        // Query database for most recent charge for this user
+        // Retry logic to handle race condition with webhook
+        // The webhook might still be processing when 3DS return arrives
         const knex = strapi.connections.default;
-        const recentTransactions = await knex('wallet_transactions')
-          .where('user_id', userId)
-          .where('type', 'top_up')
-          .where('payment_method', 'credit_card')
-          .whereNotNull('metadata')
-          .orderBy('created_at', 'desc')
-          .limit(5);
+        let retries = 3;
 
-        // Find the most recent transaction with a charge_id in metadata
-        for (const transaction of recentTransactions) {
-          try {
-            const metadata = JSON.parse(transaction.metadata);
-            if (metadata.charge_id) {
-              chargeId = metadata.charge_id;
-              strapi.log.info('[Payment] Found charge from recent transaction:', chargeId);
-              break;
+        while (retries > 0 && !chargeId) {
+          const recentTransactions = await knex('wallet_transactions')
+            .where('user_id', userId)
+            .where('type', 'top_up')
+            .where('payment_method', 'credit_card')
+            .whereNotNull('metadata')
+            .orderBy('created_at', 'desc')
+            .limit(5);
+
+          // Find the most recent transaction with a charge_id in metadata
+          for (const transaction of recentTransactions) {
+            try {
+              const metadata = JSON.parse(transaction.metadata);
+              if (metadata.charge_id) {
+                chargeId = metadata.charge_id;
+                strapi.log.info('[Payment] Found charge from recent transaction:', chargeId);
+                break;
+              }
+            } catch (e) {
+              // Skip transactions with invalid JSON
+              continue;
             }
-          } catch (e) {
-            // Skip transactions with invalid JSON
-            continue;
           }
+
+          // If not found and retries remain, wait 200ms and try again
+          if (!chargeId && retries > 1) {
+            strapi.log.info('[Payment] Charge not found, waiting for webhook... (retries left:', retries - 1, ')');
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+
+          retries--;
         }
       }
 
