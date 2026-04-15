@@ -263,8 +263,12 @@ module.exports = {
       if (charge.paid && charge.metadata?.user_id == userId) {
         // Check if already processed
         const knex = strapi.connections.default;
+
+        // Use LIKE instead of JSON_EXTRACT for better database compatibility
         const existing = await knex('wallet_transactions')
-          .whereRaw("JSON_EXTRACT(metadata, '$.charge_id') = ?", [chargeId])
+          .where('user_id', userId)
+          .where('metadata', 'like', `%${chargeId}%`)
+          .orderBy('created_at', 'desc')
           .first();
 
         if (!existing) {
