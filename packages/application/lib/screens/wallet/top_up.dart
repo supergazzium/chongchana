@@ -267,24 +267,22 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
           _pendingChargeId = chargeId;
         });
 
-        // Launch banking app
+        // Launch banking app and navigate to waiting screen
         if (authorizeUri != null) {
           final uri = Uri.parse(authorizeUri);
           if (await canLaunchUrl(uri)) {
+            // Launch the bank app
             await launchUrl(uri, mode: LaunchMode.externalApplication);
 
-            // Show snackbar with clear instructions
+            // Navigate to waiting screen that will poll for payment status
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Complete payment in $bankName app or choose another method'),
-                  duration: const Duration(seconds: 6),
-                  backgroundColor: ChongjaroenColors.primaryColors,
-                  behavior: SnackBarBehavior.floating,
-                  action: SnackBarAction(
-                    label: 'Dismiss',
-                    textColor: Colors.white,
-                    onPressed: () {},
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MobileBankingWaitingScreen(
+                    amount: selectedAmount!,
+                    bankName: bankName,
+                    chargeId: chargeId,
                   ),
                 ),
               );
@@ -476,29 +474,35 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text('Add money'),
+    return GestureDetector(
+      onTap: () {
+        // Dismiss keyboard when tapping outside
+        FocusScope.of(context).unfocus();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          centerTitle: true,
+          title: const Text('Add money'),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          elevation: 0,
+        ),
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-      ),
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 16),
-            _buildCardSelector(),
-            const SizedBox(height: 24),
-            _buildAmountSection(),
-            const SizedBox(height: 24),
-            _buildPaymentMethodSection(),
-            const SizedBox(height: 32),
-            _buildContinueButton(),
-            const SizedBox(height: 32),
-          ],
+        body: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              _buildCardSelector(),
+              const SizedBox(height: 24),
+              _buildAmountSection(),
+              const SizedBox(height: 24),
+              _buildPaymentMethodSection(),
+              const SizedBox(height: 32),
+              _buildContinueButton(),
+              const SizedBox(height: 32),
+            ],
+          ),
         ),
       ),
     );
@@ -629,10 +633,15 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                   child: TextField(
                     controller: _amountController,
                     keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
                     inputFormatters: [
                       FilteringTextInputFormatter.digitsOnly,
                     ],
                     onChanged: _onCustomAmountChanged,
+                    onSubmitted: (_) {
+                      // Dismiss keyboard when Done is tapped
+                      FocusScope.of(context).unfocus();
+                    },
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w600,

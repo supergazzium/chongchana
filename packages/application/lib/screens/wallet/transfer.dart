@@ -278,25 +278,30 @@ class _TransferScreenState extends State<TransferScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return GestureDetector(
+      onTap: () {
+        // Dismiss keyboard when tapping outside
+        FocusScope.of(context).unfocus();
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Transfer Money',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black87),
+            onPressed: () => Navigator.pop(context),
           ),
+          title: const Text(
+            'Transfer Money',
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          centerTitle: true,
         ),
-        centerTitle: true,
-      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -398,10 +403,15 @@ class _TransferScreenState extends State<TransferScreen> {
                           TextField(
                             controller: _phoneController,
                             keyboardType: TextInputType.phone,
+                            textInputAction: TextInputAction.next,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                               LengthLimitingTextInputFormatter(10),
                             ],
+                            onSubmitted: (_) {
+                              // Move focus to amount field or dismiss keyboard
+                              FocusScope.of(context).nextFocus();
+                            },
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -522,9 +532,14 @@ class _TransferScreenState extends State<TransferScreen> {
                             child: TextField(
                               controller: _amountController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              textInputAction: TextInputAction.next,
                               inputFormatters: [
                                 FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                               ],
+                              onSubmitted: (_) {
+                                // Move focus to note field
+                                FocusScope.of(context).nextFocus();
+                              },
                               style: const TextStyle(
                                 fontSize: 32,
                                 fontWeight: FontWeight.bold,
@@ -588,6 +603,11 @@ class _TransferScreenState extends State<TransferScreen> {
                         controller: _noteController,
                         maxLines: 3,
                         maxLength: 100,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) {
+                          // Dismiss keyboard when done
+                          FocusScope.of(context).unfocus();
+                        },
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.black87,
@@ -653,6 +673,7 @@ class _TransferScreenState extends State<TransferScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
