@@ -49,16 +49,28 @@ async function sendNotification(userId, title, message, additionalData = {}) {
 
     // Store notification in database for inbox retrieval
     try {
-      await strapi.query('notification').create({
-        userId,
+      const now = new Date();
+
+      // Create the notification record
+      const notification = await strapi.query('notification').create({
         title,
-        message,
-        type: additionalData.type || 'general',
-        data: additionalData,
-        oneSignalId: response.data.id,
-        readAt: null,
+        body: message,
+        cover_image: additionalData.coverImage || null,
+        published_at: now,
       });
-      strapi.log.debug(`[OneSignal] Notification stored in database`);
+
+      strapi.log.debug(`[OneSignal] Notification created with ID: ${notification.id}`);
+
+      // Create inbox entry to link notification to user
+      await strapi.query('inbox').create({
+        users_permissions_user: userId,
+        notification: notification.id,
+        published_at: now,
+        read_at: null,
+        deleted_at: null,
+      });
+
+      strapi.log.debug(`[OneSignal] Inbox entry created for user ${userId}`);
     } catch (dbError) {
       strapi.log.warn(`[OneSignal] Failed to store notification in database:`, dbError.message);
       // Don't fail the notification send if DB store fails
