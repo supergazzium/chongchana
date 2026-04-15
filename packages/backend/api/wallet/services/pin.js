@@ -314,6 +314,8 @@ module.exports = {
 
   /**
    * Hash PIN for storage
+   * NOTE: Currently unused - PIN is stored locally on device only
+   * Kept for future use if backend storage is ever needed
    */
   async hashPin(pin) {
     const salt = await bcrypt.genSalt(10);
@@ -321,7 +323,9 @@ module.exports = {
   },
 
   /**
-   * Update user's wallet PIN
+   * Update user's wallet PIN in database
+   * NOTE: Currently unused - PIN is stored locally on device only
+   * Kept for future use if backend storage is ever needed
    */
   async updateUserPin(userId, newPin) {
     try {
@@ -408,6 +412,7 @@ module.exports = {
 
   /**
    * Reset PIN with token
+   * NOTE: PIN is stored locally on device only - backend just verifies the token
    */
   async resetPinWithToken(resetToken, newPin) {
     try {
@@ -425,19 +430,16 @@ module.exports = {
         return { success: false, message: 'PIN must be exactly 6 digits' };
       }
 
-      // Update PIN
-      const result = await this.updateUserPin(userId, newPin);
+      // Backend only validates the token and PIN format
+      // Actual PIN storage happens on the device (local-only)
+      strapi.log.info(`[PIN Reset] Token verified for user ${userId} - PIN will be stored locally on device`);
 
-      if (!result.success) {
-        return { success: false, message: 'Failed to update PIN' };
-      }
-
-      // Invalidate reset token
+      // Invalidate reset token (single-use)
       this.invalidateResetToken(resetToken);
 
       return {
         success: true,
-        message: 'PIN reset successfully',
+        message: 'PIN reset verified - store locally on device',
       };
     } catch (error) {
       strapi.log.error('[PIN Reset] resetPinWithToken error:', error);
