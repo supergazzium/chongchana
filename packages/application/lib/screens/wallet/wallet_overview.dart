@@ -1003,25 +1003,11 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> with Widget
     print('[WalletOverview]   amount: $amount');
     print('[WalletOverview]   paymentMethod: $paymentMethod');
 
-    // Show checking dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            const Text('Checking payment status...'),
-          ],
-        ),
-      ),
-    );
+    // Don't show checking dialog - just check silently
+    // The user already saw the 3DS flow, no need for another loading indicator
 
     // Wait a moment for webhook to process
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 1));
 
     // Refresh wallet data
     final walletService = Provider.of<WalletService>(context, listen: false);
@@ -1029,7 +1015,6 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> with Widget
     await walletService.getTransactions(limit: 10);
 
     if (!mounted) return;
-    Navigator.pop(context); // Close checking dialog
 
     // Look for matching transaction
     final transactions = walletService.transactions;
