@@ -20,6 +20,31 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
+// Public helper class to manage pending payments
+class WalletPaymentPending {
+  static String? _pendingChargeId;
+  static double? _pendingAmount;
+  static String? _pendingPaymentMethod;
+
+  static void setPendingPayment(String chargeId, double amount, String paymentMethod) {
+    print('[WalletPaymentPending] 💾 Setting pending payment: chargeId=$chargeId, amount=$amount, method=$paymentMethod');
+    _pendingChargeId = chargeId;
+    _pendingAmount = amount;
+    _pendingPaymentMethod = paymentMethod;
+  }
+
+  static void clearPendingPayment() {
+    print('[WalletPaymentPending] 🗑️ Clearing pending payment');
+    _pendingChargeId = null;
+    _pendingAmount = null;
+    _pendingPaymentMethod = null;
+  }
+
+  static String? get chargeId => _pendingChargeId;
+  static double? get amount => _pendingAmount;
+  static String? get paymentMethod => _pendingPaymentMethod;
+}
+
 class WalletOverviewScreen extends StatefulWidget {
   const WalletOverviewScreen({Key? key}) : super(key: key);
 
@@ -27,7 +52,7 @@ class WalletOverviewScreen extends StatefulWidget {
   _WalletOverviewScreenState createState() => _WalletOverviewScreenState();
 }
 
-class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
+class _WalletOverviewScreenState extends State<WalletOverviewScreen> with WidgetsBindingObserver {
   final String cardNumber = '4622'; // Last 4 digits
   final String fullCardNumber = '6179185185694622';
   final String userName = 'ChongJaroen User';
@@ -35,6 +60,7 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final walletService = Provider.of<WalletService>(context, listen: false);
       walletService.getSettings();
@@ -44,6 +70,34 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
       // Check PIN setup and prompt if needed
       _checkPinSetup();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    print('[WalletOverview] 🔄 App lifecycle changed to: $state');
+    print('[WalletOverview]   chargeId: ${WalletPaymentPending.chargeId}');
+    print('[WalletOverview]   amount: ${WalletPaymentPending.amount}');
+    print('[WalletOverview]   paymentMethod: ${WalletPaymentPending.paymentMethod}');
+
+    if (state == AppLifecycleState.resumed && WalletPaymentPending.chargeId != null) {
+      print('[WalletOverview] 🔙 App resumed with pending payment, checking status...');
+      // User returned from payment - check if it succeeded
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && WalletPaymentPending.chargeId != null) {
+          _checkPendingPayment(
+            WalletPaymentPending.chargeId!,
+            WalletPaymentPending.amount!,
+            WalletPaymentPending.paymentMethod ?? 'unknown',
+          );
+        }
+      });
+    }
   }
 
   Future<void> _checkPinSetup() async {
@@ -916,7 +970,7 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
   }
 
   String _formatDate(DateTime date) {
-    return DateFormat('MMM d, HH:mm').format(date);
+    return DateFormat('MMM d, HH:mm').format(date.toLocal());
   }
 
   String _getTransactionSubtitle(WalletTransaction transaction) {
@@ -926,5 +980,288 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> {
     }
     // Otherwise fall back to description or payment method
     return transaction.description ?? transaction.paymentMethod ?? '';
+  }
+
+  Future<void> _checkPendingPayment(String chargeId, double amount, String paymentMethod) async {
+    print('[WalletOverview] 🔍 Checking pending payment...');
+    print('[WalletOverview]   chargeId: $chargeId');
+    print('[WalletOverview]   amount: $amount');
+    print('[WalletOverview]   paymentMethod: $paymentMethod');
+
+    // Show checking dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            const Text('Checking payment status...'),
+          ],
+        ),
+      ),
+    );
+
+    // Wait a moment for webhook to process
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Refresh wallet data
+    final walletService = Provider.of<WalletService>(context, listen: false);
+    await walletService.getBalance();
+    await walletService.getTransactions(limit: 10);
+
+    if (!mounted) return;
+    Navigator.pop(context); // Close checking dialog
+
+    // Look for matching transaction
+    final transactions = walletService.transactions;
+    final cutoffTime = DateTime.now().subtract(const Duration(minutes: 5));
+
+    final matchingTransaction = transactions.cast<WalletTransaction?>().firstWhere(
+      (tx) {
+        if (tx == null) return false;
+        final txTime = DateTime.parse(tx.createdAt.toString()).toLocal();
+        final isRecent = txTime.isAfter(cutoffTime);
+        final isTopUp = tx.type == 'top_up';
+        final amountMatches = (tx.amount - amount).abs() <= 0.01;
+
+        print('[WalletOverview] Checking tx ${tx.id}: recent=$isRecent, topUp=$isTopUp, amountMatch=$amountMatches');
+        return isRecent && isTopUp && amountMatches;
+      },
+      orElse: () => null,
+    );
+
+    if (matchingTransaction != null) {
+      print('[WalletOverview] ✅ Payment confirmed! Showing success dialog');
+      _showPaymentSuccessDialog(amount, paymentMethod);
+      WalletPaymentPending.clearPendingPayment();
+    } else {
+      print('[WalletOverview] ⚠️ Payment not found in transactions');
+      _showPaymentCheckDialog(chargeId, amount, paymentMethod);
+    }
+  }
+
+  void _showPaymentCheckDialog(String chargeId, double amount, String paymentMethod) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.blue.shade700),
+            const SizedBox(width: 8),
+            const Text('Payment Status'),
+          ],
+        ),
+        content: const Text(
+          'Payment verification is taking longer than usual. Please check your transaction history in a moment.',
+          style: TextStyle(fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              WalletPaymentPending.clearPendingPayment();
+              Navigator.pop(context);
+            },
+            child: const Text('OK'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              _checkPendingPayment(chargeId, amount, paymentMethod);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ChongjaroenColors.secondaryColor,
+            ),
+            child: const Text(
+              'Check Again',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPaymentSuccessDialog(double amount, String paymentMethod) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success Icon
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.green.shade600,
+                  size: 56,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Title
+              const Text(
+                'Payment Successful!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+
+              // Subtitle
+              const Text(
+                'Your wallet has been topped up',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.black54,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+
+              // Payment Details Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.grey.shade200,
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Amount
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Amount',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        Text(
+                          '฿${NumberFormat('#,##0.00').format(amount)}',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Divider(color: Colors.grey.shade300, height: 1),
+                    const SizedBox(height: 12),
+
+                    // Payment Method
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Method',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Icon(
+                              paymentMethod == 'credit_card'
+                                  ? Icons.credit_card
+                                  : Icons.account_balance,
+                              size: 18,
+                              color: Colors.blue.shade700,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              paymentMethod == 'credit_card'
+                                  ? 'Credit Card'
+                                  : 'Mobile Banking',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // Done Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(); // Close success dialog
+
+                    // Refresh wallet data
+                    final walletService = Provider.of<WalletService>(context, listen: false);
+                    walletService.getBalance();
+                    walletService.getTransactions(limit: 10);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ChongjaroenColors.secondaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

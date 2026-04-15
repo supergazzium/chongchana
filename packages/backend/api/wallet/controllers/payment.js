@@ -232,6 +232,8 @@ module.exports = {
   /**
    * GET /api/wallet/payment/status/:chargeId
    * Check payment status
+   * This is called by the frontend when polling for payment completion
+   * Acts as a fallback in case webhooks are delayed or not received
    */
   async checkPaymentStatus(ctx) {
     try {
@@ -247,11 +249,17 @@ module.exports = {
         return ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', 'Charge ID is required'));
       }
 
+      strapi.log.info('[Payment] Checking payment status:', {
+        chargeId,
+        userId,
+      });
+
       const charge = await paymentService.getChargeStatus(chargeId);
 
       let transactionId = null;
 
       // If payment is successful and not yet processed, credit wallet
+      // This is a fallback in case webhooks didn't fire or were delayed
       if (charge.paid && charge.metadata?.user_id == userId) {
         // Check if already processed
         const knex = strapi.connections.default;
@@ -260,10 +268,21 @@ module.exports = {
           .first();
 
         if (!existing) {
+          strapi.log.info('[Payment] 💡 Payment successful but not yet processed (webhook may have been missed)');
+          strapi.log.info('[Payment] Processing payment via status check fallback...');
+
           const result = await paymentService.processSuccessfulPayment(chargeId, userId);
           transactionId = result.transactionId;
+
+          strapi.log.info('[Payment] ✅ Payment processed successfully via fallback:', {
+            userId,
+            transactionId,
+            chargeId,
+            notificationSent: true,
+          });
         } else {
           transactionId = existing.id;
+          strapi.log.info('[Payment] ✓ Payment already processed (transaction exists):', transactionId);
         }
       }
 
@@ -507,9 +526,16 @@ module.exports = {
     try {
       const event = ctx.request.body;
 
-      strapi.log.info('[Payment] Webhook received:', {
+      strapi.log.info('[Payment] ===== WEBHOOK RECEIVED =====');
+      strapi.log.info('[Payment] Webhook event:', {
         key: event.key,
         chargeId: event.data?.id,
+        status: event.data?.status,
+        paid: event.data?.paid,
+        amount: event.data?.amount,
+        source_type: event.data?.source?.type,
+        card_type: event.data?.card?.brand,
+        metadata: event.data?.metadata,
       });
 
       // Get signature and timestamp from headers
@@ -528,6 +554,13 @@ module.exports = {
       if (event.key === 'charge.complete') {
         const charge = event.data;
 
+        strapi.log.info('[Payment] Processing charge.complete webhook:', {
+          chargeId: charge.id,
+          paid: charge.paid,
+          hasUserId: !!charge.metadata?.user_id,
+          paymentType: charge.source?.type || charge.card?.brand || 'credit_card',
+        });
+
         if (charge.paid && charge.metadata?.user_id) {
           const userId = parseInt(charge.metadata.user_id);
 
@@ -538,18 +571,31 @@ module.exports = {
             .first();
 
           if (!existing) {
-            await paymentService.processSuccessfulPayment(charge.id, userId);
-            strapi.log.info('[Payment] Webhook processed successfully for user:', userId);
+            strapi.log.info('[Payment] Processing new charge for user:', userId);
+            const result = await paymentService.processSuccessfulPayment(charge.id, userId);
+            strapi.log.info('[Payment] ✅ Webhook processed successfully:', {
+              userId,
+              transactionId: result.transactionId,
+              chargeId: charge.id,
+              notificationSent: true,
+            });
           } else {
-            strapi.log.info('[Payment] Charge already processed:', charge.id);
+            strapi.log.info('[Payment] ⚠️ Charge already processed:', charge.id);
           }
+        } else {
+          strapi.log.warn('[Payment] ⚠️ Charge not paid or missing user_id:', {
+            paid: charge.paid,
+            userId: charge.metadata?.user_id,
+          });
         }
+      } else {
+        strapi.log.info('[Payment] Webhook event not handled:', event.key);
       }
 
       // Respond to Omise
       ctx.send({ received: true });
     } catch (error) {
-      strapi.log.error('[Payment] Webhook error:', error);
+      strapi.log.error('[Payment] ❌ Webhook error:', error);
       // Still respond with 200 to prevent Omise from retrying
       ctx.send({ received: false, error: error.message });
     }
