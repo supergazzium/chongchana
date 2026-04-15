@@ -166,15 +166,29 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> {
     });
 
     OneSignal.Notifications.addForegroundWillDisplayListener((event) {
-      event.preventDefault();
+      // Store notification in inbox for all wallet events
       inboxService.setNewItemFromNotification(event.notification);
 
       // Trigger wallet notification callback if it's a wallet event
       Map<String, dynamic>? data = event.notification.additionalData;
       String? type = data?["type"];
 
+      // Handle wallet QR payments with callback (when actively waiting)
       if (type == "wallet_qr_payment" && inboxService.onWalletNotification != null) {
+        event.preventDefault(); // Prevent default notification for QR (handled by callback)
         inboxService.onWalletNotification!(data ?? {});
+      } else if (type == "wallet_topup" ||
+                 type == "wallet_topup_failed" ||
+                 type == "wallet_payment" ||
+                 type == "wallet_payment_failed" ||
+                 type == "wallet_transfer_sent" ||
+                 type == "wallet_transfer_received") {
+        // For other wallet notifications (credit card, transfers, etc),
+        // let them display normally even in foreground
+        // DON'T call event.preventDefault() - let the notification show
+      } else {
+        // For non-wallet events, prevent default display
+        event.preventDefault();
       }
     });
   }
