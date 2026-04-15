@@ -10,6 +10,7 @@ import 'package:chongchana/screens/wallet/transfer.dart';
 import 'package:chongchana/screens/wallet/wallet_security.dart';
 import 'package:chongchana/services/wallet.dart';
 import 'package:chongchana/services/wallet_auth.dart';
+import 'package:chongchana/services/omise_payment.dart';
 import 'package:chongchana/screens/wallet/pin_setup.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -1053,8 +1054,40 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> with Widget
       _showPaymentSuccessDialog(amount, paymentMethod);
       WalletPaymentPending.clearPendingPayment();
     } else {
-      print('[WalletOverview] ⚠️ Payment not found in transactions');
-      _showPaymentCheckDialog(chargeId, amount, paymentMethod);
+      print('[WalletOverview] ⚠️ Payment not found in transactions, checking charge status...');
+      // Transaction not found - check if payment failed or still pending
+      await _checkChargeStatus(chargeId, amount, paymentMethod);
+    }
+  }
+
+  Future<void> _checkChargeStatus(String chargeId, double amount, String paymentMethod) async {
+    try {
+      // Import OmisePayment service
+      final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
+      final paymentData = await omiseService.verifyPayment(chargeId);
+
+      if (!mounted) return;
+
+      if (paymentData != null && paymentData['paid'] == true) {
+        // Payment succeeded but transaction not showing yet (webhook race condition)
+        print('[WalletOverview] Payment succeeded but transaction delayed');
+        _showPaymentCheckDialog(chargeId, amount, paymentMethod);
+      } else if (paymentData != null && paymentData['status'] == 'failed') {
+        // Payment failed
+        print('[WalletOverview] ❌ Payment failed');
+        final failureMessage = paymentData['failureMessage'] ?? 'Payment was declined';
+        _showPaymentFailedDialog(failureMessage);
+        WalletPaymentPending.clearPendingPayment();
+      } else {
+        // Still pending or unknown status
+        print('[WalletOverview] Payment status unclear, showing check dialog');
+        _showPaymentCheckDialog(chargeId, amount, paymentMethod);
+      }
+    } catch (e) {
+      print('[WalletOverview] Error checking charge status: $e');
+      if (mounted) {
+        _showPaymentCheckDialog(chargeId, amount, paymentMethod);
+      }
     }
   }
 
@@ -1264,6 +1297,129 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> with Widget
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPaymentFailedDialog(String failureMessage) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Error Icon
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.red.shade600,
+                  size: 56,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Title
+              const Text(
+                'Payment Failed',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+
+              // Error Message
+              Text(
+                failureMessage,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Colors.black54,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+
+              // Try Again Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    // Navigate back to top-up screen
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TopUpScreen(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ChongjaroenColors.secondaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Try Again',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Cancel Button
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black54,
                     ),
                   ),
                 ),
