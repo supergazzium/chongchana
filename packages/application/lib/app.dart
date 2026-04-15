@@ -17,6 +17,7 @@ import 'package:provider/provider.dart';
 import 'package:chongchana/services/auth.dart';
 import 'package:chongchana/routing.dart';
 import 'package:chongchana/screens/navigator.dart';
+import 'package:chongchana/screens/wallet/wallet_overview.dart';
 
 class ChongjaroenApp extends StatefulWidget {
   const ChongjaroenApp({Key? key}) : super(key: key);
@@ -25,7 +26,7 @@ class ChongjaroenApp extends StatefulWidget {
   _ChongjaroenAppWidgetState createState() => _ChongjaroenAppWidgetState();
 }
 
-class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> {
+class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> with WidgetsBindingObserver {
   final auth = ChongjaroenAuth();
   final appInit = ChongjaroenAppInit();
   final articles = ChongjaroenArticle();
@@ -88,6 +89,9 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> {
       }
     });
 
+    // Register lifecycle observer to handle payment returns
+    WidgetsBinding.instance.addObserver(this);
+
     super.initState();
   }
 
@@ -114,11 +118,29 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     auth.removeListener(_handleAuthStateChanged);
     appInit.removeListener(_handleAppInitStateChanged);
     _routeState.dispose();
     _routerDelegate.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    print('[ChongjaroenApp] 🔄 App lifecycle changed to: $state');
+
+    // When app resumes and there's a pending credit card payment, navigate to wallet
+    if (state == AppLifecycleState.resumed && WalletPaymentPending.chargeId != null) {
+      print('[ChongjaroenApp] 💳 Pending payment detected, navigating to wallet...');
+      print('[ChongjaroenApp]   chargeId: ${WalletPaymentPending.chargeId}');
+      print('[ChongjaroenApp]   amount: ${WalletPaymentPending.amount}');
+
+      // Navigate to wallet screen so its lifecycle observer can handle the payment check
+      Future.delayed(const Duration(milliseconds: 300), () {
+        _routeState.go('/wallet');
+      });
+    }
   }
 
   Future<void> _initOneSignelService() async {
