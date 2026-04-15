@@ -222,17 +222,16 @@ module.exports = {
         purpose,
       };
 
-      // Add vending-specific info if purpose is beer_machine
-      if (purpose === 'beer_machine') {
-        response.vending = {
-          meetsMinimumBalance: meetsVendingMinimum,
-          minimumRequired: VENDING_MINIMUM_BALANCE,
-          canProceed: meetsVendingMinimum,
-        };
+      // Always include vending info for Universal QR support
+      // This allows any machine (POS or beer vending) to check eligibility
+      response.vending = {
+        meetsMinimumBalance: meetsVendingMinimum,
+        minimumRequired: VENDING_MINIMUM_BALANCE,
+        canProceed: meetsVendingMinimum,
+      };
 
-        if (!meetsVendingMinimum) {
-          response.vending.message = `Minimum balance of ฿${VENDING_MINIMUM_BALANCE} required. Available: ฿${availableBalance.toFixed(2)}`;
-        }
+      if (!meetsVendingMinimum) {
+        response.vending.message = `Minimum balance of ฿${VENDING_MINIMUM_BALANCE} required. Available: ฿${availableBalance.toFixed(2)}`;
       }
 
       ctx.send(utils.successResponse(response));
