@@ -69,6 +69,20 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> with Widget
 
       // Check PIN setup and prompt if needed
       _checkPinSetup();
+
+      // Check for pending payment when screen loads (for programmatic navigation after 3DS)
+      if (WalletPaymentPending.chargeId != null) {
+        print('[WalletOverview] 💳 Pending payment detected on init');
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (mounted && WalletPaymentPending.chargeId != null) {
+            _checkPendingPayment(
+              WalletPaymentPending.chargeId!,
+              WalletPaymentPending.amount!,
+              WalletPaymentPending.paymentMethod ?? 'unknown',
+            );
+          }
+        });
+      }
     });
   }
 
