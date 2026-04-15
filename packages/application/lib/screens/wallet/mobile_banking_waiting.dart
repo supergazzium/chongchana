@@ -145,7 +145,14 @@ class _MobileBankingWaitingScreenState extends State<MobileBankingWaitingScreen>
         final transactionId = paymentData['transactionId'] ?? widget.chargeId;
 
         _stopPaymentPolling();
-        _showSuccessDialog(transactionId);
+
+        // Only show dialog if not already shown (prevents duplicate from notification)
+        if (!_dialogShown && mounted) {
+          _dialogShown = true;
+          _showSuccessDialog(transactionId);
+        } else {
+          print('[MobileBanking] Dialog already shown, skipping duplicate');
+        }
       } else {
         print('[MobileBanking] Payment not yet paid, will retry...');
       }
@@ -158,6 +165,11 @@ class _MobileBankingWaitingScreenState extends State<MobileBankingWaitingScreen>
   void _showSuccessDialog(String transactionId) {
     // Stop polling when success dialog is shown
     _stopPaymentPolling();
+
+    // Unregister notification callback immediately to prevent duplicate triggers
+    final inboxService = Provider.of<InboxService>(context, listen: false);
+    inboxService.onWalletNotification = null;
+    print('[MobileBanking] 🔕 Unregistered notification callback');
 
     showDialog(
       context: context,
@@ -304,10 +316,22 @@ class _MobileBankingWaitingScreenState extends State<MobileBankingWaitingScreen>
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop(); // Close success dialog
-                    Navigator.of(context).pop(); // Close mobile banking waiting screen
-                    Navigator.of(context).pop(); // Go back to wallet overview
+                  onPressed: () async {
+                    print('[MobileBanking] 👆 Done button tapped');
+                    // Close dialog first
+                    Navigator.of(dialogContext).pop();
+                    print('[MobileBanking] ✅ Dialog closed');
+
+                    // Wait a frame to ensure dialog is fully closed
+                    await Future.delayed(const Duration(milliseconds: 100));
+
+                    // Now pop the waiting screen and go back to wallet
+                    if (context.mounted) {
+                      print('[MobileBanking] 🔙 Popping waiting screen');
+                      Navigator.of(context).pop(); // Close mobile banking waiting screen
+                      Navigator.of(context).pop(); // Go back to wallet overview
+                      print('[MobileBanking] ✅ Navigation complete');
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: ChongjaroenColors.secondaryColor,
