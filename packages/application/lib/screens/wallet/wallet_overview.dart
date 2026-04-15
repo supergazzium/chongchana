@@ -1247,11 +1247,7 @@ class _WalletOverviewScreenState extends State<WalletOverviewScreen> with Widget
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.of(dialogContext).pop(); // Close success dialog
-
-                    // Refresh wallet data
-                    final walletService = Provider.of<WalletService>(context, listen: false);
-                    walletService.getBalance();
-                    walletService.getTransactions(limit: 10);
+                    // No need to refresh data - already refreshed before showing this dialog
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: ChongjaroenColors.secondaryColor,
