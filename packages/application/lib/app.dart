@@ -195,9 +195,11 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> with WidgetsBindi
       Map<String, dynamic>? data = event.notification.additionalData;
       String? type = data?["type"];
 
-      // Handle wallet QR payments with callback (when actively waiting)
-      if (type == "wallet_qr_payment" && inboxService.onWalletNotification != null) {
-        event.preventDefault(); // Prevent default notification for QR (handled by callback)
+      // Handle wallet payments with callback (when actively waiting)
+      // QR payments and mobile banking both use callbacks when user is on waiting screen
+      if ((type == "wallet_qr_payment" || type == "wallet_topup") &&
+          inboxService.onWalletNotification != null) {
+        event.preventDefault(); // Prevent default notification (handled by callback)
         inboxService.onWalletNotification!(data ?? {});
       } else if (type == "wallet_topup" ||
                  type == "wallet_topup_failed" ||
@@ -205,7 +207,7 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> with WidgetsBindi
                  type == "wallet_payment_failed" ||
                  type == "wallet_transfer_sent" ||
                  type == "wallet_transfer_received") {
-        // For other wallet notifications (credit card, transfers, etc),
+        // For other wallet notifications (credit card without active listener, transfers, etc),
         // let them display normally even in foreground
         // DON'T call event.preventDefault() - let the notification show
       } else {

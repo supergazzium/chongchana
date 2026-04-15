@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:chongchana/constants/colors.dart';
 import 'package:chongchana/services/omise_payment.dart';
+import 'package:chongchana/services/inbox.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -23,7 +25,10 @@ class MobileBankingWaitingScreen extends StatefulWidget {
 class _MobileBankingWaitingScreenState extends State<MobileBankingWaitingScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  bool _isChecking = true;
+  Timer? _pollingTimer;
+  int _pollCount = 0;
+  static const int _maxPolls = 40; // 40 polls × 3 seconds = 2 minutes
+  bool _dialogShown = false;
 
   @override
   void initState() {
@@ -33,132 +38,325 @@ class _MobileBankingWaitingScreenState extends State<MobileBankingWaitingScreen>
       duration: const Duration(seconds: 2),
     )..repeat();
 
+    // Register notification callback for instant success detection
+    _setupNotificationListener();
+
+    // Start polling as fallback (in case notification doesn't arrive)
     _startPaymentStatusPolling();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _pollingTimer?.cancel();
+
+    // Unregister notification callback
+    final inboxService = Provider.of<InboxService>(context, listen: false);
+    inboxService.onWalletNotification = null;
+
     super.dispose();
   }
 
-  void _startPaymentStatusPolling() {
-    // Poll payment status every 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted && _isChecking) {
-        _checkPaymentStatus();
+  void _setupNotificationListener() {
+    print('[MobileBanking] 📲 Setting up notification listener');
+    final inboxService = Provider.of<InboxService>(context, listen: false);
+
+    // Register callback for wallet notifications
+    inboxService.onWalletNotification = (data) {
+      print('[MobileBanking] 🔔 Notification received: $data');
+
+      // Check if this is a top-up notification for mobile banking
+      final type = data['type'];
+      final chargeId = data['chargeId'];
+      final paymentMethod = data['paymentMethod'];
+
+      if (type == 'wallet_topup' &&
+          chargeId == widget.chargeId &&
+          (paymentMethod == 'mobile_banking_scb' ||
+           paymentMethod == 'mobile_banking_kbank' ||
+           paymentMethod == 'mobile_banking_bbl' ||
+           paymentMethod == 'mobile_banking_bay' ||
+           paymentMethod == 'mobile_banking_ktb' ||
+           paymentMethod?.toString().startsWith('mobile_banking_') == true)) {
+
+        print('[MobileBanking] ✅ Mobile banking payment notification matched!');
+        _stopPaymentPolling();
+
+        if (!_dialogShown && mounted) {
+          _dialogShown = true;
+          _showSuccessDialog(chargeId);
+        }
       }
+    };
+  }
+
+  void _startPaymentStatusPolling() {
+    print('[MobileBanking] 🔵 Starting payment status polling for chargeId: ${widget.chargeId}');
+
+    // Cancel any existing timer
+    _pollingTimer?.cancel();
+    _pollCount = 0;
+
+    // Start Timer.periodic for robust polling
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      print('[MobileBanking] ⏰ Timer tick - checking payment status');
+      if (!mounted) {
+        print('[MobileBanking] ⚠️ Stopping timer: widget not mounted');
+        timer.cancel();
+        _pollingTimer = null;
+        return;
+      }
+      _checkPaymentStatus();
     });
   }
 
+  void _stopPaymentPolling() {
+    print('[MobileBanking] 🛑 Stopping payment polling');
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+    _pollCount = 0;
+  }
+
   Future<void> _checkPaymentStatus() async {
+    _pollCount++;
+    print('[MobileBanking] Poll #${_pollCount}/${_maxPolls}');
+
+    // Safety check: stop after max attempts
+    if (_pollCount >= _maxPolls) {
+      print('[MobileBanking] Max polls reached, stopping');
+      _stopPaymentPolling();
+      if (mounted) {
+        Navigator.pop(context);
+        _showErrorDialog('Verification timed out. Please check your transaction history.');
+      }
+      return;
+    }
+
     final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
 
     try {
       final paymentData = await omiseService.verifyPayment(widget.chargeId);
 
+      if (!mounted) return;
+
       if (paymentData != null && paymentData['paid'] == true) {
-        if (mounted) {
-          setState(() {
-            _isChecking = false;
-          });
-          _showSuccessDialog();
-        }
+        print('[MobileBanking] ✓ Payment verified as paid!');
+
+        final transactionId = paymentData['transactionId'] ?? widget.chargeId;
+
+        _stopPaymentPolling();
+        _showSuccessDialog(transactionId);
       } else {
-        // Continue polling
-        if (mounted) {
-          _startPaymentStatusPolling();
-        }
+        print('[MobileBanking] Payment not yet paid, will retry...');
       }
     } catch (e) {
+      print('[MobileBanking] Error checking payment: $e');
       // Continue polling on error
-      if (mounted) {
-        _startPaymentStatusPolling();
-      }
     }
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog(String transactionId) {
+    // Stop polling when success dialog is shown
+    _stopPaymentPolling();
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                shape: BoxShape.circle,
+      builder: (BuildContext dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
               ),
-              child: const Icon(
-                Icons.check_circle,
-                color: Colors.green,
-                size: 32,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Payment Successful!',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success Icon
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.green.shade600,
+                  size: 56,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+
+              // Title
+              const Text(
+                'Payment Successful!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+
+              // Subtitle
+              const Text(
+                'Your wallet has been topped up',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.black54,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+
+              // Payment Details Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.grey.shade200,
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Amount
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Amount',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        Text(
+                          '฿${NumberFormat('#,##0.00').format(widget.amount)}',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Divider(color: Colors.grey.shade300, height: 1),
+                    const SizedBox(height: 12),
+
+                    // Payment Method
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Method',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        Flexible(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.account_balance,
+                                size: 18,
+                                color: Colors.blue.shade700,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  widget.bankName,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // Done Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(); // Close success dialog
+                    Navigator.of(context).pop(); // Close mobile banking waiting screen
+                    Navigator.of(context).pop(); // Go back to wallet overview
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ChongjaroenColors.secondaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Row(
           children: [
-            Text(
-              'Amount: ฿${_formatAmount(widget.amount)}',
-              style: const TextStyle(fontSize: 15, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Payment Method: ${widget.bankName}',
-              style: const TextStyle(fontSize: 15, color: Colors.black87),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Your wallet has been topped up successfully.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Payment Error'),
           ],
         ),
+        content: Text(message),
         actions: [
-          ElevatedButton(
+          TextButton(
             onPressed: () {
-              Navigator.of(dialogContext).pop(); // Close dialog
-              Navigator.of(context).pop(); // Go back to top-up screen
-              Navigator.of(context).pop(); // Go back to wallet overview
+              Navigator.pop(context); // Close error dialog
+              Navigator.pop(context); // Close waiting screen
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ChongjaroenColors.secondaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
             child: const Text(
-              'Done',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              'OK',
+              style: TextStyle(color: ChongjaroenColors.secondaryColor),
             ),
           ),
         ],
