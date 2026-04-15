@@ -347,25 +347,6 @@ class _WalletSecurityScreenState extends State<WalletSecurityScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () async {
-                  await authService.resetAuthentication();
-                  Fluttertoast.showToast(
-                    msg: 'Authentication reset',
-                    backgroundColor: Colors.orange,
-                  );
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.orange,
-                  side: const BorderSide(color: Colors.orange),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text('🔧 Reset'),
-              ),
             ],
           ),
         );

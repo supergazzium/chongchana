@@ -131,7 +131,7 @@ class _ForgotPinScreenState extends State<ForgotPinScreen> {
 
               // Phone option (read-only display)
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: _cardBackground,
                   borderRadius: BorderRadius.circular(16),
@@ -148,6 +148,7 @@ class _ForgotPinScreenState extends State<ForgotPinScreen> {
                   ],
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       width: 48,
@@ -162,10 +163,11 @@ class _ForgotPinScreenState extends State<ForgotPinScreen> {
                         size: 24,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             'Phone Number',
@@ -174,6 +176,7 @@ class _ForgotPinScreenState extends State<ForgotPinScreen> {
                               fontWeight: FontWeight.w600,
                               color: _greenPrimary,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -182,10 +185,12 @@ class _ForgotPinScreenState extends State<ForgotPinScreen> {
                               fontSize: 14,
                               color: _textSecondary,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(width: 12),
                     Icon(
                       Icons.sms_outlined,
                       color: _greenAccent,
