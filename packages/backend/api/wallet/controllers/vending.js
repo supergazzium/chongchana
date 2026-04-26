@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const Decimal = require('decimal.js');
 const utils = require('../services/utils');
+const { releaseExpiredSessions, parseMetadata } = require('../services/vending-cleanup');
 const { sendPushNotification } = require('../../helpers');
 
 /**
@@ -71,6 +72,11 @@ module.exports = {
       const trx = await knex.transaction();
 
       try {
+        // Release any expired-but-still-active sessions for this user before
+        // computing available balance. Otherwise a previously-abandoned session
+        // permanently blocks reserve.
+        await releaseExpiredSessions(trx, userId);
+
         // Lock wallet row for update
         const wallet = await trx('wallets')
           .where({ user_id: userId })
@@ -538,7 +544,7 @@ module.exports = {
         startedAt: session.started_at,
         endedAt: session.ended_at,
         expiresAt: session.expires_at,
-        metadata: session.metadata ? JSON.parse(session.metadata) : null,
+        metadata: parseMetadata(session.metadata),
       }));
 
     } catch (error) {

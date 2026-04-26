@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const Decimal = require('decimal.js');
 const utils = require('../services/utils');
+const { releaseExpiredSessions } = require('../services/vending-cleanup');
 const { sendPushNotification } = require('../../helpers');
 
 /**
@@ -174,6 +175,15 @@ module.exports = {
           .where({ nonce })
           .update({ status: 'expired' });
         return ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', 'QR code has expired'));
+      }
+
+      // Sweep any expired-but-still-active vending sessions for this user
+      // so the available balance we surface reflects truly-locked funds only.
+      try {
+        await releaseExpiredSessions(knex, userId);
+      } catch (cleanupError) {
+        strapi.log.error('[Payment QR] releaseExpiredSessions failed:', cleanupError);
+        // Non-fatal: continue with whatever balance we read.
       }
 
       // Get user and wallet info
