@@ -187,6 +187,10 @@
   ---
   Step 2.3: Reserve Funds (Machine Locks Balance)
 
+  Reserve locks the user's full available balance into the session. No price
+  is set at reserve time — the machine supplies the final amount on finalize
+  (since each beer can have a different price).
+
   curl -X POST https://wallet-backend-test-pc-ndd56.ondigitalocean.app/wallet/vending/reserve \
     -H "Content-Type: application/json" \
     -d '{
@@ -206,8 +210,6 @@
       "sessionId": "VS-1744717200000-A1B2C3D4",
       "userId": 123,
       "reservedAmount": 1500.00,
-      "maxVolume": 750,
-      "pricePerMl": 2.00,
       "balance": 1500.00,
       "availableBalance": 1500.00,
       "expiresAt": "2026-04-15T10:10:00.000Z",
@@ -218,8 +220,7 @@
   Checklist:
   - success: true
   - sessionId exists
-  - reservedAmount = 1500.00
-  - maxVolume = 750 (1500 ÷ 2)
+  - reservedAmount = 1500.00 (matches full available balance)
   - expiresIn = 600 (10 minutes)
 
   Save: Copy the sessionId value
@@ -246,12 +247,18 @@
   ---
   Step 2.4: Finalize Transaction (Dispense 200ml Beer)
 
+  The machine computes the total price (it knows the per-beer rates) and
+  sends both volumeDispensed (for analytics) and amount (the charge in baht).
+  Both are required. Backend rejects amount > ฿10,000 per dispense or
+  amount > reservedAmount.
+
   curl -X POST https://wallet-backend-test-pc-ndd56.ondigitalocean.app/wallet/vending/finalize
   \
     -H "Content-Type: application/json" \
     -d '{
       "sessionId": "PASTE_SESSION_ID_FROM_STEP_2.3",
       "volumeDispensed": 200,
+      "amount": 400.00,
       "machineId": "BVM-TEST-001",
       "metadata": {
         "pourDuration": 15,
@@ -279,7 +286,8 @@
   Checklist:
   - success: true
   - transactionId exists
-  - amount = 400.00 (200ml × ฿2/ml)
+  - volumeDispensed = 200 (dispensed amount in ml, for analytics)
+  - amount = 400.00 (total price machine sent)
   - balanceBefore = 1500.00
   - balanceAfter = 1100.00
   - totalDispensed = 200
@@ -356,7 +364,6 @@
       "reservedAmount": 1500.00,
       "totalDispensed": 200,
       "totalCharged": 400.00,
-      "pricePerMl": 2.00,
       "status": "completed",
       "startedAt": "2026-04-15T10:00:00.000Z",
       "endedAt": "2026-04-15T10:05:30.000Z",
@@ -497,14 +504,38 @@
   }
 
   ---
-  Step 3.5: Test Volume Exceeds Reserved Amount
+  Step 3.5: Test Charge Amount Exceeds Reserved
 
   curl -X POST https://wallet-backend-test-pc-ndd56.ondigitalocean.app/wallet/vending/finalize
   \
     -H "Content-Type: application/json" \
     -d '{
       "sessionId": "YOUR_ACTIVE_SESSION_ID",
-      "volumeDispensed": 99999,
+      "volumeDispensed": 200,
+      "amount": 5000.00,
+      "machineId": "BVM-TEST-001"
+    }'
+
+  Expected (when reservedAmount is ฿1,500):
+  {
+    "success": false,
+    "error": {
+      "code": "VENDING_ERROR",
+      "message": "Charge amount ฿5000.00 exceeds reserved amount ฿1500.00"
+    }
+  }
+
+  ---
+  Step 3.5b: Test Finalize amount Validation
+
+  Verifies that finalize rejects missing or out-of-range amount values.
+
+  Test 1 — Missing amount:
+  curl -X POST https://wallet-backend-test-pc-ndd56.ondigitalocean.app/wallet/vending/finalize \
+    -H "Content-Type: application/json" \
+    -d '{
+      "sessionId": "YOUR_ACTIVE_SESSION_ID",
+      "volumeDispensed": 200,
       "machineId": "BVM-TEST-001"
     }'
 
@@ -513,9 +544,21 @@
     "success": false,
     "error": {
       "code": "VENDING_ERROR",
-      "message": "Charge amount ฿199998.00 exceeds reserved amount ฿1500.00"
+      "message": "amount is required"
     }
   }
+
+  Test 2 — Negative amount:
+  Body: { ..., "amount": -50 }
+  Expected: "amount must be a non-negative number"
+
+  Test 3 — Above per-dispense ceiling (฿10,000):
+  Body: { ..., "amount": 99999 }
+  Expected: "amount exceeds per-dispense maximum of ฿10000"
+
+  Test 4 — Non-numeric:
+  Body: { ..., "amount": "abc" }
+  Expected: "amount must be a non-negative number"
 
   ---
   Step 3.6: Test End Session (Cancel Without Finalizing)
@@ -674,6 +717,7 @@
     - Excess volume rejected
     - Cancel session releases funds
     - Expired session auto-released on next validate/reserve
+    - Missing/invalid amount on finalize rejected with clear message
   - Database Consistency
     - No orphaned reserved balances
     - All sessions properly closed
@@ -708,19 +752,27 @@
     "branchId": YOUR_BRANCH_ID,
     "metadata": { "location": "...", "temperature": ... }
   }
-    - Save the sessionId and maxVolume
+    - Reserve locks the user's full available balance into the session.
+    - No price is sent here: each beer can have a different rate, so the
+      machine computes the total at finalize time.
+    - Save the sessionId and reservedAmount.
   4. Dispense Beer (physical hardware action)
-    - Track actual volumeDispensed in ml
-    - Track pourDuration in seconds
+    - Track actual volumeDispensed in ml.
+    - Compute total amount in baht using the machine's local per-beer
+      pricing (whatever model you use — fixed per-pour, ml-based, etc.).
   5. Finalize Transaction
   POST /wallet/vending/finalize
   Body: {
     "sessionId": "from_step_3",
     "volumeDispensed": actual_ml,
+    "amount": total_in_baht,
     "machineId": "YOUR_MACHINE_ID",
     "metadata": { "pourDuration": ..., "temperature": ... }
   }
-    - User is charged based on actual volume
+    - amount is required; it is the total to charge the user.
+    - amount must be ≥ 0, ≤ ฿10,000, and ≤ session.reservedAmount.
+    - volumeDispensed is required (recorded for analytics; does not
+      drive the charge).
 
   Key Points:
 

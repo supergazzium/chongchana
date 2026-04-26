@@ -19,7 +19,7 @@ const { sendPushNotification } = require('../../helpers');
 // Configuration
 const VENDING_MINIMUM_BALANCE = 500; // ฿500 minimum
 const VENDING_SESSION_TIMEOUT = 600000; // 10 minutes in ms
-const PRICE_PER_ML = 2.00; // ฿2 per ml
+const VENDING_MAX_AMOUNT_PER_DISPENSE = 10000; // ฿10,000 ceiling per single finalize call
 
 module.exports = {
   /**
@@ -116,15 +116,14 @@ module.exports = {
         const reserveAmount = availableBalance;
         const newReservedBalance = reservedBalance.plus(reserveAmount);
 
-        // Calculate max dispensable volume
-        const pricePerMl = new Decimal(PRICE_PER_ML);
-        const maxVolume = reserveAmount.dividedBy(pricePerMl).floor().toNumber(); // ml
-
         // Generate session ID
         const sessionId = `VS-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
         const expiresAt = new Date(Date.now() + VENDING_SESSION_TIMEOUT);
 
-        // Create vending session
+        // Create vending session.
+        // price_per_ml is no longer set at reserve time. The machine sells
+        // multiple beer types at different rates and supplies the final
+        // amount on /finalize, so we don't lock a single rate here.
         await trx('wallet_vending_sessions').insert({
           id: sessionId,
           user_id: userId,
@@ -134,7 +133,7 @@ module.exports = {
           reserved_amount: reserveAmount.toFixed(2),
           total_dispensed: 0,
           total_charged: 0.00,
-          price_per_ml: pricePerMl.toFixed(2),
+          price_per_ml: null,
           status: 'active',
           started_at: new Date(),
           expires_at: expiresAt,
@@ -156,15 +155,12 @@ module.exports = {
           sessionId,
           userId,
           reserveAmount: reserveAmount.toFixed(2),
-          maxVolume,
         });
 
         ctx.send(utils.successResponse({
           sessionId,
           userId,
           reservedAmount: parseFloat(reserveAmount.toFixed(2)),
-          maxVolume,
-          pricePerMl: parseFloat(pricePerMl.toFixed(2)),
           balance: parseFloat(balance.toFixed(2)),
           availableBalance: parseFloat(availableBalance.toFixed(2)),
           expiresAt: expiresAt.toISOString(),
@@ -192,6 +188,7 @@ module.exports = {
       const {
         sessionId,
         volumeDispensed, // in ml
+        amount: rawAmount, // total charge in baht — machine computes from beer prices
         machineId,
         metadata = {},
       } = ctx.request.body;
@@ -206,7 +203,24 @@ module.exports = {
         return ctx.badRequest(utils.errorResponse('VENDING_ERROR', 'Invalid volume'));
       }
 
-      strapi.log.info('[Vending] Finalizing session:', { sessionId, volumeDispensed: volume, machineId });
+      // amount is required: the machine knows the per-beer prices and tells
+      // us the total. We validate bounds here so a buggy machine can't
+      // overcharge a customer.
+      if (rawAmount === undefined || rawAmount === null) {
+        return ctx.badRequest(utils.errorResponse('VENDING_ERROR', 'amount is required'));
+      }
+      const amountNum = Number(rawAmount);
+      if (!Number.isFinite(amountNum) || amountNum < 0) {
+        return ctx.badRequest(utils.errorResponse('VENDING_ERROR', 'amount must be a non-negative number'));
+      }
+      if (amountNum > VENDING_MAX_AMOUNT_PER_DISPENSE) {
+        return ctx.badRequest(utils.errorResponse(
+          'VENDING_ERROR',
+          `amount exceeds per-dispense maximum of ฿${VENDING_MAX_AMOUNT_PER_DISPENSE}`
+        ));
+      }
+
+      strapi.log.info('[Vending] Finalizing session:', { sessionId, volumeDispensed: volume, amount: amountNum, machineId });
 
       const knex = strapi.connections.default;
 
@@ -245,11 +259,10 @@ module.exports = {
         }
 
         const userId = session.user_id;
-        const pricePerMl = new Decimal(session.price_per_ml);
         const reservedAmount = new Decimal(session.reserved_amount);
 
-        // Calculate charge amount
-        const chargeAmount = pricePerMl.times(volume);
+        // Machine-supplied amount drives the charge.
+        const chargeAmount = new Decimal(amountNum);
 
         // Verify charge doesn't exceed reserved amount
         if (chargeAmount.greaterThan(reservedAmount)) {
@@ -316,7 +329,6 @@ module.exports = {
           metadata: JSON.stringify({
             ...metadata,
             machineId,
-            pricePerMl: parseFloat(pricePerMl.toFixed(2)),
             volumeDispensed: volume,
             sessionId,
           }),
@@ -539,7 +551,6 @@ module.exports = {
         reservedAmount: parseFloat(session.reserved_amount),
         totalDispensed: session.total_dispensed,
         totalCharged: parseFloat(session.total_charged),
-        pricePerMl: parseFloat(session.price_per_ml),
         status: session.status,
         startedAt: session.started_at,
         endedAt: session.ended_at,
