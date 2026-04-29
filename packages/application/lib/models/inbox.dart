@@ -25,10 +25,10 @@ class Inbox {
   Inbox.fromJson(Map<String, dynamic> json) {
     id = json['id'];
     notificationID = json['notificationID'];
-    title = json['title'];
-    shortDescription = json['shortDescription'];
+    title = json['title'] ?? '';
+    shortDescription = json['shortDescription'] ?? '';
     readAt = json['readAt'];
-    publishedAt = json['publishedAt'];
+    publishedAt = json['publishedAt'] ?? '';
     coverUrl = json['coverImage'] != null && json['coverImage']["url"] != null
         ? json['coverImage']["url"]
         : "";

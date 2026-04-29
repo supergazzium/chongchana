@@ -52,10 +52,17 @@ async function sendNotification(userId, title, message, additionalData = {}) {
     try {
       const now = new Date();
 
-      // Create the notification record
+      // Schema-aligned fields (notification.settings.json):
+      //   short_description (text)  ← NOT 'body'
+      //   type (enum, required)
+      //   sending_method (enum, required)
+      //   status (enum, required)
       const notification = await strapi.query('notification').create({
         title,
-        body: message,
+        short_description: message,
+        type: 'message',
+        sending_method: 'push',
+        status: 'completed',
         cover_image: additionalData.coverImage || null,
         published_at: now,
       });

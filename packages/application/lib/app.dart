@@ -243,6 +243,7 @@ class _ChongjaroenAppWidgetState extends State<ChongjaroenApp> with WidgetsBindi
                 colorScheme: ThemeData.light().colorScheme.copyWith(
                       surface: ChongjaroenColors.blackColor,
                     ),
+                scaffoldBackgroundColor: Colors.white,
                 fontFamily: "FC Iconic",
                 textTheme: const TextTheme(
                   displayLarge: TextStyle(
