@@ -312,20 +312,18 @@ module.exports = {
         });
       });
 
-      // Send push notification for successful top-up
-      try {
-        const paymentMethod = charge.source?.type || 'credit_card';
-        await notificationService.sendTopUpSuccessNotification(
-          userId,
-          amount,
-          paymentMethod,
-          chargeId
-        );
-        strapi.log.info('[Payment] OneSignal notification sent for top-up:', userId);
-      } catch (notificationError) {
-        // Don't fail the payment if notification fails
-        strapi.log.error('[Payment] Failed to send OneSignal notification:', notificationError);
-      }
+      // Fire-and-forget the push notification so the webhook can return promptly.
+      // Omise retries webhooks after ~30s and Cloudflare cuts off around 100s — we
+      // must not let a slow OneSignal call delay the 200 response.
+      const paymentMethod = charge.source?.type || 'credit_card';
+      notificationService
+        .sendTopUpSuccessNotification(userId, amount, paymentMethod, chargeId)
+        .then(() => {
+          strapi.log.info('[Payment] OneSignal notification sent for top-up:', userId);
+        })
+        .catch((notificationError) => {
+          strapi.log.error('[Payment] Failed to send OneSignal notification:', notificationError);
+        });
 
       return {
         success: true,

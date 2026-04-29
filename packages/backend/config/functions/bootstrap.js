@@ -10,6 +10,23 @@
  * See more details here: https://strapi.io/documentation/developer-docs/latest/setup-deployment-guides/configurations.html#bootstrap
  */
 
+// Install process-level safety nets exactly once. Node 14 currently warns on
+// unhandled rejections; future Node versions terminate the process. We log and
+// keep running so a stray promise from any code path can't take the API down.
+if (!global.__processSafetyNetsInstalled) {
+  global.__processSafetyNetsInstalled = true;
+
+  process.on('unhandledRejection', (reason) => {
+    const log = (typeof strapi !== 'undefined' && strapi.log) ? strapi.log : console;
+    log.error('[Process] Unhandled promise rejection:', reason && reason.stack || reason);
+  });
+
+  process.on('uncaughtException', (err) => {
+    const log = (typeof strapi !== 'undefined' && strapi.log) ? strapi.log : console;
+    log.error('[Process] Uncaught exception:', err && err.stack || err);
+  });
+}
+
 module.exports = async () => {
   // ============================================================================
   // CRITICAL: Handle OPTIONS requests BEFORE authentication middleware

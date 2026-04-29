@@ -209,33 +209,54 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
     final omiseService = Provider.of<OmisePaymentService>(context, listen: false);
     String bankName = _getBankName(selectedPaymentMethod!);
 
-    // Show dismissible loading dialog
+    BuildContext? loadingDialogContext;
+    bool userCancelled = false;
+
+    void dismissLoadingDialog() {
+      if (loadingDialogContext != null) {
+        final ctx = loadingDialogContext!;
+        loadingDialogContext = null;
+        if (Navigator.canPop(ctx)) {
+          Navigator.pop(ctx);
+        }
+      }
+    }
+
     showDialog(
       context: context,
-      barrierDismissible: true, // User can dismiss by tapping outside
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 20),
-            Text(
-              'Creating payment with $bankName...',
-              style: const TextStyle(fontSize: 15),
-              textAlign: TextAlign.center,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        loadingDialogContext = dialogContext;
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 20),
+                Text(
+                  'Creating payment with $bankName...',
+                  style: const TextStyle(fontSize: 15),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  userCancelled = true;
+                  dismissLoadingDialog();
+                },
+                child: const Text('Cancel'),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
 
     try {
@@ -255,8 +276,10 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
 
       print('[TopUp] Result from createInternetBankingCharge: $result');
 
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading dialog
+      // Always close loading dialog first - by its own context, not by route stack
+      dismissLoadingDialog();
+
+      if (userCancelled || !mounted) return;
 
       if (result != null && result['success'] == true) {
         final chargeId = result['chargeId'];
@@ -276,7 +299,7 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
 
             // Navigate to waiting screen that will poll for payment status
             if (mounted) {
-              Navigator.push(
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => MobileBankingWaitingScreen(
@@ -286,6 +309,18 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                   ),
                 ),
               );
+
+              // Clear pending charge when returning from waiting screen
+              if (mounted) {
+                setState(() {
+                  _pendingChargeId = null;
+                });
+
+                // If payment was successful, go back to wallet overview
+                if (result == true) {
+                  Navigator.pop(context); // Pop TopUpScreen to return to WalletOverview
+                }
+              }
             }
           } else {
             // Banking app not installed or URL cannot be launched
@@ -301,8 +336,9 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
         _showErrorDialog('Failed to create payment. Please try again.');
       }
     } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading dialog
+      print('[TopUp] Error in _handleMobileBankingPayment: $e');
+      dismissLoadingDialog();
+      if (!mounted || userCancelled) return;
       _showErrorDialog('An error occurred: ${e.toString()}');
     }
   }

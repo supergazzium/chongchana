@@ -43,6 +43,7 @@ async function sendNotification(userId, title, message, additionalData = {}) {
         'Content-Type': 'application/json',
         Authorization: `Basic ${API_KEY}`,
       },
+      timeout: 10000,
     });
 
     strapi.log.info(`[OneSignal] Notification sent successfully. ID: ${response.data.id}`);

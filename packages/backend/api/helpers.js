@@ -11,14 +11,25 @@ const slugify = str => {
     .replace(/-+$/, '')
 }
 
+// Never throws. Returns { success: bool, error?: any, response?: any }.
+// Callers may safely fire-and-forget without risking unhandled rejections.
 const sendPushNotification = async ({ content, heading, external_ids, additionalData }) => {
-  // Validate OneSignal credentials
   if (!process.env.ONESIGNAL_APP_ID || !process.env.ONESIGNAL_API_KEY) {
     console.error('[OneSignal] ERROR: Missing credentials!');
     console.error('[OneSignal] ONESIGNAL_APP_ID:', process.env.ONESIGNAL_APP_ID ? 'SET' : 'EMPTY');
     console.error('[OneSignal] ONESIGNAL_API_KEY:', process.env.ONESIGNAL_API_KEY ? 'SET' : 'EMPTY');
-    console.error('[OneSignal] Please configure OneSignal credentials in .env file');
-    throw new Error('OneSignal credentials not configured');
+    return { success: false, error: 'OneSignal credentials not configured' };
+  }
+
+  // OneSignal rejects notifications with empty contents/headings.
+  // Validate up front to fail fast with a clear log instead of a 400 from the API.
+  if (!content || (typeof content === 'string' && content.trim() === '')) {
+    console.error('[OneSignal] Skipping notification: empty content', { heading, external_ids });
+    return { success: false, error: 'empty_content' };
+  }
+  if (!heading || (typeof heading === 'string' && heading.trim() === '')) {
+    console.error('[OneSignal] Skipping notification: empty heading', { content, external_ids });
+    return { success: false, error: 'empty_heading' };
   }
 
   const client = new OneSignal.Client(
@@ -38,7 +49,6 @@ const sendPushNotification = async ({ content, heading, external_ids, additional
     ...(external_ids ? { include_external_user_ids: external_ids } : {}),
   }
 
-  // using async/await
   try {
     console.log('[OneSignal] Sending push notification...');
     console.log('[OneSignal] Heading:', heading);
@@ -52,18 +62,17 @@ const sendPushNotification = async ({ content, heading, external_ids, additional
     console.log('[OneSignal] Notification ID:', response.body.id);
     console.log('[OneSignal] Recipients:', response.body.recipients);
 
-    return response;
+    return { success: true, response };
   } catch (e) {
     console.error('[OneSignal] ❌ Failed to send notification');
     if (e instanceof OneSignal.HTTPError) {
-      // When status code of HTTP response is not 2xx, HTTPError is thrown.
       console.error('[OneSignal] HTTP Status:', e.statusCode);
       console.error('[OneSignal] Error Body:', JSON.stringify(e.body, null, 2));
     } else {
       console.error('[OneSignal] Error:', e.message);
       console.error('[OneSignal] Stack:', e.stack);
     }
-    throw e;
+    return { success: false, error: e };
   }
 }
 
