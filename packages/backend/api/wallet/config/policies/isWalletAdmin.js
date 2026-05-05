@@ -23,38 +23,22 @@ module.exports = async (ctx, next) => {
   }
 
   // Check for admin privileges
-  const roleType = (fullUser.role.type || fullUser.role.name || '').toLowerCase();
+  const roleType = (fullUser.role.type || '').toLowerCase();
   const roleName = (fullUser.role.name || '').toLowerCase();
 
-  // Log detailed role information for debugging
-  strapi.log.info('[WalletAdminPolicy] User role details:', {
-    userId: user.id,
-    roleType: roleType,
-    roleName: roleName,
-    roleId: fullUser.role.id,
-    fullRole: JSON.stringify(fullUser.role),
-  });
-
-  // Allow authenticated users (remove restrictions temporarily for debugging)
-  // const allowedRoles = ['admin', 'superadmin', 'super-admin', 'staff', 'authenticated'];
-  // const isAdmin = allowedRoles.some(role => roleType.includes(role) || roleName.includes(role));
-
-  // Temporarily allow all authenticated users
-  const isAdmin = true;
+  const allowedRoles = ['admin', 'superadmin', 'super-admin'];
+  const isAdmin = allowedRoles.some(
+    (role) => roleType === role || roleName === role
+  );
 
   if (!isAdmin) {
     strapi.log.warn('[WalletAdminPolicy] Insufficient privileges:', {
       userId: user.id,
-      roleType: roleType,
-      roleName: roleName,
+      roleType,
+      roleName,
     });
     return ctx.forbidden('Admin access required');
   }
-
-  strapi.log.info('[WalletAdminPolicy] Admin access granted:', {
-    userId: user.id,
-    roleType: roleType,
-  });
 
   return await next();
 };

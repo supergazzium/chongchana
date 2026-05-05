@@ -199,7 +199,7 @@
       "path": "/api/wallet-admin/wallets",
       "handler": "api.listWallets",
       "config": {
-        "policies": []
+        "policies": ["global::wallet-admin-access"]
       }
     },
     {
@@ -207,7 +207,7 @@
       "path": "/api/wallet-admin/wallet/adjust",
       "handler": "api.adjustBalance",
       "config": {
-        "policies": []
+        "policies": ["global::wallet-admin-access"]
       }
     },
     {
@@ -215,7 +215,7 @@
       "path": "/api/wallet-admin/wallet/freeze",
       "handler": "api.freezeWallet",
       "config": {
-        "policies": []
+        "policies": ["global::wallet-admin-access"]
       }
     },
     {
@@ -223,7 +223,7 @@
       "path": "/api/wallet-admin/wallet/voucher/create",
       "handler": "api.createVoucher",
       "config": {
-        "policies": []
+        "policies": ["global::wallet-admin-access"]
       }
     },
     {
@@ -231,7 +231,7 @@
       "path": "/api/wallet-admin/transactions",
       "handler": "api.getAllTransactions",
       "config": {
-        "policies": []
+        "policies": ["global::wallet-admin-access"]
       }
     },
     {
@@ -239,7 +239,7 @@
       "path": "/api/wallet-admin/refund",
       "handler": "api.refundTransaction",
       "config": {
-        "policies": []
+        "policies": ["global::wallet-admin-access"]
       }
     },
     {
@@ -247,7 +247,7 @@
       "path": "/api/wallet-admin/reports",
       "handler": "api.getReports",
       "config": {
-        "policies": []
+        "policies": ["global::wallet-admin-access"]
       }
     },
     {
@@ -255,7 +255,7 @@
       "path": "/api/wallet-admin/wallet/:userId",
       "handler": "api.getWalletDetail",
       "config": {
-        "policies": []
+        "policies": ["global::wallet-admin-access"]
       }
     },
     {
