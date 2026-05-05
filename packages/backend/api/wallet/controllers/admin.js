@@ -8,6 +8,16 @@ const utils = require('../services/utils');
  * Admin-facing wallet management endpoints
  */
 
+// Tolerant accessor: Knex `raw()` returns [[rows], fields] under mysql,
+// but [rows] under mysql2 — normalize both to a row array.
+function rawRows(result) {
+  if (!Array.isArray(result)) return [];
+  const first = result[0];
+  if (Array.isArray(first)) return first;
+  if (first && typeof first === 'object') return result;
+  return [];
+}
+
 module.exports = {
   /**
    * GET /api/admin/wallets
@@ -100,7 +110,7 @@ module.exports = {
       }
 
       const countResult = await strapi.connections.default.raw(countQuery, countParams);
-      const total = countResult[0][0].total;
+      const total = Number(rawRows(countResult)[0]?.total) || 0;
 
       // Add sorting and pagination
       const validSortBy = ['balance', 'last_transaction', 'created_at', 'user_id'];
@@ -414,7 +424,7 @@ module.exports = {
       // Get total count
       const countQuery = query.replace('t.*, u.email, u.first_name as firstName, u.last_name as lastName', 'COUNT(*) as total');
       const countResult = await strapi.connections.default.raw(countQuery, params);
-      const total = countResult[0][0].total;
+      const total = Number(rawRows(countResult)[0]?.total) || 0;
 
       // Add pagination
       query += ` ORDER BY t.created_at DESC LIMIT ? OFFSET ?`;
