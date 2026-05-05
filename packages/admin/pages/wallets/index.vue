@@ -42,7 +42,7 @@
         </div>
         <div class="stat-label">Total Balance</div>
         <div class="stat-value">฿{{ formatNumber(stats.totalBalance) }}</div>
-        <div class="stat-subtitle">↑ {{ stats.balanceChange }}% from last month</div>
+        <div class="stat-subtitle">Across {{ formatInt(stats.totalWallets) }} wallets</div>
       </div>
 
       <div class="wallet-stat-card">
@@ -52,8 +52,8 @@
           </div>
         </div>
         <div class="stat-label">Active Wallets</div>
-        <div class="stat-value">{{ formatNumber(stats.activeWallets) }}</div>
-        <div class="stat-subtitle">{{ stats.newWallets }} new this week</div>
+        <div class="stat-value">{{ formatInt(stats.activeWallets) }}</div>
+        <div class="stat-subtitle">{{ stats.frozenWallets }} frozen · {{ stats.suspendedWallets }} suspended</div>
       </div>
 
       <div class="wallet-stat-card">
@@ -62,9 +62,9 @@
             <i class="fas fa-chart-line"></i>
           </div>
         </div>
-        <div class="stat-label">Today's Volume</div>
-        <div class="stat-value">฿{{ formatNumber(stats.todayVolume) }}</div>
-        <div class="stat-subtitle">{{ stats.todayTransactions }} transactions</div>
+        <div class="stat-label">Volume ({{ stats.periodLabel }})</div>
+        <div class="stat-value">฿{{ formatNumber(stats.periodVolume) }}</div>
+        <div class="stat-subtitle">{{ formatInt(stats.periodTransactions) }} transactions</div>
       </div>
 
       <div class="wallet-stat-card">
@@ -73,41 +73,45 @@
             <i class="fas fa-clock"></i>
           </div>
         </div>
-        <div class="stat-label">Pending</div>
-        <div class="stat-value">{{ stats.pendingCount }}</div>
-        <div class="stat-subtitle">฿{{ formatNumber(stats.pendingAmount) }} total</div>
+        <div class="stat-label">Pending Balance</div>
+        <div class="stat-value">฿{{ formatNumber(stats.pendingBalance) }}</div>
+        <div class="stat-subtitle">Frozen: ฿{{ formatNumber(stats.frozenBalance) }}</div>
       </div>
     </div>
 
     <!-- Quick Filters -->
     <div class="wallet-filter-chips">
       <button
-        @click="filters.status = ''; loadWallets()"
+        @click="setStatus('')"
         :class="['wallet-filter-chip', { active: filters.status === '' }]"
       >
         <i class="fas fa-list"></i>
         All Wallets
+        <span class="chip-count">{{ formatInt(stats.totalWallets) }}</span>
       </button>
       <button
-        @click="filters.status = 'active'; loadWallets()"
+        @click="setStatus('active')"
         :class="['wallet-filter-chip', { active: filters.status === 'active' }]"
       >
         <i class="fas fa-check-circle"></i>
-        Active Only
+        Active
+        <span class="chip-count">{{ formatInt(stats.activeWallets) }}</span>
       </button>
       <button
-        @click="filters.status = 'frozen'; loadWallets()"
+        @click="setStatus('frozen')"
         :class="['wallet-filter-chip', { active: filters.status === 'frozen' }]"
       >
         <i class="fas fa-snowflake"></i>
         Frozen
+        <span class="chip-count">{{ formatInt(stats.frozenWallets) }}</span>
       </button>
       <button
-        @click="filters.status = 'suspended'; loadWallets()"
+        @click="setStatus('suspended')"
         :class="['wallet-filter-chip', { active: filters.status === 'suspended' }]"
       >
         <i class="fas fa-ban"></i>
         Suspended
+        <span class="chip-count">{{ formatInt(stats.suspendedWallets) }}</span>
       </button>
       <button @click="resetFilters" class="wallet-filter-chip">
         <i class="fas fa-redo"></i>
@@ -157,28 +161,6 @@
           />
         </div>
 
-        <div class="wallet-filter-item">
-          <label>
-            <i class="fas fa-sort"></i>
-            Sort By
-          </label>
-          <select v-model="filters.sortBy" @change="loadWallets">
-            <option value="created_at">Created Date</option>
-            <option value="balance">Balance</option>
-            <option value="last_transaction">Last Transaction</option>
-          </select>
-        </div>
-
-        <div class="wallet-filter-item">
-          <label>
-            <i class="fas fa-sort-amount-down"></i>
-            Order
-          </label>
-          <select v-model="filters.sortOrder" @change="loadWallets">
-            <option value="desc">Newest First</option>
-            <option value="asc">Oldest First</option>
-          </select>
-        </div>
       </div>
     </div>
 
@@ -187,13 +169,22 @@
       <table class="wallet-table">
         <thead>
           <tr>
-            <th><i class="fas fa-hashtag"></i> User ID</th>
+            <th class="sortable" @click="toggleSort('user_id')">
+              <i class="fas fa-hashtag"></i> User ID
+              <i :class="sortIcon('user_id')"></i>
+            </th>
             <th><i class="fas fa-user"></i> Name</th>
             <th><i class="fas fa-envelope"></i> Email</th>
-            <th><i class="fas fa-wallet"></i> Balance</th>
+            <th class="sortable" @click="toggleSort('balance')">
+              <i class="fas fa-wallet"></i> Balance
+              <i :class="sortIcon('balance')"></i>
+            </th>
             <th><i class="fas fa-clock"></i> Pending</th>
             <th><i class="fas fa-info-circle"></i> Status</th>
-            <th><i class="fas fa-calendar"></i> Last Transaction</th>
+            <th class="sortable" @click="toggleSort('last_transaction')">
+              <i class="fas fa-calendar"></i> Last Transaction
+              <i :class="sortIcon('last_transaction')"></i>
+            </th>
             <th><i class="fas fa-tools"></i> Actions</th>
           </tr>
         </thead>
@@ -375,13 +366,15 @@ export default {
       },
       stats: {
         totalBalance: 0,
+        totalWallets: 0,
         activeWallets: 0,
-        balanceChange: 0,
-        newWallets: 0,
-        todayVolume: 0,
-        todayTransactions: 0,
-        pendingCount: 0,
-        pendingAmount: 0,
+        frozenWallets: 0,
+        suspendedWallets: 0,
+        periodVolume: 0,
+        periodTransactions: 0,
+        periodLabel: 'MTD',
+        pendingBalance: 0,
+        frozenBalance: 0,
       },
       showAdjustDialog: false,
       adjustData: {
@@ -444,20 +437,38 @@ export default {
 
         if (response.success) {
           const data = response.data;
+          const summary = data.summary || {};
+          const txSummary = data.transactionSummary || {};
+          const totalWallets =
+            (summary.activeWallets || 0) +
+            (summary.frozenWallets || 0) +
+            (summary.suspendedWallets || 0);
+
           this.stats = {
-            totalBalance: data.summary?.totalWalletBalance || 0,
-            activeWallets: data.summary?.activeWallets || 0,
-            balanceChange: 12.5,
-            newWallets: 234,
-            todayVolume: data.transactionSummary?.totalVolume || 0,
-            todayTransactions: data.transactionSummary?.totalTransactions || 0,
-            pendingCount: 24,
-            pendingAmount: 8450,
+            totalBalance: summary.totalWalletBalance || 0,
+            totalWallets,
+            activeWallets: summary.activeWallets || 0,
+            frozenWallets: summary.frozenWallets || 0,
+            suspendedWallets: summary.suspendedWallets || 0,
+            periodVolume: txSummary.totalVolume || 0,
+            periodTransactions: txSummary.totalTransactions || 0,
+            periodLabel: this.derivePeriodLabel(data.period),
+            pendingBalance: summary.totalPendingBalance || 0,
+            frozenBalance: summary.totalFrozenBalance || 0,
           };
         }
       } catch (error) {
         console.error('Error loading stats:', error);
       }
+    },
+
+    derivePeriodLabel(period) {
+      if (!period || !period.from || !period.to) return 'MTD';
+      const from = this.$moment(period.from).tz('Asia/Bangkok');
+      const to = this.$moment(period.to).tz('Asia/Bangkok');
+      if (from.isSame(to, 'day')) return from.format('MMM D');
+      if (from.date() === 1 && from.isSame(to, 'month')) return 'MTD';
+      return `${from.format('MMM D')} – ${to.format('MMM D')}`;
     },
 
     debouncedSearch() {
@@ -466,6 +477,30 @@ export default {
         this.pagination.offset = 0;
         this.loadWallets();
       }, 500);
+    },
+
+    setStatus(status) {
+      this.filters.status = status;
+      this.pagination.offset = 0;
+      this.loadWallets();
+    },
+
+    toggleSort(column) {
+      if (this.filters.sortBy === column) {
+        this.filters.sortOrder = this.filters.sortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        this.filters.sortBy = column;
+        this.filters.sortOrder = 'desc';
+      }
+      this.pagination.offset = 0;
+      this.loadWallets();
+    },
+
+    sortIcon(column) {
+      if (this.filters.sortBy !== column) return 'fas fa-sort sort-icon inactive';
+      return this.filters.sortOrder === 'asc'
+        ? 'fas fa-sort-up sort-icon active'
+        : 'fas fa-sort-down sort-icon active';
     },
 
     resetFilters() {
@@ -536,6 +571,7 @@ export default {
           });
           this.closeAdjustModal();
           this.loadWallets();
+          this.loadStats();
         }
       } catch (error) {
         console.error('Error adjusting balance:', error);
@@ -578,6 +614,7 @@ export default {
               text: 'Wallet frozen successfully',
             });
             this.loadWallets();
+            this.loadStats();
           }
         } catch (error) {
           console.error('Error freezing wallet:', error);
@@ -613,6 +650,7 @@ export default {
               text: 'Wallet unfrozen successfully',
             });
             this.loadWallets();
+            this.loadStats();
           }
         } catch (error) {
           console.error('Error unfreezing wallet:', error);
@@ -648,6 +686,11 @@ export default {
       });
     },
 
+    formatInt(value) {
+      if (value === null || value === undefined) return '0';
+      return parseInt(value, 10).toLocaleString('en-US');
+    },
+
     formatDate(date) {
       if (!date) return 'Never';
       return this.$moment(date).tz('Asia/Bangkok').format('MMM D, YYYY HH:mm');
@@ -661,6 +704,48 @@ export default {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.chip-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 8px;
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+}
+
+.wallet-filter-chip.active .chip-count {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.wallet-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.wallet-table th.sortable:hover {
+  background: rgba(23, 151, 173, 0.08);
+}
+
+.sort-icon {
+  margin-left: 6px;
+  font-size: 11px;
+}
+
+.sort-icon.inactive {
+  opacity: 0.35;
+}
+
+.sort-icon.active {
+  color: #1797AD;
 }
 
 .modal-overlay {
