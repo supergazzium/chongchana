@@ -135,36 +135,32 @@
       </div>
 
       <!-- Charts Section -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; margin-bottom: 24px;">
-        <div class="wallet-stat-card" style="min-height: 300px; display: flex; flex-direction: column;">
-          <h3 style="font-size: 18px; font-weight: 700; color: #063F48; margin-bottom: 16px;">
-            <i class="fas fa-chart-line"></i>
-            Transaction Volume Trend
+      <div class="charts-grid">
+        <div class="wallet-stat-card chart-card">
+          <h3 class="chart-title">
+            <i class="fas fa-chart-bar"></i>
+            Volume by Transaction Type
           </h3>
-          <div style="flex: 1; display: flex; align-items: center; justify-content: center; background: #F7FAFC; border: 2px dashed #E2E8F0; border-radius: 12px; padding: 40px; text-align: center;">
-            <div>
-              <i class="fas fa-chart-area" style="font-size: 48px; color: #D1D5DB; margin-bottom: 16px;"></i>
-              <p style="color: #6B7280; font-size: 14px; margin: 0;">Chart visualization would go here</p>
-              <p style="color: #9CA3AF; font-size: 12px; margin-top: 8px; font-style: italic;">
-                Integrate Chart.js or similar library
-              </p>
-            </div>
+          <div v-if="!hasTypeData" class="chart-empty">
+            <i class="fas fa-chart-bar"></i>
+            <p>No transactions in this period</p>
+          </div>
+          <div v-else class="chart-canvas-wrap">
+            <canvas ref="volumeChart"></canvas>
           </div>
         </div>
 
-        <div class="wallet-stat-card" style="min-height: 300px; display: flex; flex-direction: column;">
-          <h3 style="font-size: 18px; font-weight: 700; color: #063F48; margin-bottom: 16px;">
+        <div class="wallet-stat-card chart-card">
+          <h3 class="chart-title">
             <i class="fas fa-chart-pie"></i>
-            Transaction Types Distribution
+            Transactions by Type
           </h3>
-          <div style="flex: 1; display: flex; align-items: center; justify-content: center; background: #F7FAFC; border: 2px dashed #E2E8F0; border-radius: 12px; padding: 40px; text-align: center;">
-            <div>
-              <i class="fas fa-chart-pie" style="font-size: 48px; color: #D1D5DB; margin-bottom: 16px;"></i>
-              <p style="color: #6B7280; font-size: 14px; margin: 0;">Pie chart would go here</p>
-              <p style="color: #9CA3AF; font-size: 12px; margin-top: 8px; font-style: italic;">
-                Show percentage breakdown of types
-              </p>
-            </div>
+          <div v-if="!hasTypeData" class="chart-empty">
+            <i class="fas fa-chart-pie"></i>
+            <p>No transactions in this period</p>
+          </div>
+          <div v-else class="chart-canvas-wrap">
+            <canvas ref="countChart"></canvas>
           </div>
         </div>
       </div>
@@ -257,10 +253,29 @@ export default {
         transactionSummary: {},
         revenue: {},
       },
+      Chart: null,
+      volumeChartInstance: null,
+      countChartInstance: null,
     };
   },
+  computed: {
+    typeEntries() {
+      const byType = this.report.transactionSummary?.byType || {};
+      return Object.entries(byType).filter(([, d]) => (d.count || 0) > 0 || (d.volume || 0) > 0);
+    },
+    hasTypeData() {
+      return this.typeEntries.length > 0;
+    },
+  },
   async mounted() {
+    if (process.client) {
+      const chartModule = await import('chart.js');
+      this.Chart = chartModule.Chart;
+    }
     await this.loadReports();
+  },
+  beforeDestroy() {
+    this.destroyCharts();
   },
   methods: {
     async loadReports() {
@@ -270,6 +285,7 @@ export default {
 
         if (response.success) {
           this.report = response.data;
+          this.$nextTick(() => this.renderCharts());
         }
       } catch (error) {
         console.error('Error loading reports:', error);
@@ -280,6 +296,98 @@ export default {
         });
       } finally {
         this.loading = false;
+      }
+    },
+
+    destroyCharts() {
+      if (this.volumeChartInstance) {
+        this.volumeChartInstance.destroy();
+        this.volumeChartInstance = null;
+      }
+      if (this.countChartInstance) {
+        this.countChartInstance.destroy();
+        this.countChartInstance = null;
+      }
+    },
+
+    renderCharts() {
+      if (!this.Chart || !this.hasTypeData) return;
+      this.destroyCharts();
+
+      const labels = this.typeEntries.map(([type]) => this.formatType(type));
+      const volumes = this.typeEntries.map(([, d]) => parseFloat(d.volume) || 0);
+      const counts = this.typeEntries.map(([, d]) => parseInt(d.count, 10) || 0);
+
+      const palette = [
+        '#1797AD', '#00A862', '#FFB800', '#E45858',
+        '#7C5CFF', '#FF8A4C', '#3FB6E0', '#9E7BFF',
+      ];
+      const colors = labels.map((_, i) => palette[i % palette.length]);
+
+      const volumeCanvas = this.$refs.volumeChart;
+      if (volumeCanvas) {
+        this.volumeChartInstance = new this.Chart(volumeCanvas, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Volume (฿)',
+              data: volumes,
+              backgroundColor: colors,
+              borderRadius: 6,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => `฿${ctx.parsed.y.toLocaleString('en-US', {
+                    minimumFractionDigits: 2, maximumFractionDigits: 2,
+                  })}`,
+                },
+              },
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: (v) => `฿${Number(v).toLocaleString('en-US')}`,
+                },
+              },
+            },
+          },
+        });
+      }
+
+      const countCanvas = this.$refs.countChart;
+      if (countCanvas) {
+        this.countChartInstance = new this.Chart(countCanvas, {
+          type: 'doughnut',
+          data: {
+            labels,
+            datasets: [{ data: counts, backgroundColor: colors, borderWidth: 0 }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+              legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const total = counts.reduce((a, b) => a + b, 0) || 1;
+                    const pct = ((ctx.parsed / total) * 100).toFixed(1);
+                    return `${ctx.label}: ${ctx.parsed} (${pct}%)`;
+                  },
+                },
+              },
+            },
+          },
+        });
       }
     },
 
@@ -342,6 +450,57 @@ export default {
 <style scoped>
 .reports-content {
   animation: fadeIn 0.3s ease;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.chart-card {
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #063F48;
+  margin-bottom: 16px;
+}
+
+.chart-canvas-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 260px;
+}
+
+.chart-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #F7FAFC;
+  border: 2px dashed #E2E8F0;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  color: #6B7280;
+}
+
+.chart-empty i {
+  font-size: 40px;
+  color: #D1D5DB;
+  margin-bottom: 12px;
+}
+
+.chart-empty p {
+  margin: 0;
+  font-size: 14px;
 }
 
 @keyframes fadeIn {
