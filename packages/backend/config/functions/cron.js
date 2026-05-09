@@ -62,4 +62,26 @@ module.exports = {
       tz: 'Asia/Bangkok',
     }
   },
+  "*/1 * * * *": {
+    task: async () => {
+      strapi.services["cron-tasks"].wrapTask(async () => {
+        // Task: ReleaseExpiredVendingSessions — unlock reserved balance for
+        // beer-machine sessions whose expires_at has passed but were never
+        // finalized or cancelled (e.g. customer lost connection mid-purchase).
+        // Without this, an abandoned session strands the user's reserved
+        // funds until they themselves return to trigger lazy cleanup.
+        const { releaseAllExpiredSessions } = require('../../api/wallet/services/vending-cleanup');
+        const result = await releaseAllExpiredSessions(strapi.connections.default);
+        if (result.sweptSessions > 0) {
+          strapi.log.info('[Task][releaseExpiredVending] released:', result);
+        }
+      }, {
+        cron: "*/1 * * * *",
+        key: `every-1-min-vending-${moment().utcOffset('+0700').format('YYYYMMDDHHmm')}`,
+      });
+    },
+    options: {
+      tz: 'Asia/Bangkok',
+    }
+  },
 }

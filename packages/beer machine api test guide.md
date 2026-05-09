@@ -59,9 +59,14 @@
   reserve will sweep it. You should NOT see reserved_balance > 0 from
   prior aborted tests blocking new sessions.
 
-  Manual recovery is no longer required for expired sessions. For sessions
-  that are still within their 10-minute window but you want to abandon,
-  use POST /wallet/vending/end-session (Step 3.6).
+  Manual recovery is no longer required for expired sessions. A periodic
+  cron job (every 1 minute) also sweeps any abandoned active session whose
+  expires_at has passed across all users — so a stranded customer's locked
+  funds are returned automatically within ~1 minute of the 5-minute
+  session timeout, even if they never reopen the app.
+
+  For sessions that are still within their 5-minute window but you want
+  to abandon, use POST /wallet/vending/end-session (Step 3.6).
 
   ---
   Step 1.3: Get User JWT Token
@@ -229,8 +234,8 @@
       "availableBalance": 1500.00,
       "minAmount": 80.00,
       "maxAmount": 500.00,
-      "expiresAt": "2026-04-15T10:10:00.000Z",
-      "expiresIn": 600
+      "expiresAt": "2026-04-15T10:05:00.000Z",
+      "expiresIn": 300
     }
   }
 
@@ -239,7 +244,7 @@
   - sessionId exists
   - reservedAmount = min(maxAmount, availableBalance) = 500.00
   - minAmount and maxAmount echoed back
-  - expiresIn = 600 (10 minutes)
+  - expiresIn = 300 (5 minutes)
 
   Legacy form (no bounds — locks full balance):
 
@@ -260,8 +265,8 @@
       "reservedAmount": 1500.00,
       "balance": 1500.00,
       "availableBalance": 1500.00,
-      "expiresAt": "2026-04-15T10:10:00.000Z",
-      "expiresIn": 600
+      "expiresAt": "2026-04-15T10:05:00.000Z",
+      "expiresIn": 300
     }
   }
 
@@ -954,7 +959,9 @@
 
   - Machine needs QR scanner hardware
   - Machine needs API credentials (not user JWT)
-  - Handle timeout errors (sessions expire in 10 minutes)
+  - Handle timeout errors (sessions expire in 5 minutes; abandoned
+    sessions are also auto-released by a backend cron job within ~1
+    minute of expiry)
   - Handle dispense failures (call finalize with actual volume, even if 0)
   - Pass minAmount/maxAmount on reserve so an abandoned session only
     locks the machine's price ceiling, not the user's whole wallet
