@@ -95,6 +95,36 @@ export default ($axios) => ({
   },
 
   /**
+   * List active vending sessions for a user. Used to identify
+   * sessions that have stranded reserved_balance.
+   */
+  async getUserVendingSessions(userId) {
+    try {
+      const response = await $axios.get(`/api/wallet-admin/wallet/${userId}/vending-sessions`);
+      return response.data;
+    } catch (error) {
+      console.error('[WalletService] getUserVendingSessions error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Force-release a stuck vending session.
+   */
+  async releaseVendingSession(sessionId, reason) {
+    try {
+      const response = await $axios.post('/api/wallet-admin/wallet/vending-session/release', {
+        sessionId,
+        reason,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('[WalletService] releaseVendingSession error:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Get financial reports and analytics
    * @param {object} params - Report parameters
    * @returns {Promise} Reports response

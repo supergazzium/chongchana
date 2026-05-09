@@ -73,6 +73,46 @@
           <span class="label">Status:</span>
           <span :class="['status-badge', wallet.wallet.status]">{{ wallet.wallet.status }}</span>
         </div>
+
+        <!-- Active Vending Sessions (stuck reserved balance escape hatch) -->
+        <div v-if="vendingSessions.length > 0" class="vending-sessions-panel">
+          <h3 class="section-title">Active Vending Sessions</h3>
+          <p class="vending-hint">
+            ฿{{ formatNumber(vendingTotalUnreleased) }} reserved across
+            {{ vendingSessions.length }} session(s). Cron auto-releases
+            after expiry; use Force Release for immediate recovery.
+          </p>
+          <div class="vending-list">
+            <div
+              v-for="session in vendingSessions"
+              :key="session.sessionId"
+              class="vending-row"
+              :class="{ 'is-expired': session.isExpired }"
+            >
+              <div class="vending-meta">
+                <div class="vending-session-id">{{ session.sessionId }}</div>
+                <div class="vending-machine">
+                  Machine: {{ session.machineId }}
+                  <span v-if="session.isExpired" class="expired-tag">expired</span>
+                </div>
+                <div class="vending-times">
+                  Started {{ formatDate(session.startedAt) }} · Expires
+                  {{ formatDate(session.expiresAt) }}
+                </div>
+              </div>
+              <div class="vending-amount">
+                ฿{{ formatNumber(session.unreleasedAmount) }}
+              </div>
+              <button
+                class="btn-danger btn-sm"
+                :disabled="releasingSessionId === session.sessionId"
+                @click="forceReleaseSession(session)"
+              >
+                {{ releasingSessionId === session.sessionId ? 'Releasing…' : 'Force Release' }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Statistics -->
@@ -207,6 +247,9 @@ export default {
         amount: '',
         reason: '',
       },
+      vendingSessions: [],
+      vendingTotalUnreleased: 0,
+      releasingSessionId: null,
     };
   },
   computed: {
@@ -231,6 +274,7 @@ export default {
   },
   async mounted() {
     await this.loadWalletDetail();
+    await this.loadVendingSessions();
   },
   methods: {
     async loadWalletDetail() {
@@ -251,6 +295,51 @@ export default {
         });
       } finally {
         this.loading = false;
+      }
+    },
+
+    async loadVendingSessions() {
+      try {
+        const userId = this.$route.params.userId;
+        const response = await this.$walletService.getUserVendingSessions(userId);
+        if (response.success) {
+          this.vendingSessions = response.data.activeSessions || [];
+          this.vendingTotalUnreleased = response.data.totalUnreleased || 0;
+        }
+      } catch (error) {
+        // Non-fatal: panel just stays hidden
+        console.error('Error loading vending sessions:', error);
+      }
+    },
+
+    async forceReleaseSession(session) {
+      const result = await this.$swal({
+        icon: 'warning',
+        title: 'Force-release vending session?',
+        html: `Session <code>${session.sessionId}</code> on machine ${session.machineId}<br>` +
+              `Will release ฿${this.formatNumber(session.unreleasedAmount)} back to the user's available balance.<br><br>` +
+              `Provide a reason for the audit log:`,
+        input: 'textarea',
+        inputPlaceholder: 'e.g. customer reported stranded balance after disconnect',
+        showCancelButton: true,
+        confirmButtonText: 'Release',
+        inputValidator: (value) => (!value ? 'Reason is required' : undefined),
+      });
+
+      if (!result.isConfirmed) return;
+
+      this.releasingSessionId = session.sessionId;
+      try {
+        const resp = await this.$walletService.releaseVendingSession(session.sessionId, result.value);
+        if (resp.success) {
+          this.$swal('Released', `฿${this.formatNumber(resp.data.releasedAmount)} returned to wallet.`, 'success');
+          await Promise.all([this.loadWalletDetail(), this.loadVendingSessions()]);
+        }
+      } catch (error) {
+        const message = error.response?.data?.error?.message || error.message || 'Failed to release session';
+        this.$swal('Error', message, 'error');
+      } finally {
+        this.releasingSessionId = null;
       }
     },
 
@@ -675,5 +764,81 @@ export default {
   text-align: center;
   padding: 60px;
   color: #6b7280;
+}
+
+.vending-sessions-panel {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  border-radius: 8px;
+}
+
+.vending-hint {
+  margin: 4px 0 12px;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.vending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vending-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #f3e8c1;
+  border-radius: 6px;
+}
+
+.vending-row.is-expired {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.vending-meta {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.vending-session-id {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.vending-machine {
+  margin-top: 2px;
+}
+
+.expired-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: #dc2626;
+  color: white;
+  border-radius: 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vending-amount {
+  font-weight: 700;
+  color: #b45309;
+  font-size: 15px;
+}
+
+.btn-sm {
+  padding: 6px 10px !important;
+  font-size: 12px !important;
 }
 </style>

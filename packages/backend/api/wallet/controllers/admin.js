@@ -1316,4 +1316,146 @@ module.exports = {
       ctx.badRequest(utils.errorResponse('UPLOAD_ERROR', error.message));
     }
   },
+
+  /**
+   * GET /api/wallet-admin/wallet/:userId/vending-sessions
+   * List active beer-machine vending sessions for a user. Used by support
+   * to identify sessions that have stranded reserved_balance and need a
+   * manual release. The cron sweeper handles abandoned sessions
+   * automatically after expiry — this is the "I want to release it now"
+   * escape hatch.
+   */
+  async listUserVendingSessions(ctx) {
+    try {
+      const { userId } = ctx.params;
+      if (!userId) {
+        return ctx.badRequest(utils.errorResponse('VALIDATION_ERROR', 'userId is required'));
+      }
+
+      const knex = strapi.connections.default;
+      const sessions = await knex('wallet_vending_sessions')
+        .where({ user_id: userId, status: 'active' })
+        .orderBy('started_at', 'desc');
+
+      const now = new Date();
+      const enriched = sessions.map((s) => {
+        const expiresAt = new Date(s.expires_at);
+        return {
+          sessionId: s.id,
+          machineId: s.machine_id,
+          branchId: s.branch_id,
+          reservedAmount: parseFloat(s.reserved_amount),
+          totalCharged: parseFloat(s.total_charged),
+          unreleasedAmount: parseFloat(s.reserved_amount) - parseFloat(s.total_charged),
+          startedAt: s.started_at,
+          expiresAt: s.expires_at,
+          isExpired: now > expiresAt,
+        };
+      });
+
+      ctx.send(utils.successResponse({
+        userId: parseInt(userId),
+        activeSessions: enriched,
+        totalUnreleased: enriched.reduce((sum, s) => sum + s.unreleasedAmount, 0),
+      }));
+    } catch (error) {
+      strapi.log.error('[WalletAdmin] listUserVendingSessions error:', error);
+      ctx.badRequest(utils.errorResponse('VENDING_ERROR', error.message));
+    }
+  },
+
+  /**
+   * POST /api/wallet-admin/wallet/vending-session/release
+   * Force-release an active vending session. Body: { sessionId, reason }.
+   * Functionally equivalent to the public end-session endpoint, but
+   * scoped to admins (no machineId match required) and tagged with the
+   * acting admin in the session's metadata for audit.
+   */
+  async releaseVendingSession(ctx) {
+    try {
+      const { sessionId, reason = 'admin_released' } = ctx.request.body;
+      const adminId = ctx.state.user?.id;
+      const adminEmail = ctx.state.user?.email;
+
+      if (!sessionId) {
+        return ctx.badRequest(utils.errorResponse('VALIDATION_ERROR', 'sessionId is required'));
+      }
+
+      const Decimal = require('decimal.js');
+      const { parseMetadata } = require('../services/vending-cleanup');
+      const knex = strapi.connections.default;
+
+      const result = await knex.transaction(async (trx) => {
+        const session = await trx('wallet_vending_sessions')
+          .where({ id: sessionId })
+          .forUpdate()
+          .first();
+
+        if (!session) {
+          return { ok: false, code: 'NOT_FOUND', message: 'Session not found' };
+        }
+        if (session.status !== 'active') {
+          return { ok: false, code: 'ALREADY_ENDED', message: `Session is ${session.status}`, status: session.status };
+        }
+
+        const reservedAmount = new Decimal(session.reserved_amount);
+        const totalCharged = new Decimal(session.total_charged);
+        const releaseAmount = reservedAmount.minus(totalCharged);
+
+        const wallet = await trx('wallets')
+          .where({ user_id: session.user_id })
+          .forUpdate()
+          .first();
+
+        if (!wallet) {
+          return { ok: false, code: 'WALLET_NOT_FOUND', message: 'Wallet not found' };
+        }
+
+        const currentReserved = new Decimal(wallet.reserved_balance || 0);
+        const newReserved = Decimal.max(currentReserved.minus(releaseAmount), new Decimal(0));
+
+        await trx('wallets')
+          .where({ user_id: session.user_id })
+          .update({
+            reserved_balance: newReserved.toFixed(2),
+            updated_at: new Date(),
+          });
+
+        const meta = parseMetadata(session.metadata) || {};
+        meta.adminRelease = {
+          adminId,
+          adminEmail,
+          reason,
+          releasedAt: new Date().toISOString(),
+        };
+
+        await trx('wallet_vending_sessions')
+          .where({ id: sessionId })
+          .update({
+            status: 'cancelled',
+            ended_at: new Date(),
+            metadata: JSON.stringify(meta),
+          });
+
+        return {
+          ok: true,
+          sessionId,
+          userId: session.user_id,
+          releasedAmount: parseFloat(releaseAmount.toFixed(2)),
+          finalReserved: parseFloat(newReserved.toFixed(2)),
+        };
+      });
+
+      if (!result.ok) {
+        if (result.code === 'NOT_FOUND') return ctx.notFound(utils.errorResponse('VENDING_ERROR', result.message));
+        return ctx.badRequest(utils.errorResponse('VENDING_ERROR', result.message));
+      }
+
+      strapi.log.info('[WalletAdmin] Vending session force-released:', { sessionId, adminId, releasedAmount: result.releasedAmount });
+      ctx.send(utils.successResponse(result));
+    } catch (error) {
+      strapi.log.error('[WalletAdmin] releaseVendingSession error:', error);
+      ctx.badRequest(utils.errorResponse('VENDING_ERROR', error.message));
+    }
+  },
 };

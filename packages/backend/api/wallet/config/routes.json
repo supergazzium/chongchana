@@ -212,6 +212,22 @@
     },
     {
       "method": "GET",
+      "path": "/api/wallet-admin/wallet/:userId/vending-sessions",
+      "handler": "admin.listUserVendingSessions",
+      "config": {
+        "policies": ["isWalletAdmin"]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/wallet/vending-session/release",
+      "handler": "admin.releaseVendingSession",
+      "config": {
+        "policies": ["isWalletAdmin"]
+      }
+    },
+    {
+      "method": "GET",
       "path": "/api/wallet-admin/transfers",
       "handler": "admin.getAllTransfers",
       "config": {
