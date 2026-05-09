@@ -187,9 +187,22 @@
   ---
   Step 2.3: Reserve Funds (Machine Locks Balance)
 
-  Reserve locks the user's full available balance into the session. No price
-  is set at reserve time — the machine supplies the final amount on finalize
-  (since each beer can have a different price).
+  Reserve locks a bounded amount for the session. The machine declares its
+  price band up front by passing minAmount and maxAmount:
+
+  - minAmount (optional): the smallest charge this machine will ever
+    finalize (e.g. cheapest beer's price). Backend rejects finalize calls
+    below this. Also requires availableBalance >= minAmount at reserve time.
+  - maxAmount (optional): the largest charge this machine will ever
+    finalize (e.g. most expensive beer × max pours). Backend locks
+    min(maxAmount, availableBalance), so an abandoned session does not
+    strand the user's full wallet.
+
+  Backwards-compatibility: if both fields are omitted, behavior matches the
+  legacy contract — no min check on finalize, and the entire available
+  balance is locked. Existing firmware keeps working unchanged.
+
+  Recommended (new firmware):
 
   curl -X POST https://wallet-backend-test-pc-ndd56.ondigitalocean.app/wallet/vending/reserve \
     -H "Content-Type: application/json" \
@@ -197,13 +210,48 @@
       "nonce": "PASTE_NONCE_FROM_STEP_2.2",
       "machineId": "BVM-TEST-001",
       "branchId": 1,
+      "minAmount": 80,
+      "maxAmount": 500,
       "metadata": {
         "location": "Test Branch",
         "temperature": 4
       }
     }'
 
-  Expected Response:
+  Expected Response (with bounds):
+  {
+    "success": true,
+    "data": {
+      "sessionId": "VS-1744717200000-A1B2C3D4",
+      "userId": 123,
+      "reservedAmount": 500.00,
+      "balance": 1500.00,
+      "availableBalance": 1500.00,
+      "minAmount": 80.00,
+      "maxAmount": 500.00,
+      "expiresAt": "2026-04-15T10:10:00.000Z",
+      "expiresIn": 600
+    }
+  }
+
+  Checklist:
+  - success: true
+  - sessionId exists
+  - reservedAmount = min(maxAmount, availableBalance) = 500.00
+  - minAmount and maxAmount echoed back
+  - expiresIn = 600 (10 minutes)
+
+  Legacy form (no bounds — locks full balance):
+
+  curl -X POST https://wallet-backend-test-pc-ndd56.ondigitalocean.app/wallet/vending/reserve \
+    -H "Content-Type: application/json" \
+    -d '{
+      "nonce": "PASTE_NONCE_FROM_STEP_2.2",
+      "machineId": "BVM-TEST-001",
+      "branchId": 1
+    }'
+
+  Expected Response (legacy):
   {
     "success": true,
     "data": {
@@ -217,17 +265,14 @@
     }
   }
 
-  Checklist:
-  - success: true
-  - sessionId exists
-  - reservedAmount = 1500.00 (matches full available balance)
-  - expiresIn = 600 (10 minutes)
+  Note: minAmount/maxAmount are absent from the legacy response.
 
   Save: Copy the sessionId value
 
   Verify in Database:
-  -- Check session created
-  SELECT * FROM wallet_vending_sessions
+  -- Check session created (bounds persisted in metadata JSON)
+  SELECT id, reserved_amount, status, metadata
+  FROM wallet_vending_sessions
   WHERE user_id = YOUR_USER_ID
   ORDER BY started_at DESC
   LIMIT 1;
@@ -240,9 +285,16 @@
   FROM wallets
   WHERE user_id = YOUR_USER_ID;
 
-  Expected Database State:
+  Expected Database State (bounded reserve, maxAmount=500):
+  - Session: status = 'active', reserved_amount = 500.00,
+             metadata contains { "minAmount": 80, "maxAmount": 500, ... }
+  - Wallet: balance = 1500.00, reserved_balance = 500.00,
+             available_balance = 1000.00
+
+  Expected Database State (legacy reserve, no bounds):
   - Session: status = 'active', reserved_amount = 1500.00
-  - Wallet: balance = 1500.00, reserved_balance = 1500.00, available_balance = 0.00
+  - Wallet: balance = 1500.00, reserved_balance = 1500.00,
+             available_balance = 0.00
 
   ---
   Step 2.4: Finalize Transaction (Dispense 200ml Beer)
@@ -561,6 +613,114 @@
   Expected: "amount must be a non-negative number"
 
   ---
+  Step 3.5c: Test Reserve minAmount/maxAmount Validation
+
+  Verifies that reserve rejects malformed bounds.
+
+  Test 1 — Negative minAmount:
+  Body: { ..., "minAmount": -10 }
+  Expected: "minAmount must be a non-negative number"
+
+  Test 2 — Zero or negative maxAmount:
+  Body: { ..., "maxAmount": 0 }
+  Expected: "maxAmount must be a positive number"
+
+  Test 3 — Non-numeric maxAmount:
+  Body: { ..., "maxAmount": "abc" }
+  Expected: "maxAmount must be a positive number"
+
+  Test 4 — minAmount above per-dispense ceiling:
+  Body: { ..., "minAmount": 20000 }
+  Expected: "minAmount exceeds per-dispense ceiling of ฿10000"
+
+  Test 5 — maxAmount above per-dispense ceiling:
+  Body: { ..., "maxAmount": 20000 }
+  Expected: "maxAmount exceeds per-dispense ceiling of ฿10000"
+
+  Test 6 — minAmount > maxAmount:
+  Body: { ..., "minAmount": 600, "maxAmount": 500 }
+  Expected: "minAmount (฿600.00) cannot exceed maxAmount (฿500.00)"
+
+  Test 7 — Available balance below minAmount:
+  Setup: UPDATE wallets SET balance = 600 WHERE user_id = YOUR_USER_ID;
+  (Available is ฿600, well above ฿500 global floor — so the global gate
+  passes, but the machine's minAmount=฿800 must reject.)
+  Body: {
+    "nonce": "...",
+    "machineId": "BVM-TEST-001",
+    "branchId": 1,
+    "minAmount": 800,
+    "maxAmount": 1000
+  }
+  Expected:
+  {
+    "success": false,
+    "error": {
+      "code": "VENDING_MINIMUM_NOT_MET",
+      "message": "Insufficient balance for this machine. Required: ฿800.00, available: ฿600.00"
+    }
+  }
+
+  Reset: UPDATE wallets SET balance = 1500 WHERE user_id = YOUR_USER_ID;
+
+  ---
+  Step 3.5d: Test Finalize Against Session Price Band
+
+  Verifies that finalize enforces the minAmount/maxAmount that the machine
+  declared at reserve time. These are independent of the global per-dispense
+  ceiling tested in Step 3.5b.
+
+  Setup: Create a session with bounds:
+  Reserve body: { ..., "minAmount": 80, "maxAmount": 500 }
+  → reservedAmount = 500.00 (assuming availableBalance >= 500)
+
+  Test 1 — Charge below session minimum:
+  curl -X POST https://wallet-backend-test-pc-ndd56.ondigitalocean.app/wallet/vending/finalize \
+    -H "Content-Type: application/json" \
+    -d '{
+      "sessionId": "YOUR_BOUNDED_SESSION_ID",
+      "volumeDispensed": 50,
+      "amount": 50.00,
+      "machineId": "BVM-TEST-001"
+    }'
+
+  Expected:
+  {
+    "success": false,
+    "error": {
+      "code": "VENDING_ERROR",
+      "message": "Charge amount ฿50.00 is below session minimum ฿80.00"
+    }
+  }
+
+  Test 2 — Charge above session maximum:
+  Body: { ..., "amount": 600 }
+  Expected:
+  {
+    "success": false,
+    "error": {
+      "code": "VENDING_ERROR",
+      "message": "Charge amount ฿600.00 exceeds session maximum ฿500.00"
+    }
+  }
+
+  Test 3 — Charge inside band succeeds:
+  Body: { ..., "amount": 250 }
+  Expected: success, balanceAfter = balanceBefore - 250
+
+  Test 4 — Legacy session (no bounds) ignores band check:
+  Setup: Reserve with no minAmount/maxAmount.
+  Body: { ..., "amount": 0.01 }
+  Expected: success (no session-level floor applies; only the global
+  rules from Step 3.5b enforce here).
+
+  Checklist:
+  - Floor enforcement returns "below session minimum" with both values
+  - Ceiling enforcement returns "exceeds session maximum" with both values
+  - Mid-band charges succeed normally
+  - Legacy (unbounded) sessions are unaffected — backwards compatible
+
+  ---
   Step 3.6: Test End Session (Cancel Without Finalizing)
 
   Setup: Create a new session (repeat Steps 2.1-2.3)
@@ -750,16 +910,29 @@
     "nonce": "from_step_2",
     "machineId": "YOUR_MACHINE_ID",
     "branchId": YOUR_BRANCH_ID,
+    "minAmount": <cheapest_beer_price>,
+    "maxAmount": <most_expensive_beer_price * max_pours>,
     "metadata": { "location": "...", "temperature": ... }
   }
-    - Reserve locks the user's full available balance into the session.
-    - No price is sent here: each beer can have a different rate, so the
-      machine computes the total at finalize time.
-    - Save the sessionId and reservedAmount.
+    - minAmount and maxAmount declare the price band this machine will
+      operate in. They are OPTIONAL but strongly recommended:
+      * minAmount: the smallest charge the machine will ever finalize.
+        Backend rejects finalize calls below this. Reserve also rejects
+        if availableBalance < minAmount.
+      * maxAmount: the largest charge the machine will ever finalize.
+        Backend locks min(maxAmount, availableBalance) — so abandoned
+        sessions don't strand the user's full wallet.
+    - When both are omitted, legacy behavior applies: full available
+      balance is locked, no per-charge floor at finalize.
+    - No exact price is sent here: each beer can have a different rate,
+      so the machine computes the total at finalize time.
+    - Save the sessionId and reservedAmount. The response also echoes
+      minAmount/maxAmount when provided.
   4. Dispense Beer (physical hardware action)
     - Track actual volumeDispensed in ml.
     - Compute total amount in baht using the machine's local per-beer
       pricing (whatever model you use — fixed per-pour, ml-based, etc.).
+    - Ensure the computed amount falls inside [minAmount, maxAmount].
   5. Finalize Transaction
   POST /wallet/vending/finalize
   Body: {
@@ -771,6 +944,9 @@
   }
     - amount is required; it is the total to charge the user.
     - amount must be ≥ 0, ≤ ฿10,000, and ≤ session.reservedAmount.
+    - If the session was created with minAmount/maxAmount, amount must
+      also be inside that band; otherwise finalize returns
+      VENDING_ERROR "below session minimum" or "exceeds session maximum".
     - volumeDispensed is required (recorded for analytics; does not
       drive the charge).
 
@@ -780,3 +956,5 @@
   - Machine needs API credentials (not user JWT)
   - Handle timeout errors (sessions expire in 10 minutes)
   - Handle dispense failures (call finalize with actual volume, even if 0)
+  - Pass minAmount/maxAmount on reserve so an abandoned session only
+    locks the machine's price ceiling, not the user's whole wallet

@@ -209,10 +209,6 @@ module.exports = {
       const reservedBalance = new Decimal(wallet.reserved_balance || 0);
       const availableBalance = balance.minus(reservedBalance);
 
-      // For beer machines, check minimum balance requirement
-      const VENDING_MINIMUM_BALANCE = 500;
-      const meetsVendingMinimum = availableBalance.greaterThanOrEqualTo(VENDING_MINIMUM_BALANCE);
-
       // Prepare response
       const response = {
         valid: true,
@@ -232,16 +228,23 @@ module.exports = {
         purpose,
       };
 
-      // Always include vending info for Universal QR support
-      // This allows any machine (POS or beer vending) to check eligibility
-      response.vending = {
-        meetsMinimumBalance: meetsVendingMinimum,
-        minimumRequired: VENDING_MINIMUM_BALANCE,
-        canProceed: meetsVendingMinimum,
-      };
-
-      if (!meetsVendingMinimum) {
-        response.vending.message = `Minimum balance of ฿${VENDING_MINIMUM_BALANCE} required. Available: ฿${availableBalance.toFixed(2)}`;
+      // Vending eligibility is only relevant for beer_machine QR codes.
+      // Attaching it to plain payment / store_payment caused POS clients
+      // that gated on canProceed to refuse small in-store charges from
+      // users with < ฿500 available (e.g. while a beer session locks
+      // their balance). Store payments have their own minimum (฿0.01)
+      // enforced in processPayment.
+      if (purpose === 'beer_machine') {
+        const VENDING_MINIMUM_BALANCE = 500;
+        const meetsVendingMinimum = availableBalance.greaterThanOrEqualTo(VENDING_MINIMUM_BALANCE);
+        response.vending = {
+          meetsMinimumBalance: meetsVendingMinimum,
+          minimumRequired: VENDING_MINIMUM_BALANCE,
+          canProceed: meetsVendingMinimum,
+        };
+        if (!meetsVendingMinimum) {
+          response.vending.message = `Minimum balance of ฿${VENDING_MINIMUM_BALANCE} required. Available: ฿${availableBalance.toFixed(2)}`;
+        }
       }
 
       ctx.send(utils.successResponse(response));
@@ -339,13 +342,18 @@ module.exports = {
           return ctx.badRequest(utils.errorResponse('WALLET_002', 'Wallet is frozen'));
         }
 
-        // Check sufficient balance - use Decimal.js for precision
+        // Check sufficient available balance (balance minus funds reserved
+        // for in-flight vending sessions). Reading raw balance would let a
+        // store charge consume funds already locked for a beer session,
+        // taking the wallet negative once that session finalizes.
         const currentBalance = new Decimal(wallet.balance || 0);
+        const reservedBalance = new Decimal(wallet.reserved_balance || 0);
+        const availableBalance = currentBalance.minus(reservedBalance);
         const paymentAmount = new Decimal(amountNum);
 
-        if (currentBalance.lessThan(paymentAmount)) {
+        if (availableBalance.lessThan(paymentAmount)) {
           await trx.rollback();
-          return ctx.badRequest(utils.errorResponse('WALLET_001', `Insufficient balance. Available: ฿${currentBalance.toFixed(2)}`));
+          return ctx.badRequest(utils.errorResponse('WALLET_001', `Insufficient balance. Available: ฿${availableBalance.toFixed(2)}`));
         }
 
         // Deduct amount from wallet - use Decimal.js to prevent floating point errors

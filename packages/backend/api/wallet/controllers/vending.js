@@ -24,8 +24,21 @@ const VENDING_MAX_AMOUNT_PER_DISPENSE = 10000; // ฿10,000 ceiling per single f
 module.exports = {
   /**
    * POST /wallet/vending/reserve
-   * Reserve maximum available funds for vending session
-   * Machine calls this after validating QR and checking minimum balance
+   * Reserve a bounded amount for the vending session.
+   *
+   * The machine declares its price band up front:
+   *   - minAmount: smallest charge the machine will ever finalize (the
+   *     floor — e.g. cheapest beer's price). Backend rejects finalize
+   *     calls below this. Optional.
+   *   - maxAmount: largest charge the machine will ever finalize (the
+   *     ceiling — e.g. most expensive beer × max pours). We lock
+   *     min(maxAmount, availableBalance) on the wallet, so an abandoned
+   *     session doesn't strand the user's full balance. Optional.
+   *
+   * Both bounds are persisted in the session metadata and re-checked on
+   * finalize. When omitted, behavior degrades gracefully: no min check at
+   * finalize, and reserve falls back to locking the full available
+   * balance (capped at the per-dispense ceiling).
    */
   async reserve(ctx) {
     try {
@@ -33,6 +46,8 @@ module.exports = {
         nonce,
         machineId,
         branchId,
+        minAmount: rawMinAmount,
+        maxAmount: rawMaxAmount,
         metadata = {},
       } = ctx.request.body;
 
@@ -41,7 +56,51 @@ module.exports = {
         return ctx.badRequest(utils.errorResponse('VENDING_ERROR', 'Nonce and machineId are required'));
       }
 
-      strapi.log.info('[Vending] Creating reserve session:', { nonce, machineId, branchId });
+      // Validate minAmount if provided
+      let requestedMin = null;
+      if (rawMinAmount !== undefined && rawMinAmount !== null) {
+        const n = Number(rawMinAmount);
+        if (!Number.isFinite(n) || n < 0) {
+          return ctx.badRequest(utils.errorResponse('VENDING_ERROR', 'minAmount must be a non-negative number'));
+        }
+        if (n > VENDING_MAX_AMOUNT_PER_DISPENSE) {
+          return ctx.badRequest(utils.errorResponse(
+            'VENDING_ERROR',
+            `minAmount exceeds per-dispense ceiling of ฿${VENDING_MAX_AMOUNT_PER_DISPENSE}`
+          ));
+        }
+        requestedMin = new Decimal(n);
+      }
+
+      // Validate maxAmount if provided
+      let requestedMax = null;
+      if (rawMaxAmount !== undefined && rawMaxAmount !== null) {
+        const n = Number(rawMaxAmount);
+        if (!Number.isFinite(n) || n <= 0) {
+          return ctx.badRequest(utils.errorResponse('VENDING_ERROR', 'maxAmount must be a positive number'));
+        }
+        if (n > VENDING_MAX_AMOUNT_PER_DISPENSE) {
+          return ctx.badRequest(utils.errorResponse(
+            'VENDING_ERROR',
+            `maxAmount exceeds per-dispense ceiling of ฿${VENDING_MAX_AMOUNT_PER_DISPENSE}`
+          ));
+        }
+        requestedMax = new Decimal(n);
+      }
+
+      // Cross-validate: min must not exceed max
+      if (requestedMin && requestedMax && requestedMin.greaterThan(requestedMax)) {
+        return ctx.badRequest(utils.errorResponse(
+          'VENDING_ERROR',
+          `minAmount (฿${requestedMin.toFixed(2)}) cannot exceed maxAmount (฿${requestedMax.toFixed(2)})`
+        ));
+      }
+
+      strapi.log.info('[Vending] Creating reserve session:', {
+        nonce, machineId, branchId,
+        minAmount: requestedMin?.toFixed(2),
+        maxAmount: requestedMax?.toFixed(2),
+      });
 
       const knex = strapi.connections.default;
 
@@ -112,9 +171,32 @@ module.exports = {
           ));
         }
 
-        // Reserve the available balance
-        const reserveAmount = availableBalance;
+        // If the machine declared a per-charge floor, the user must be able
+        // to cover at least one minimum-priced item.
+        if (requestedMin && availableBalance.lessThan(requestedMin)) {
+          await trx.rollback();
+          return ctx.badRequest(utils.errorResponse(
+            'VENDING_MINIMUM_NOT_MET',
+            `Insufficient balance for this machine. Required: ฿${requestedMin.toFixed(2)}, available: ฿${availableBalance.toFixed(2)}`
+          ));
+        }
+
+        // Lock min(machine-requested cap, available balance). When the
+        // machine omits maxAmount, fall back to the legacy "lock everything
+        // available" behavior.
+        const reserveAmount = requestedMax
+          ? Decimal.min(requestedMax, availableBalance)
+          : availableBalance;
         const newReservedBalance = reservedBalance.plus(reserveAmount);
+
+        // Persist bounds inside metadata so finalize can re-check them.
+        // Storing in metadata keeps this change zero-migration; if these
+        // bounds become hot-path / queried, promote them to columns later.
+        const sessionMetadata = {
+          ...metadata,
+          ...(requestedMin ? { minAmount: parseFloat(requestedMin.toFixed(2)) } : {}),
+          ...(requestedMax ? { maxAmount: parseFloat(requestedMax.toFixed(2)) } : {}),
+        };
 
         // Generate session ID
         const sessionId = `VS-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -137,7 +219,7 @@ module.exports = {
           status: 'active',
           started_at: new Date(),
           expires_at: expiresAt,
-          metadata: JSON.stringify(metadata),
+          metadata: JSON.stringify(sessionMetadata),
         });
 
         // Update wallet reserved balance
@@ -163,6 +245,8 @@ module.exports = {
           reservedAmount: parseFloat(reserveAmount.toFixed(2)),
           balance: parseFloat(balance.toFixed(2)),
           availableBalance: parseFloat(availableBalance.toFixed(2)),
+          ...(requestedMin ? { minAmount: parseFloat(requestedMin.toFixed(2)) } : {}),
+          ...(requestedMax ? { maxAmount: parseFloat(requestedMax.toFixed(2)) } : {}),
           expiresAt: expiresAt.toISOString(),
           expiresIn: VENDING_SESSION_TIMEOUT / 1000, // seconds
         }));
@@ -264,7 +348,34 @@ module.exports = {
         // Machine-supplied amount drives the charge.
         const chargeAmount = new Decimal(amountNum);
 
-        // Verify charge doesn't exceed reserved amount
+        // Enforce the per-session price band declared at reserve time. This
+        // protects the customer from a buggy/compromised machine charging
+        // outside its advertised range.
+        const sessionMeta = parseMetadata(session.metadata) || {};
+        if (sessionMeta.minAmount !== undefined && sessionMeta.minAmount !== null) {
+          const sessionMin = new Decimal(sessionMeta.minAmount);
+          if (chargeAmount.lessThan(sessionMin)) {
+            await trx.rollback();
+            return ctx.badRequest(utils.errorResponse(
+              'VENDING_ERROR',
+              `Charge amount ฿${chargeAmount.toFixed(2)} is below session minimum ฿${sessionMin.toFixed(2)}`
+            ));
+          }
+        }
+        if (sessionMeta.maxAmount !== undefined && sessionMeta.maxAmount !== null) {
+          const sessionMax = new Decimal(sessionMeta.maxAmount);
+          if (chargeAmount.greaterThan(sessionMax)) {
+            await trx.rollback();
+            return ctx.badRequest(utils.errorResponse(
+              'VENDING_ERROR',
+              `Charge amount ฿${chargeAmount.toFixed(2)} exceeds session maximum ฿${sessionMax.toFixed(2)}`
+            ));
+          }
+        }
+
+        // Verify charge doesn't exceed reserved amount (defense in depth:
+        // reservedAmount is min(maxAmount, availableBalance), so this catches
+        // the case where availableBalance was the binding constraint).
         if (chargeAmount.greaterThan(reservedAmount)) {
           await trx.rollback();
           return ctx.badRequest(utils.errorResponse(
