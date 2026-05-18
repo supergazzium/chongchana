@@ -46,49 +46,6 @@
       </div>
     </div>
 
-    <!-- Summary Cards -->
-    <div class="summary-grid">
-      <div class="summary-card">
-        <div class="card-icon completed">
-          <i class="fas fa-check-circle"></i>
-        </div>
-        <div class="card-content">
-          <div class="card-value">{{ summary.completed }}</div>
-          <div class="card-label">{{ __wt('txCompleted') }}</div>
-        </div>
-      </div>
-
-      <div class="summary-card">
-        <div class="card-icon pending">
-          <i class="fas fa-clock"></i>
-        </div>
-        <div class="card-content">
-          <div class="card-value">{{ summary.pending }}</div>
-          <div class="card-label">{{ __wt('txPending') }}</div>
-        </div>
-      </div>
-
-      <div class="summary-card">
-        <div class="card-icon failed">
-          <i class="fas fa-times-circle"></i>
-        </div>
-        <div class="card-content">
-          <div class="card-value">{{ summary.failed }}</div>
-          <div class="card-label">{{ __wt('txFailed') }}</div>
-        </div>
-      </div>
-
-      <div class="summary-card">
-        <div class="card-icon volume">
-          <i class="fas fa-coins"></i>
-        </div>
-        <div class="card-content">
-          <div class="card-value">฿{{ formatNumber(summary.totalVolume) }}</div>
-          <div class="card-label">{{ __wt('txTotalVolume') }}</div>
-        </div>
-      </div>
-    </div>
-
     <!-- Quick Filters (Chips) -->
     <div class="quick-filters">
       <button
@@ -531,13 +488,6 @@ export default {
         hasMore: false,
       },
 
-      summary: {
-        completed: 0,
-        pending: 0,
-        failed: 0,
-        totalVolume: 0,
-      },
-
       quickFilters: [
         { value: '', label: 'All', icon: 'fas fa-list' },
         { value: 'top_up', label: 'Top Ups', icon: 'fas fa-arrow-up' },
@@ -594,10 +544,7 @@ export default {
   async mounted() {
     this.__hydrateWalletUiLang();
     this.applyQueryFilters();
-    await Promise.all([
-      this.loadTransactions(),
-      this.loadSummary(),
-    ]);
+    await this.loadTransactions();
   },
 
   methods: {
@@ -703,18 +650,6 @@ export default {
       } finally {
         this.loading = false;
       }
-    },
-
-    async loadSummary() {
-      // Calculate from current data - you can implement API call if needed
-      const completed = this.transactions.filter(t => t.status === 'completed').length;
-      const pending = this.transactions.filter(t => t.status === 'pending').length;
-      const failed = this.transactions.filter(t => t.status === 'failed').length;
-      const totalVolume = this.transactions
-        .filter(t => t.status === 'completed')
-        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0);
-
-      this.summary = { completed, pending, failed, totalVolume };
     },
 
     toggleFilters() {
