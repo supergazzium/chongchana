@@ -832,6 +832,88 @@ module.exports = {
         return { key, label, type, direction: 'debit', amount: Math.abs(mv.debit), count: mv.debitCount };
       };
 
+      // Promotional cost detail: split the 'bonus' bucket between
+      // voucher redemptions (reference_type = 'voucher') and everything
+      // else (system bonuses, manual credits, etc.). reference_type is
+      // set by the voucher redemption flow in services/wallet.js.
+      const promoBreakdown = await knex.raw(`
+        SELECT
+          CASE WHEN reference_type = 'voucher' THEN 'voucher' ELSE 'system_bonus' END as category,
+          COUNT(*) as tx_count,
+          SUM(amount) as amount
+        FROM wallet_transactions
+        WHERE created_at BETWEEN ? AND ?
+          AND status = 'completed'
+          AND type = 'bonus'
+        GROUP BY category
+      `, [from, to]);
+
+      // Top voucher codes by redemption volume in the period. Joining
+      // through wallet_voucher_redemptions -> wallet_vouchers to get
+      // the human-readable code + description.
+      const topVouchers = await knex.raw(`
+        SELECT
+          v.code,
+          v.description,
+          COUNT(r.id) as redemptions,
+          SUM(r.amount) as amount
+        FROM wallet_voucher_redemptions r
+        JOIN wallet_vouchers v ON v.id = r.voucher_id
+        WHERE r.redeemed_at BETWEEN ? AND ?
+        GROUP BY v.code, v.description
+        ORDER BY amount DESC
+        LIMIT 10
+      `, [from, to]);
+
+      // Attention items. These are intentionally separate queries so
+      // each one can be tuned independently.
+      // 1. Stuck pending top-ups (>24h old, still pending).
+      const stuckPending = await knex.raw(`
+        SELECT id, user_id, amount, created_at, payment_method
+        FROM wallet_transactions
+        WHERE type = 'top_up'
+          AND status = 'pending'
+          AND created_at < (NOW() - INTERVAL 24 HOUR)
+        ORDER BY created_at ASC
+        LIMIT 50
+      `);
+
+      // 2. Failed transactions in the period (count + volume by type).
+      const failedTx = await knex.raw(`
+        SELECT type, COUNT(*) as tx_count, SUM(ABS(amount)) as volume
+        FROM wallet_transactions
+        WHERE created_at BETWEEN ? AND ?
+          AND status = 'failed'
+        GROUP BY type
+        ORDER BY volume DESC
+      `, [from, to]);
+
+      // 3. Admin adjustments in the period — every one is an audit
+      // candidate. Pull admin name when available.
+      const adjustments = await knex.raw(`
+        SELECT
+          t.id, t.user_id, t.amount, t.admin_reason, t.created_at,
+          u.username as admin_username,
+          u.email as admin_email
+        FROM wallet_transactions t
+        LEFT JOIN \`users-permissions_user\` u ON u.id = t.admin_id
+        WHERE t.created_at BETWEEN ? AND ?
+          AND t.type = 'adjustment'
+        ORDER BY t.created_at DESC
+        LIMIT 100
+      `, [from, to]);
+
+      // 4. Refunds in the period.
+      const refunds = await knex.raw(`
+        SELECT id, user_id, amount, description, created_at
+        FROM wallet_transactions
+        WHERE created_at BETWEEN ? AND ?
+          AND type = 'refund'
+          AND status = 'completed'
+        ORDER BY created_at DESC
+        LIMIT 100
+      `, [from, to]);
+
       // Cash position: a separate view of the same data answering
       // "how much cash moved through the system" vs reconciliation's
       // "how did liability change". Promotional cost is what we GAVE
@@ -863,6 +945,67 @@ module.exports = {
         // Negative = customers consumed more than they topped up.
         netCashPosition: cashCollected - serviceDelivered - refundedToCustomers,
       };
+
+      // Promotional cost detail.
+      const promoMap = { voucher: { count: 0, amount: 0 }, system_bonus: { count: 0, amount: 0 } };
+      promoBreakdown[0].forEach((row) => {
+        promoMap[row.category] = {
+          count: Number(row.tx_count) || 0,
+          amount: parseFloat(row.amount) || 0,
+        };
+      });
+      const promotionalCostDetail = {
+        total: promotionalCost,
+        totalCount: promotionalCostCount,
+        voucher: promoMap.voucher,
+        systemBonus: promoMap.system_bonus,
+        topVouchers: topVouchers[0].map((v) => ({
+          code: v.code,
+          description: v.description,
+          redemptions: Number(v.redemptions) || 0,
+          amount: parseFloat(v.amount) || 0,
+        })),
+      };
+
+      // Attention items — surface stuck/failed/sensitive activity that
+      // accounting should look at before signing off on the period.
+      const attentionItems = {
+        stuckPendingTopUps: stuckPending[0].map((r) => ({
+          id: r.id,
+          userId: r.user_id,
+          amount: parseFloat(r.amount) || 0,
+          paymentMethod: r.payment_method,
+          createdAt: r.created_at,
+        })),
+        failedByType: failedTx[0].map((r) => ({
+          type: r.type,
+          count: Number(r.tx_count) || 0,
+          volume: parseFloat(r.volume) || 0,
+        })),
+        adjustments: adjustments[0].map((r) => ({
+          id: r.id,
+          userId: r.user_id,
+          amount: parseFloat(r.amount) || 0,
+          reason: r.admin_reason,
+          adminUsername: r.admin_username,
+          adminEmail: r.admin_email,
+          createdAt: r.created_at,
+        })),
+        refunds: refunds[0].map((r) => ({
+          id: r.id,
+          userId: r.user_id,
+          amount: parseFloat(r.amount) || 0,
+          description: r.description,
+          createdAt: r.created_at,
+        })),
+      };
+
+      // Aggregate counts for the panel header.
+      attentionItems.totalItems =
+        attentionItems.stuckPendingTopUps.length +
+        attentionItems.failedByType.reduce((s, f) => s + f.count, 0) +
+        attentionItems.adjustments.length +
+        attentionItems.refunds.length;
 
       // Pivot dailyActivity rows into one entry per day. Each entry
       // carries totals for the categories that matter in daily AR/POS
@@ -971,6 +1114,8 @@ module.exports = {
         },
         reconciliation,
         cashPosition,
+        promotionalCostDetail,
+        attentionItems,
         daily,
         byBranch: branchBreakdown[0].map((row) => {
           const isUnattributed = row.branch === '__unattributed__';

@@ -8,10 +8,14 @@
         <h1>Financial Reports & Analytics</h1>
         <p class="subtitle">Comprehensive wallet and transaction analytics</p>
       </div>
-      <div class="header-actions">
+      <div class="header-actions no-print">
+        <button @click="printReport" class="wallet-btn secondary">
+          <i class="fas fa-print"></i>
+          Print / PDF
+        </button>
         <button @click="exportReport" class="wallet-btn success">
           <i class="fas fa-download"></i>
-          Export Report
+          Export CSV
         </button>
         <button @click="loadReports" class="wallet-btn primary">
           <i class="fas fa-sync-alt"></i>
@@ -21,7 +25,7 @@
     </div>
 
     <!-- Date Range Filters -->
-    <div class="wallet-filters-panel">
+    <div class="wallet-filters-panel no-print">
       <div class="wallet-filters-grid">
         <div class="wallet-filter-item">
           <label>
@@ -62,6 +66,17 @@
     </div>
 
     <div v-else class="reports-content">
+      <!-- Print-only header. Hidden on screen, shown when printed. -->
+      <div class="print-only print-header">
+        <h1>Wallet Financial Report</h1>
+        <div class="print-period">
+          Period: {{ filters.fromDate }} → {{ filters.toDate }}
+        </div>
+        <div class="print-generated">
+          Generated {{ generatedAt }}
+        </div>
+      </div>
+
       <!-- Wallet Liability Reconciliation -->
       <div class="recon-card" v-if="report.reconciliation">
         <div class="recon-header">
@@ -249,6 +264,76 @@
           Net cash held change = Cash collected − Service delivered − Refunds.
           Promotional cost reflects credit you gave away (no cash impact);
           it's tracked separately for marketing accounting.
+        </div>
+      </div>
+
+      <!-- Promotional Cost detail -->
+      <div class="promo-card" v-if="report.promotionalCostDetail">
+        <div class="promo-header">
+          <div>
+            <h2>
+              <i class="fas fa-gift"></i>
+              Promotional Cost
+            </h2>
+            <p>
+              Wallet credit you gave to customers. Not cash out, but a
+              marketing expense.
+            </p>
+          </div>
+          <div class="promo-total">
+            <span class="promo-total-label">Total given</span>
+            <span class="promo-total-value">฿{{ formatNumber(report.promotionalCostDetail.total) }}</span>
+            <span class="promo-total-sub">{{ formatInt(report.promotionalCostDetail.totalCount) }} bonuses</span>
+          </div>
+        </div>
+
+        <div class="promo-split">
+          <div class="promo-split-tile">
+            <div class="promo-tile-head">
+              <i class="fas fa-ticket-alt"></i>
+              Voucher redemptions
+            </div>
+            <div class="promo-tile-value">฿{{ formatNumber(report.promotionalCostDetail.voucher.amount) }}</div>
+            <div class="promo-tile-sub">
+              {{ formatInt(report.promotionalCostDetail.voucher.count) }} redemptions
+              · {{ promoShare(report.promotionalCostDetail.voucher.amount) }}% of total
+            </div>
+          </div>
+          <div class="promo-split-tile">
+            <div class="promo-tile-head">
+              <i class="fas fa-star"></i>
+              System bonuses
+            </div>
+            <div class="promo-tile-value">฿{{ formatNumber(report.promotionalCostDetail.systemBonus.amount) }}</div>
+            <div class="promo-tile-sub">
+              {{ formatInt(report.promotionalCostDetail.systemBonus.count) }} bonuses
+              · {{ promoShare(report.promotionalCostDetail.systemBonus.amount) }}% of total
+            </div>
+          </div>
+        </div>
+
+        <div class="promo-vouchers" v-if="report.promotionalCostDetail.topVouchers.length">
+          <h3>Top vouchers by redemption volume</h3>
+          <table class="promo-voucher-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Description</th>
+                <th class="num">Redemptions</th>
+                <th class="num">Amount given</th>
+                <th class="num">% of voucher cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="v in report.promotionalCostDetail.topVouchers" :key="v.code">
+                <td><code class="voucher-code">{{ v.code }}</code></td>
+                <td class="voucher-desc">{{ v.description || '—' }}</td>
+                <td class="num">{{ formatInt(v.redemptions) }}</td>
+                <td class="num"><strong>฿{{ formatNumber(v.amount) }}</strong></td>
+                <td class="num">{{ voucherShare(v.amount) }}%</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -462,6 +547,161 @@
         </div>
       </div>
 
+      <!-- Attention Items -->
+      <div class="attention-card" v-if="report.attentionItems">
+        <div class="attention-header">
+          <div>
+            <h2>
+              <i class="fas fa-exclamation-triangle"></i>
+              Items Requiring Attention
+            </h2>
+            <p>
+              Anything an accountant should look at before closing the period.
+            </p>
+          </div>
+          <div
+            :class="['attention-count', report.attentionItems.totalItems === 0 ? 'all-clear' : 'has-items']"
+          >
+            <span v-if="report.attentionItems.totalItems === 0">All clear</span>
+            <span v-else>{{ formatInt(report.attentionItems.totalItems) }} items</span>
+          </div>
+        </div>
+
+        <div class="attention-sections">
+          <!-- Stuck pending top-ups -->
+          <div class="attention-section">
+            <div class="attention-section-head">
+              <i class="fas fa-hourglass-half"></i>
+              <span>Stuck pending top-ups</span>
+              <span class="attention-section-count">
+                {{ report.attentionItems.stuckPendingTopUps.length }}
+              </span>
+            </div>
+            <div v-if="report.attentionItems.stuckPendingTopUps.length === 0" class="attention-empty">
+              No stuck top-ups.
+            </div>
+            <table v-else class="attention-table">
+              <thead>
+                <tr>
+                  <th>Transaction</th>
+                  <th>User</th>
+                  <th>Method</th>
+                  <th class="num">Amount</th>
+                  <th>Stuck since</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in report.attentionItems.stuckPendingTopUps" :key="r.id">
+                  <td><code class="tx-id">{{ r.id }}</code></td>
+                  <td>#{{ r.userId }}</td>
+                  <td>{{ r.paymentMethod || '—' }}</td>
+                  <td class="num"><strong>฿{{ formatNumber(r.amount) }}</strong></td>
+                  <td>{{ formatRelativeDate(r.createdAt) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Failed transactions -->
+          <div class="attention-section">
+            <div class="attention-section-head">
+              <i class="fas fa-times-circle"></i>
+              <span>Failed transactions</span>
+              <span class="attention-section-count">
+                {{ failedTotalCount }}
+              </span>
+            </div>
+            <div v-if="report.attentionItems.failedByType.length === 0" class="attention-empty">
+              No failed transactions in this period.
+            </div>
+            <table v-else class="attention-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th class="num">Count</th>
+                  <th class="num">Volume attempted</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="f in report.attentionItems.failedByType" :key="f.type">
+                  <td>{{ formatType(f.type) }}</td>
+                  <td class="num">{{ formatInt(f.count) }}</td>
+                  <td class="num"><strong>฿{{ formatNumber(f.volume) }}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Admin adjustments -->
+          <div class="attention-section">
+            <div class="attention-section-head">
+              <i class="fas fa-user-shield"></i>
+              <span>Admin adjustments</span>
+              <span class="attention-section-count">
+                {{ report.attentionItems.adjustments.length }}
+              </span>
+            </div>
+            <div v-if="report.attentionItems.adjustments.length === 0" class="attention-empty">
+              No admin adjustments in this period.
+            </div>
+            <table v-else class="attention-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>User</th>
+                  <th class="num">Amount</th>
+                  <th>Admin</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="a in report.attentionItems.adjustments" :key="a.id">
+                  <td>{{ formatStatementDate(a.createdAt) }}</td>
+                  <td>#{{ a.userId }}</td>
+                  <td :class="['num', a.amount >= 0 ? 'up' : 'down']">
+                    <strong>{{ a.amount >= 0 ? '+' : '−' }}฿{{ formatNumber(Math.abs(a.amount)) }}</strong>
+                  </td>
+                  <td>{{ a.adminUsername || a.adminEmail || '—' }}</td>
+                  <td class="reason-cell">{{ a.reason || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Refunds -->
+          <div class="attention-section">
+            <div class="attention-section-head">
+              <i class="fas fa-undo"></i>
+              <span>Refunds</span>
+              <span class="attention-section-count">
+                {{ report.attentionItems.refunds.length }}
+              </span>
+            </div>
+            <div v-if="report.attentionItems.refunds.length === 0" class="attention-empty">
+              No refunds in this period.
+            </div>
+            <table v-else class="attention-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>User</th>
+                  <th class="num">Amount</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in report.attentionItems.refunds" :key="r.id">
+                  <td>{{ formatStatementDate(r.createdAt) }}</td>
+                  <td>#{{ r.userId }}</td>
+                  <td class="num"><strong>฿{{ formatNumber(r.amount) }}</strong></td>
+                  <td class="reason-cell">{{ r.description || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- Transaction Breakdown -->
       <div style="background: white; border-radius: 16px; padding: 24px; margin-bottom: 24px; border: 1px solid #E2E8F0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);">
         <h2 style="font-size: 20px; font-weight: 700; color: #063F48; margin-bottom: 24px;">
@@ -661,6 +901,13 @@ export default {
         { revenue: 0, pours: 0, volumeMl: 0 }
       );
     },
+    generatedAt() {
+      return this.$moment().tz('Asia/Bangkok').format('MMM D, YYYY HH:mm');
+    },
+    failedTotalCount() {
+      const items = (this.report.attentionItems && this.report.attentionItems.failedByType) || [];
+      return items.reduce((s, f) => s + (f.count || 0), 0);
+    },
     dailyTotals() {
       const rows = this.report.daily || [];
       if (rows.length === 0) return null;
@@ -815,6 +1062,10 @@ export default {
       }
     },
 
+    printReport() {
+      window.print();
+    },
+
     async exportReport() {
       try {
         const csvData = this.generateReportCSV();
@@ -899,6 +1150,79 @@ export default {
         rows.push([type, data.count, data.volume]);
       }
       rows.push([]);
+
+      const promo = this.report.promotionalCostDetail;
+      if (promo) {
+        rows.push(['PROMOTIONAL COST']);
+        rows.push(['Category', 'Count', 'Amount']);
+        rows.push(['Voucher redemptions', promo.voucher.count, promo.voucher.amount.toFixed(2)]);
+        rows.push(['System bonuses', promo.systemBonus.count, promo.systemBonus.amount.toFixed(2)]);
+        rows.push(['Total', promo.totalCount, promo.total.toFixed(2)]);
+        if (promo.topVouchers && promo.topVouchers.length) {
+          rows.push([]);
+          rows.push(['TOP VOUCHERS']);
+          rows.push(['Code', 'Description', 'Redemptions', 'Amount']);
+          for (const v of promo.topVouchers) {
+            rows.push([
+              this.csvCell(v.code),
+              this.csvCell(v.description || ''),
+              v.redemptions,
+              v.amount.toFixed(2),
+            ]);
+          }
+        }
+        rows.push([]);
+      }
+
+      const att = this.report.attentionItems;
+      if (att) {
+        rows.push(['ATTENTION: STUCK PENDING TOP-UPS']);
+        rows.push(['Transaction ID', 'User ID', 'Method', 'Amount', 'Created at']);
+        for (const r of att.stuckPendingTopUps) {
+          rows.push([
+            this.csvCell(r.id),
+            r.userId,
+            this.csvCell(r.paymentMethod || ''),
+            r.amount.toFixed(2),
+            r.createdAt ? this.$moment(r.createdAt).tz('Asia/Bangkok').format('YYYY-MM-DD HH:mm') : '',
+          ]);
+        }
+        rows.push([]);
+
+        rows.push(['ATTENTION: FAILED TRANSACTIONS']);
+        rows.push(['Type', 'Count', 'Volume']);
+        for (const f of att.failedByType) {
+          rows.push([this.csvCell(f.type), f.count, f.volume.toFixed(2)]);
+        }
+        rows.push([]);
+
+        rows.push(['ATTENTION: ADMIN ADJUSTMENTS']);
+        rows.push(['Date', 'Transaction ID', 'User ID', 'Amount', 'Admin', 'Reason']);
+        for (const a of att.adjustments) {
+          rows.push([
+            a.createdAt ? this.$moment(a.createdAt).tz('Asia/Bangkok').format('YYYY-MM-DD HH:mm') : '',
+            this.csvCell(a.id),
+            a.userId,
+            a.amount.toFixed(2),
+            this.csvCell(a.adminUsername || a.adminEmail || ''),
+            this.csvCell(a.reason || ''),
+          ]);
+        }
+        rows.push([]);
+
+        rows.push(['ATTENTION: REFUNDS']);
+        rows.push(['Date', 'Transaction ID', 'User ID', 'Amount', 'Description']);
+        for (const r of att.refunds) {
+          rows.push([
+            r.createdAt ? this.$moment(r.createdAt).tz('Asia/Bangkok').format('YYYY-MM-DD HH:mm') : '',
+            this.csvCell(r.id),
+            r.userId,
+            r.amount.toFixed(2),
+            this.csvCell(r.description || ''),
+          ]);
+        }
+        rows.push([]);
+      }
 
       rows.push(['BEER MACHINE REVENUE']);
       rows.push(['Branch', 'Machine ID', 'Pours', 'Volume (ml)', 'Revenue', 'Avg per pour', 'Last activity']);
@@ -985,6 +1309,21 @@ export default {
       return ((machineRevenue / branchRevenue) * 100).toFixed(1);
     },
 
+    promoShare(amount) {
+      const total = this.report.promotionalCostDetail && this.report.promotionalCostDetail.total;
+      if (!total) return '0.0';
+      return ((amount / total) * 100).toFixed(1);
+    },
+
+    voucherShare(amount) {
+      const voucherTotal =
+        this.report.promotionalCostDetail
+        && this.report.promotionalCostDetail.voucher
+        && this.report.promotionalCostDetail.voucher.amount;
+      if (!voucherTotal) return '0.0';
+      return ((amount / voucherTotal) * 100).toFixed(1);
+    },
+
     formatType(type) {
       return type
         .split('_')
@@ -1060,6 +1399,35 @@ export default {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Print-only header. Hidden on screen. */
+.print-only {
+  display: none;
+}
+
+.print-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #063F48;
+}
+
+.print-header h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  color: #063F48;
+}
+
+.print-period {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1F2937;
+}
+
+.print-generated {
+  font-size: 12px;
+  color: #6B7280;
+  margin-top: 4px;
 }
 
 /* Reconciliation Statement */
@@ -1288,6 +1656,341 @@ export default {
   .recon-label { grid-area: label; }
   .recon-amount { grid-area: amount; }
   .recon-sub { grid-area: sub; }
+}
+
+/* Promotional Cost card */
+.promo-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.promo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.promo-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #063F48;
+}
+
+.promo-header h2 i {
+  margin-right: 8px;
+  color: #FFB800;
+}
+
+.promo-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.promo-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(255, 184, 0, 0.1);
+  border: 2px solid #FFB800;
+}
+
+.promo-total-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #92400e;
+}
+
+.promo-total-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #92400e;
+  font-variant-numeric: tabular-nums;
+}
+
+.promo-total-sub {
+  font-size: 11px;
+  color: #92400e;
+}
+
+.promo-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.promo-split-tile {
+  padding: 16px;
+  border-radius: 12px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+}
+
+.promo-tile-head {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6B7280;
+  margin-bottom: 8px;
+}
+
+.promo-tile-head i {
+  margin-right: 6px;
+  color: #FFB800;
+}
+
+.promo-tile-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #063F48;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+
+.promo-tile-sub {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.promo-vouchers h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #063F48;
+  margin: 0 0 12px;
+}
+
+.promo-voucher-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.promo-voucher-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #F7FAFC;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6B7280;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.promo-voucher-table th.num,
+.promo-voucher-table td.num {
+  text-align: right;
+}
+
+.promo-voucher-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #F1F5F9;
+  color: #1F2937;
+}
+
+.promo-voucher-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.voucher-code {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  padding: 2px 8px;
+  background: rgba(255, 184, 0, 0.15);
+  border-radius: 6px;
+  color: #92400e;
+  font-weight: 600;
+}
+
+.voucher-desc {
+  color: #6B7280;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Attention Items card */
+.attention-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.attention-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.attention-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #063F48;
+}
+
+.attention-header h2 i {
+  margin-right: 8px;
+  color: #E45858;
+}
+
+.attention-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.attention-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.attention-count.all-clear {
+  background: rgba(0, 168, 98, 0.12);
+  color: #00794a;
+}
+
+.attention-count.has-items {
+  background: rgba(228, 88, 88, 0.12);
+  color: #b03333;
+}
+
+.attention-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.attention-section {
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.attention-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #F7FAFC;
+  font-size: 14px;
+  font-weight: 700;
+  color: #063F48;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.attention-section-head i {
+  color: #E45858;
+}
+
+.attention-section-count {
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #fff;
+  color: #4B5563;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #E5E7EB;
+}
+
+.attention-empty {
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: #9CA3AF;
+}
+
+.attention-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.attention-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  color: #6B7280;
+  border-bottom: 1px solid #F1F5F9;
+  background: #FAFBFC;
+}
+
+.attention-table th.num,
+.attention-table td.num {
+  text-align: right;
+}
+
+.attention-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #F1F5F9;
+  color: #1F2937;
+}
+
+.attention-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.attention-table td.up { color: #00794a; }
+.attention-table td.down { color: #b03333; }
+
+.tx-id {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+  padding: 2px 6px;
+  background: #F1F5F9;
+  border-radius: 4px;
+  color: #4B5563;
+}
+
+.reason-cell {
+  max-width: 300px;
+  color: #6B7280;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .promo-split {
+    grid-template-columns: 1fr;
+  }
+
+  .promo-voucher-table,
+  .attention-table {
+    font-size: 12px;
+  }
 }
 
 /* Cash Position card */
@@ -1811,6 +2514,110 @@ export default {
   .mrev-table thead th,
   .mrev-table tbody td {
     padding: 8px;
+  }
+}
+
+/* ============================================================
+   Print stylesheet — clean PDF output via window.print()
+   ============================================================ */
+@media print {
+  /* Hide screen-only chrome: filters, action buttons, charts. */
+  .no-print,
+  .charts-grid {
+    display: none !important;
+  }
+
+  /* Reveal print-only blocks. */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Page setup. A4 with generous margins. */
+  @page {
+    size: A4;
+    margin: 16mm 14mm;
+  }
+
+  /* Strip the page chrome around the report. The admin layout uses
+     fixed nav / scroll containers that interfere with print. */
+  body,
+  html {
+    background: #fff !important;
+  }
+
+  /* Force background colors and borders to print (Chrome / Safari). */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .wallet-page-container {
+    background: #fff !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Cards: avoid splitting across pages where possible. */
+  .recon-card,
+  .cash-card,
+  .promo-card,
+  .machine-revenue-card,
+  .daily-card,
+  .attention-card,
+  .wallet-stat-card,
+  .wallet-table-container {
+    box-shadow: none !important;
+    border: 1px solid #c0c8d0 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 14px !important;
+  }
+
+  /* Tables: keep header with body across page breaks. */
+  table {
+    page-break-inside: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Reduce padding so reports fit more per page. */
+  .recon-card,
+  .cash-card,
+  .promo-card,
+  .machine-revenue-card,
+  .daily-card,
+  .attention-card {
+    padding: 14px !important;
+  }
+
+  /* The reconciliation section heads use background — keep visible. */
+  .recon-section-head,
+  .recon-opening,
+  .recon-subtotal,
+  .recon-net,
+  .recon-closing,
+  .recon-actual,
+  .recon-gap {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Footnotes still useful in PDF. */
+  .recon-footnote,
+  .cash-footnote {
+    font-size: 10px;
+    color: #4B5563 !important;
+  }
+
+  /* Hide Breadcrumb on print — it's screen navigation, not report. */
+  .Breadcrumb,
+  nav,
+  aside {
+    display: none !important;
   }
 }
 </style>
