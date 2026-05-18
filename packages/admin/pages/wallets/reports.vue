@@ -413,7 +413,19 @@
                   :class="{ 'mrev-unknown': m.machineUnknown }"
                 >
                   <td>
-                    <code class="machine-id" v-if="m.machineId">{{ m.machineId }}</code>
+                    <template v-if="m.displayName">
+                      <div class="machine-display-name">
+                        {{ m.displayName }}
+                        <span v-if="m.model" class="machine-model">{{ m.model }}</span>
+                      </div>
+                      <code class="machine-id muted">{{ m.machineId }}</code>
+                    </template>
+                    <template v-else-if="m.machineId">
+                      <code class="machine-id">{{ m.machineId }}</code>
+                      <nuxt-link to="/wallets/machines" class="machine-name-link">
+                        <i class="fas fa-tag"></i> Name this
+                      </nuxt-link>
+                    </template>
                     <span v-else class="mrev-tag">unknown machine</span>
                   </td>
                   <td class="num">{{ formatInt(m.pours) }}</td>
@@ -1225,7 +1237,7 @@ export default {
       }
 
       rows.push(['BEER MACHINE REVENUE']);
-      rows.push(['Branch', 'Machine ID', 'Pours', 'Volume (ml)', 'Revenue', 'Avg per pour', 'Last activity']);
+      rows.push(['Branch', 'Machine ID', 'Display name', 'Model', 'Pours', 'Volume (ml)', 'Revenue', 'Avg per pour', 'Last activity']);
       for (const m of this.report.byMachine || []) {
         const avg = m.pours ? m.revenue / m.pours : 0;
         const last = m.lastActivity
@@ -1234,6 +1246,8 @@ export default {
         rows.push([
           this.csvCell(m.branch),
           this.csvCell(m.machineId || 'unknown'),
+          this.csvCell(m.displayName || ''),
+          this.csvCell(m.model || ''),
           m.pours,
           Math.round(m.volumeMl),
           m.revenue.toFixed(2),
@@ -2487,6 +2501,49 @@ export default {
   background: #F1F5F9;
   border-radius: 6px;
   color: #0F172A;
+}
+
+.machine-id.muted {
+  background: transparent;
+  color: #9CA3AF;
+  padding: 0;
+  font-size: 11px;
+}
+
+.machine-display-name {
+  font-weight: 600;
+  color: #063F48;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.machine-model {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4B5563;
+  background: #E5E7EB;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.machine-name-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 11px;
+  color: #1797AD;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.machine-name-link:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 768px) {

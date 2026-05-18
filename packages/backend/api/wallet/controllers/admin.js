@@ -18,6 +18,30 @@ function rawRows(result) {
   return [];
 }
 
+// Lookup table for beer machine display names. id matches the raw
+// machineId stamped on wallet_transactions.metadata.machineId. Auto-
+// created on first reference so we don't need a migration framework
+// for this single table. Repeated calls are a fast no-op.
+let machinesTableEnsured = false;
+async function ensureMachinesTable(knex) {
+  if (machinesTableEnsured) return;
+  await knex.raw(`
+    CREATE TABLE IF NOT EXISTS wallet_machines (
+      id VARCHAR(64) NOT NULL,
+      display_name VARCHAR(128) NOT NULL,
+      branch_id INT NULL,
+      model VARCHAR(128) NULL,
+      notes TEXT NULL,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
+      installed_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id)
+    )
+  `);
+  machinesTableEnsured = true;
+}
+
 module.exports = {
   /**
    * GET /api/admin/wallets
@@ -744,28 +768,38 @@ module.exports = {
         GROUP BY type
       `, [from, to]);
 
+      // Ensure machines lookup exists before joining. Fast no-op when
+      // already present.
+      await ensureMachinesTable(knex);
+
       // Beer machine revenue, grouped by branch and machine_id.
       // machine_id lives inside the JSON metadata column (set by the
       // vending controller). volume_dispensed has its own column and
       // is in millilitres per pour.
+      // LEFT JOIN wallet_machines so each row carries the friendly
+      // display_name when admins have set one.
       const machineBreakdown = await knex.raw(`
         SELECT
           CASE
-            WHEN branch IS NULL OR branch = '' THEN '__unattributed__'
-            ELSE branch
+            WHEN t.branch IS NULL OR t.branch = '' THEN '__unattributed__'
+            ELSE t.branch
           END AS branch,
           COALESCE(
-            JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.machineId')),
+            JSON_UNQUOTE(JSON_EXTRACT(t.metadata, '$.machineId')),
             '__unknown_machine__'
           ) AS machine_id,
+          m.display_name as display_name,
+          m.model as model,
           COUNT(*) as pours,
-          SUM(ABS(amount)) as revenue,
-          SUM(COALESCE(volume_dispensed, 0)) as volume_ml,
-          MAX(created_at) as last_activity
-        FROM wallet_transactions
-        WHERE created_at BETWEEN ? AND ?
-          AND type = 'beer_machine_payment'
-        GROUP BY branch, machine_id
+          SUM(ABS(t.amount)) as revenue,
+          SUM(COALESCE(t.volume_dispensed, 0)) as volume_ml,
+          MAX(t.created_at) as last_activity
+        FROM wallet_transactions t
+        LEFT JOIN wallet_machines m
+          ON m.id = JSON_UNQUOTE(JSON_EXTRACT(t.metadata, '$.machineId'))
+        WHERE t.created_at BETWEEN ? AND ?
+          AND t.type = 'beer_machine_payment'
+        GROUP BY branch, machine_id, m.display_name, m.model
         ORDER BY revenue DESC
       `, [from, to]);
 
@@ -1127,8 +1161,7 @@ module.exports = {
           };
         }),
         // Beer machine revenue, one row per (branch, machine_id) pair.
-        // Frontend renders raw machineId now; once a machines lookup table
-        // exists, swap displayName via a join without changing this shape.
+        // displayName is populated from wallet_machines when known.
         byMachine: machineBreakdown[0].map((row) => {
           const isUnattributed = row.branch === '__unattributed__';
           const isUnknownMachine = row.machine_id === '__unknown_machine__';
@@ -1137,6 +1170,8 @@ module.exports = {
             branchUnattributed: isUnattributed,
             machineId: isUnknownMachine ? null : row.machine_id,
             machineUnknown: isUnknownMachine,
+            displayName: row.display_name || null,
+            model: row.model || null,
             pours: Number(row.pours) || 0,
             revenue: parseFloat(row.revenue) || 0,
             volumeMl: parseFloat(row.volume_ml) || 0,
@@ -1917,6 +1952,193 @@ module.exports = {
     } catch (error) {
       strapi.log.error('[WalletAdmin] releaseVendingSession error:', error);
       ctx.badRequest(utils.errorResponse('VENDING_ERROR', error.message));
+    }
+  },
+
+  /**
+   * GET /api/wallet-admin/machines
+   * List beer machines in the lookup table, optionally including
+   * machine IDs that appear in wallet_transactions but have no entry
+   * yet (unmapped IDs — the data-quality candidates).
+   */
+  async listMachines(ctx) {
+    try {
+      const knex = strapi.connections.default;
+      await ensureMachinesTable(knex);
+      const includeUnmapped =
+        ctx.query.includeUnmapped === '1' || ctx.query.includeUnmapped === 'true';
+
+      const machines = await knex.raw(`
+        SELECT
+          m.id, m.display_name, m.branch_id, m.model, m.notes,
+          m.is_active, m.installed_at, m.created_at, m.updated_at,
+          b.name as branch_name,
+          (SELECT COUNT(*) FROM wallet_transactions wt
+           WHERE wt.type = 'beer_machine_payment'
+             AND JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.machineId')) = m.id
+          ) as lifetime_pours,
+          (SELECT SUM(ABS(wt.amount)) FROM wallet_transactions wt
+           WHERE wt.type = 'beer_machine_payment'
+             AND JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.machineId')) = m.id
+          ) as lifetime_revenue,
+          (SELECT MAX(wt.created_at) FROM wallet_transactions wt
+           WHERE wt.type = 'beer_machine_payment'
+             AND JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.machineId')) = m.id
+          ) as last_activity
+        FROM wallet_machines m
+        LEFT JOIN branches b ON b.id = m.branch_id
+        ORDER BY m.is_active DESC, m.display_name ASC
+      `);
+
+      let unmapped = [];
+      if (includeUnmapped) {
+        const unmappedRows = await knex.raw(`
+          SELECT
+            JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.machineId')) as machine_id,
+            COUNT(*) as pours,
+            SUM(ABS(wt.amount)) as revenue,
+            MAX(wt.created_at) as last_activity
+          FROM wallet_transactions wt
+          LEFT JOIN wallet_machines m
+            ON m.id = JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.machineId'))
+          WHERE wt.type = 'beer_machine_payment'
+            AND m.id IS NULL
+            AND JSON_UNQUOTE(JSON_EXTRACT(wt.metadata, '$.machineId')) IS NOT NULL
+          GROUP BY machine_id
+          ORDER BY revenue DESC
+        `);
+        unmapped = unmappedRows[0].map((r) => ({
+          machineId: r.machine_id,
+          pours: Number(r.pours) || 0,
+          revenue: parseFloat(r.revenue) || 0,
+          lastActivity: r.last_activity,
+        }));
+      }
+
+      ctx.send(utils.successResponse({
+        machines: machines[0].map((m) => ({
+          id: m.id,
+          displayName: m.display_name,
+          branchId: m.branch_id,
+          branchName: m.branch_name,
+          model: m.model,
+          notes: m.notes,
+          isActive: !!m.is_active,
+          installedAt: m.installed_at,
+          createdAt: m.created_at,
+          updatedAt: m.updated_at,
+          lifetimePours: Number(m.lifetime_pours) || 0,
+          lifetimeRevenue: parseFloat(m.lifetime_revenue) || 0,
+          lastActivity: m.last_activity,
+        })),
+        unmapped,
+      }));
+    } catch (error) {
+      strapi.log.error('[WalletAdmin] listMachines error:', error);
+      ctx.badRequest(utils.errorResponse('WALLET_ERROR', error.message));
+    }
+  },
+
+  /**
+   * POST /api/wallet-admin/machines
+   * Create a machine lookup entry.
+   */
+  async createMachine(ctx) {
+    try {
+      const knex = strapi.connections.default;
+      await ensureMachinesTable(knex);
+
+      const {
+        id,
+        displayName,
+        branchId = null,
+        model = null,
+        notes = null,
+        installedAt = null,
+        isActive = true,
+      } = ctx.request.body;
+
+      if (!id || !displayName) {
+        return ctx.badRequest(utils.errorResponse('WALLET_ERROR', 'id and displayName are required'));
+      }
+
+      const existing = await knex('wallet_machines').where({ id }).first();
+      if (existing) {
+        return ctx.badRequest(utils.errorResponse('WALLET_ERROR', 'Machine id already exists'));
+      }
+
+      await knex('wallet_machines').insert({
+        id: String(id).trim(),
+        display_name: String(displayName).trim(),
+        branch_id: branchId || null,
+        model: model || null,
+        notes: notes || null,
+        is_active: isActive ? 1 : 0,
+        installed_at: installedAt || null,
+      });
+
+      ctx.send(utils.successResponse({ id }));
+    } catch (error) {
+      strapi.log.error('[WalletAdmin] createMachine error:', error);
+      ctx.badRequest(utils.errorResponse('WALLET_ERROR', error.message));
+    }
+  },
+
+  /**
+   * PUT /api/wallet-admin/machines/:id
+   * Update display name, branch, model, notes, active flag.
+   */
+  async updateMachine(ctx) {
+    try {
+      const knex = strapi.connections.default;
+      await ensureMachinesTable(knex);
+
+      const { id } = ctx.params;
+      const updates = {};
+      const body = ctx.request.body || {};
+      if (body.displayName !== undefined) updates.display_name = String(body.displayName).trim();
+      if (body.branchId !== undefined) updates.branch_id = body.branchId || null;
+      if (body.model !== undefined) updates.model = body.model || null;
+      if (body.notes !== undefined) updates.notes = body.notes || null;
+      if (body.isActive !== undefined) updates.is_active = body.isActive ? 1 : 0;
+      if (body.installedAt !== undefined) updates.installed_at = body.installedAt || null;
+
+      if (Object.keys(updates).length === 0) {
+        return ctx.badRequest(utils.errorResponse('WALLET_ERROR', 'No fields to update'));
+      }
+
+      const affected = await knex('wallet_machines').where({ id }).update(updates);
+      if (affected === 0) {
+        return ctx.notFound('Machine not found');
+      }
+
+      ctx.send(utils.successResponse({ id, updated: Object.keys(updates) }));
+    } catch (error) {
+      strapi.log.error('[WalletAdmin] updateMachine error:', error);
+      ctx.badRequest(utils.errorResponse('WALLET_ERROR', error.message));
+    }
+  },
+
+  /**
+   * DELETE /api/wallet-admin/machines/:id
+   * Hard-deletes the lookup row. Transactions retain their raw machine_id
+   * in metadata, so deleting only removes the friendly-name mapping —
+   * the underlying revenue is never lost.
+   */
+  async deleteMachine(ctx) {
+    try {
+      const knex = strapi.connections.default;
+      await ensureMachinesTable(knex);
+      const { id } = ctx.params;
+
+      const affected = await knex('wallet_machines').where({ id }).delete();
+      if (affected === 0) {
+        return ctx.notFound('Machine not found');
+      }
+      ctx.send(utils.successResponse({ id }));
+    } catch (error) {
+      strapi.log.error('[WalletAdmin] deleteMachine error:', error);
+      ctx.badRequest(utils.errorResponse('WALLET_ERROR', error.message));
     }
   },
 };

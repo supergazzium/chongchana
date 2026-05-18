@@ -23,4 +23,8 @@ module.exports = {
   rejectPointRedemption: adminController.rejectPointRedemption,
   getTransferSettings: adminController.getTransferSettings,
   updateTransferSettings: adminController.updateTransferSettings,
+  listMachines: adminController.listMachines,
+  createMachine: adminController.createMachine,
+  updateMachine: adminController.updateMachine,
+  deleteMachine: adminController.deleteMachine,
 };

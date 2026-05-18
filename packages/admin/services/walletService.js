@@ -139,6 +139,46 @@ export default ($axios) => ({
     }
   },
 
+  async listMachines(params = {}) {
+    try {
+      const response = await $axios.get('/api/wallet-admin/machines', { params });
+      return response.data;
+    } catch (error) {
+      console.error('[WalletService] listMachines error:', error);
+      throw error;
+    }
+  },
+
+  async createMachine(data) {
+    try {
+      const response = await $axios.post('/api/wallet-admin/machines', data);
+      return response.data;
+    } catch (error) {
+      console.error('[WalletService] createMachine error:', error);
+      throw error;
+    }
+  },
+
+  async updateMachine(id, data) {
+    try {
+      const response = await $axios.put(`/api/wallet-admin/machines/${encodeURIComponent(id)}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('[WalletService] updateMachine error:', error);
+      throw error;
+    }
+  },
+
+  async deleteMachine(id) {
+    try {
+      const response = await $axios.delete(`/api/wallet-admin/machines/${encodeURIComponent(id)}`);
+      return response.data;
+    } catch (error) {
+      console.error('[WalletService] deleteMachine error:', error);
+      throw error;
+    }
+  },
+
   /**
    * Create wallet voucher code
    * @param {object} data - Voucher data

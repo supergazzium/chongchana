@@ -33,6 +33,11 @@ const menus = [
         icon: 'chart-bar'
       },
       {
+        label: 'Beer Machines',
+        path: '/wallets/machines',
+        icon: 'beer'
+      },
+      {
         label: 'Voucher Management',
         path: '/wallets/vouchers',
         icon: 'ticket-alt'

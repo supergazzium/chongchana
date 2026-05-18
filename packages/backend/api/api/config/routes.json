@@ -252,6 +252,38 @@
     },
     {
       "method": "GET",
+      "path": "/api/wallet-admin/machines",
+      "handler": "api.listMachines",
+      "config": {
+        "policies": ["global::wallet-admin-access"]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet-admin/machines",
+      "handler": "api.createMachine",
+      "config": {
+        "policies": ["global::wallet-admin-access"]
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/wallet-admin/machines/:id",
+      "handler": "api.updateMachine",
+      "config": {
+        "policies": ["global::wallet-admin-access"]
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/wallet-admin/machines/:id",
+      "handler": "api.deleteMachine",
+      "config": {
+        "policies": ["global::wallet-admin-access"]
+      }
+    },
+    {
+      "method": "GET",
       "path": "/api/wallet-admin/wallet/:userId",
       "handler": "api.getWalletDetail",
       "config": {
