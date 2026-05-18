@@ -6,21 +6,29 @@
     <!-- Page Header -->
     <div class="wallet-page-header">
       <div>
-        <h1>Financial Reports & Analytics</h1>
-        <p class="subtitle">Comprehensive wallet and transaction analytics</p>
+        <h1>{{ __wt('rptTitle') }}</h1>
+        <p class="subtitle">{{ __wt('rptSubtitle') }}</p>
       </div>
       <div class="header-actions no-print">
+        <button
+          @click="toggleWalletLang"
+          class="wallet-btn secondary wallet-lang-toggle"
+          :title="__wt('langToggle')"
+        >
+          <i class="fas fa-language"></i>
+          {{ __wt('langToggle') }}
+        </button>
         <button @click="printReport" class="wallet-btn secondary">
           <i class="fas fa-print"></i>
-          Print / PDF
+          {{ __wt('rptPrint') }}
         </button>
         <button @click="exportReport" class="wallet-btn success">
           <i class="fas fa-download"></i>
-          Export CSV
+          {{ __wt('rptExportCsv') }}
         </button>
         <button @click="loadReports" class="wallet-btn primary">
           <i class="fas fa-sync-alt"></i>
-          Refresh
+          {{ __wt('rptRefresh') }}
         </button>
       </div>
     </div>
@@ -31,31 +39,31 @@
         <div class="wallet-filter-item">
           <label>
             <i class="fas fa-calendar-alt"></i>
-            From Date
+            {{ __wt('rptFromDate') }}
           </label>
           <input v-model="filters.fromDate" type="date" />
         </div>
         <div class="wallet-filter-item">
           <label>
             <i class="fas fa-calendar-check"></i>
-            To Date
+            {{ __wt('rptToDate') }}
           </label>
           <input v-model="filters.toDate" type="date" />
         </div>
         <div class="wallet-filter-item">
           <label>
             <i class="fas fa-chart-bar"></i>
-            Report Type
+            {{ __wt('rptReportType') }}
           </label>
           <select v-model="filters.reportType">
-            <option value="summary">Summary Report</option>
-            <option value="detailed">Detailed Report</option>
+            <option value="summary">{{ __wt('rptReportSummary') }}</option>
+            <option value="detailed">{{ __wt('rptReportDetailed') }}</option>
           </select>
         </div>
         <div style="display: flex; align-items: flex-end;">
           <button @click="loadReports" class="wallet-btn primary" style="width: 100%;">
             <i class="fas fa-filter"></i>
-            Apply Filters
+            {{ __wt('rptApplyFilters') }}
           </button>
         </div>
       </div>
@@ -63,18 +71,18 @@
 
     <div v-if="loading" class="wallet-loading">
       <i class="fas fa-spinner fa-spin"></i>
-      <p>Generating reports...</p>
+      <p>{{ __wt('rptGenerating') }}</p>
     </div>
 
     <div v-else class="reports-content">
       <!-- Print-only header. Hidden on screen, shown when printed. -->
       <div class="print-only print-header">
-        <h1>Wallet Financial Report</h1>
+        <h1>{{ __wt('rptPrintHeader') }}</h1>
         <div class="print-period">
-          Period: {{ filters.fromDate }} → {{ filters.toDate }}
+          {{ __wt('rptPrintPeriod') }}: {{ filters.fromDate }} → {{ filters.toDate }}
         </div>
         <div class="print-generated">
-          Generated {{ generatedAt }}
+          {{ __wt('rptPrintGenerated') }} {{ generatedAt }}
         </div>
       </div>
 
@@ -84,87 +92,84 @@
           <div>
             <h2>
               <i class="fas fa-balance-scale-right"></i>
-              Wallet Liability Reconciliation
+              {{ __wt('reconTitle') }}
             </h2>
-            <p>
-              Movement of customer wallet balances during the period.
-              Opening + movements should equal the live wallet total.
-            </p>
+            <p>{{ __wt('reconSubtitle') }}</p>
           </div>
           <div
             :class="['recon-status', report.reconciliation.reconciled ? 'ok' : 'mismatch']"
           >
             <i :class="report.reconciliation.reconciled ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle'"></i>
-            <span v-if="report.reconciliation.reconciled">Reconciled</span>
-            <span v-else>Mismatch ฿{{ formatNumber(Math.abs(report.reconciliation.gap)) }}</span>
+            <span v-if="report.reconciliation.reconciled">{{ __wt('reconReconciled') }}</span>
+            <span v-else>{{ __wt('reconMismatch', { amount: formatNumber(Math.abs(report.reconciliation.gap)) }) }}</span>
           </div>
         </div>
 
         <div class="recon-statement">
           <div class="recon-row recon-opening">
-            <span class="recon-label">Opening balance</span>
+            <span class="recon-label">{{ __wt('reconOpeningBalance') }}</span>
             <span class="recon-sub">{{ formatStatementDate(report.period.from) }}</span>
             <span class="recon-amount">฿{{ formatNumber(report.reconciliation.openingBalance) }}</span>
           </div>
 
           <div class="recon-section-head">
-            <i class="fas fa-plus-circle"></i> Credits (money in)
+            <i class="fas fa-plus-circle"></i> {{ __wt('reconCreditsHead') }}
           </div>
           <div
             v-for="line in nonZeroCredits"
             :key="line.key"
             class="recon-row recon-credit"
           >
-            <span class="recon-label">{{ line.label }}</span>
-            <span class="recon-sub">{{ line.count }} {{ line.count === 1 ? 'transaction' : 'transactions' }}</span>
+            <span class="recon-label">{{ translateReconLine(line) }}</span>
+            <span class="recon-sub">{{ __wt(line.count === 1 ? 'reconTransactionCountSingular' : 'reconTransactionCount', { count: line.count }) }}</span>
             <span class="recon-amount">+฿{{ formatNumber(line.amount) }}</span>
           </div>
           <div v-if="nonZeroCredits.length === 0" class="recon-row recon-empty">
-            <span class="recon-label">No credits in this period</span>
+            <span class="recon-label">{{ __wt('reconNoCredits') }}</span>
             <span class="recon-amount muted">฿0.00</span>
           </div>
           <div class="recon-row recon-subtotal">
-            <span class="recon-label">Total credits</span>
+            <span class="recon-label">{{ __wt('reconTotalCredits') }}</span>
             <span class="recon-amount">+฿{{ formatNumber(totalCredits) }}</span>
           </div>
 
           <div class="recon-section-head">
-            <i class="fas fa-minus-circle"></i> Debits (money out)
+            <i class="fas fa-minus-circle"></i> {{ __wt('reconDebitsHead') }}
           </div>
           <div
             v-for="line in nonZeroDebits"
             :key="line.key"
             class="recon-row recon-debit"
           >
-            <span class="recon-label">{{ line.label }}</span>
-            <span class="recon-sub">{{ line.count }} {{ line.count === 1 ? 'transaction' : 'transactions' }}</span>
+            <span class="recon-label">{{ translateReconLine(line) }}</span>
+            <span class="recon-sub">{{ __wt(line.count === 1 ? 'reconTransactionCountSingular' : 'reconTransactionCount', { count: line.count }) }}</span>
             <span class="recon-amount">−฿{{ formatNumber(line.amount) }}</span>
           </div>
           <div v-if="nonZeroDebits.length === 0" class="recon-row recon-empty">
-            <span class="recon-label">No debits in this period</span>
+            <span class="recon-label">{{ __wt('reconNoDebits') }}</span>
             <span class="recon-amount muted">฿0.00</span>
           </div>
           <div class="recon-row recon-subtotal">
-            <span class="recon-label">Total debits</span>
+            <span class="recon-label">{{ __wt('reconTotalDebits') }}</span>
             <span class="recon-amount">−฿{{ formatNumber(totalDebits) }}</span>
           </div>
 
           <div class="recon-row recon-net">
-            <span class="recon-label">Net change</span>
+            <span class="recon-label">{{ __wt('reconNetChange') }}</span>
             <span :class="['recon-amount', report.reconciliation.netChange >= 0 ? 'up' : 'down']">
               {{ report.reconciliation.netChange >= 0 ? '+' : '−' }}฿{{ formatNumber(Math.abs(report.reconciliation.netChange)) }}
             </span>
           </div>
 
           <div class="recon-row recon-closing">
-            <span class="recon-label">Computed closing balance</span>
-            <span class="recon-sub">opening + net change</span>
+            <span class="recon-label">{{ __wt('reconComputedClosing') }}</span>
+            <span class="recon-sub">{{ __wt('reconComputedClosingSub') }}</span>
             <span class="recon-amount">฿{{ formatNumber(report.reconciliation.computedClosingBalance) }}</span>
           </div>
 
           <div class="recon-row recon-actual">
-            <span class="recon-label">Actual closing balance</span>
-            <span class="recon-sub">live sum of all wallets</span>
+            <span class="recon-label">{{ __wt('reconActualClosing') }}</span>
+            <span class="recon-sub">{{ __wt('reconActualClosingSub') }}</span>
             <span class="recon-amount">฿{{ formatNumber(report.reconciliation.actualClosingBalance) }}</span>
           </div>
 
@@ -174,21 +179,16 @@
           >
             <span class="recon-label">
               <i class="fas fa-exclamation-triangle"></i>
-              Unexplained gap
+              {{ __wt('reconUnexplainedGap') }}
             </span>
-            <span class="recon-sub">
-              Investigate: backdated transactions, schema drift, or direct wallet edits
-            </span>
+            <span class="recon-sub">{{ __wt('reconUnexplainedGapSub') }}</span>
             <span class="recon-amount">฿{{ formatNumber(report.reconciliation.gap) }}</span>
           </div>
         </div>
 
         <div class="recon-footnote">
           <i class="fas fa-info-circle"></i>
-          Opening balance is computed as
-          <code>actual closing − net period movements</code>.
-          For an audit-grade snapshot, capture a daily balance snapshot
-          and reconcile against that instead.
+          {{ __wt('reconFootnote') }}
         </div>
       </div>
 
@@ -198,16 +198,14 @@
           <div>
             <h2>
               <i class="fas fa-coins"></i>
-              Cash Position
+              {{ __wt('cashTitle') }}
             </h2>
-            <p>
-              Cash flowing in and out of the wallet system during the period.
-            </p>
+            <p>{{ __wt('cashSubtitle') }}</p>
           </div>
           <div
             :class="['cash-net-pill', report.cashPosition.netCashPosition >= 0 ? 'up' : 'down']"
           >
-            <span class="cash-net-label">Net cash held change</span>
+            <span class="cash-net-label">{{ __wt('cashNetLabel') }}</span>
             <span class="cash-net-amount">
               {{ report.cashPosition.netCashPosition >= 0 ? '+' : '−' }}฿{{ formatNumber(Math.abs(report.cashPosition.netCashPosition)) }}
             </span>
@@ -220,9 +218,9 @@
               <i class="fas fa-arrow-down"></i>
             </div>
             <div class="cash-tile-body">
-              <div class="cash-tile-label">Cash collected</div>
+              <div class="cash-tile-label">{{ __wt('cashCollected') }}</div>
               <div class="cash-tile-value">฿{{ formatNumber(report.cashPosition.cashCollected) }}</div>
-              <div class="cash-tile-sub">{{ formatInt(report.cashPosition.cashCollectedCount) }} top-ups</div>
+              <div class="cash-tile-sub">{{ __wt('cashCollectedSub', { count: formatInt(report.cashPosition.cashCollectedCount) }) }}</div>
             </div>
           </div>
 
@@ -231,9 +229,9 @@
               <i class="fas fa-arrow-up"></i>
             </div>
             <div class="cash-tile-body">
-              <div class="cash-tile-label">Service delivered</div>
+              <div class="cash-tile-label">{{ __wt('cashServiceDelivered') }}</div>
               <div class="cash-tile-value">฿{{ formatNumber(report.cashPosition.serviceDelivered) }}</div>
-              <div class="cash-tile-sub">{{ formatInt(report.cashPosition.serviceDeliveredCount) }} payments</div>
+              <div class="cash-tile-sub">{{ __wt('cashServiceDeliveredSub', { count: formatInt(report.cashPosition.serviceDeliveredCount) }) }}</div>
             </div>
           </div>
 
@@ -242,9 +240,9 @@
               <i class="fas fa-gift"></i>
             </div>
             <div class="cash-tile-body">
-              <div class="cash-tile-label">Promotional cost</div>
+              <div class="cash-tile-label">{{ __wt('cashPromoCost') }}</div>
               <div class="cash-tile-value">฿{{ formatNumber(report.cashPosition.promotionalCost) }}</div>
-              <div class="cash-tile-sub">{{ formatInt(report.cashPosition.promotionalCostCount) }} bonuses / vouchers</div>
+              <div class="cash-tile-sub">{{ __wt('cashPromoCostSub', { count: formatInt(report.cashPosition.promotionalCostCount) }) }}</div>
             </div>
           </div>
 
@@ -253,18 +251,16 @@
               <i class="fas fa-undo"></i>
             </div>
             <div class="cash-tile-body">
-              <div class="cash-tile-label">Refunded to customers</div>
+              <div class="cash-tile-label">{{ __wt('cashRefunded') }}</div>
               <div class="cash-tile-value">฿{{ formatNumber(report.cashPosition.refundedToCustomers) }}</div>
-              <div class="cash-tile-sub">{{ formatInt(report.cashPosition.refundedToCustomersCount) }} refunds</div>
+              <div class="cash-tile-sub">{{ __wt('cashRefundedSub', { count: formatInt(report.cashPosition.refundedToCustomersCount) }) }}</div>
             </div>
           </div>
         </div>
 
         <div class="cash-footnote">
           <i class="fas fa-info-circle"></i>
-          Net cash held change = Cash collected − Service delivered − Refunds.
-          Promotional cost reflects credit you gave away (no cash impact);
-          it's tracked separately for marketing accounting.
+          {{ __wt('cashFootnote') }}
         </div>
       </div>
 
@@ -274,17 +270,14 @@
           <div>
             <h2>
               <i class="fas fa-gift"></i>
-              Promotional Cost
+              {{ __wt('promoTitle') }}
             </h2>
-            <p>
-              Wallet credit you gave to customers. Not cash out, but a
-              marketing expense.
-            </p>
+            <p>{{ __wt('promoSubtitle') }}</p>
           </div>
           <div class="promo-total">
-            <span class="promo-total-label">Total given</span>
+            <span class="promo-total-label">{{ __wt('promoTotalLabel') }}</span>
             <span class="promo-total-value">฿{{ formatNumber(report.promotionalCostDetail.total) }}</span>
-            <span class="promo-total-sub">{{ formatInt(report.promotionalCostDetail.totalCount) }} bonuses</span>
+            <span class="promo-total-sub">{{ __wt('promoTotalSub', { count: formatInt(report.promotionalCostDetail.totalCount) }) }}</span>
           </div>
         </div>
 
@@ -292,37 +285,35 @@
           <div class="promo-split-tile">
             <div class="promo-tile-head">
               <i class="fas fa-ticket-alt"></i>
-              Voucher redemptions
+              {{ __wt('promoVouchers') }}
             </div>
             <div class="promo-tile-value">฿{{ formatNumber(report.promotionalCostDetail.voucher.amount) }}</div>
             <div class="promo-tile-sub">
-              {{ formatInt(report.promotionalCostDetail.voucher.count) }} redemptions
-              · {{ promoShare(report.promotionalCostDetail.voucher.amount) }}% of total
+              {{ __wt('promoVoucherCount', { count: formatInt(report.promotionalCostDetail.voucher.count), percent: promoShare(report.promotionalCostDetail.voucher.amount) }) }}
             </div>
           </div>
           <div class="promo-split-tile">
             <div class="promo-tile-head">
               <i class="fas fa-star"></i>
-              System bonuses
+              {{ __wt('promoSystemBonuses') }}
             </div>
             <div class="promo-tile-value">฿{{ formatNumber(report.promotionalCostDetail.systemBonus.amount) }}</div>
             <div class="promo-tile-sub">
-              {{ formatInt(report.promotionalCostDetail.systemBonus.count) }} bonuses
-              · {{ promoShare(report.promotionalCostDetail.systemBonus.amount) }}% of total
+              {{ __wt('promoBonusCount', { count: formatInt(report.promotionalCostDetail.systemBonus.count), percent: promoShare(report.promotionalCostDetail.systemBonus.amount) }) }}
             </div>
           </div>
         </div>
 
         <div class="promo-vouchers" v-if="report.promotionalCostDetail.topVouchers.length">
-          <h3>Top vouchers by redemption volume</h3>
+          <h3>{{ __wt('promoTopVouchers') }}</h3>
           <table class="promo-voucher-table">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Description</th>
-                <th class="num">Redemptions</th>
-                <th class="num">Amount given</th>
-                <th class="num">% of voucher cost</th>
+                <th>{{ __wt('promoCol_code') }}</th>
+                <th>{{ __wt('promoCol_description') }}</th>
+                <th class="num">{{ __wt('promoCol_redemptions') }}</th>
+                <th class="num">{{ __wt('promoCol_amount') }}</th>
+                <th class="num">{{ __wt('promoCol_share') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -344,23 +335,21 @@
           <div>
             <h2>
               <i class="fas fa-beer"></i>
-              Beer Machine Revenue
+              {{ __wt('machinesTitle') }}
             </h2>
-            <p>
-              Revenue, pours, and volume dispensed per machine, grouped by branch.
-            </p>
+            <p>{{ __wt('machinesSubtitle') }}</p>
           </div>
           <div class="machine-revenue-totals">
             <div class="mrev-total">
-              <span class="mrev-total-label">Revenue</span>
+              <span class="mrev-total-label">{{ __wt('machinesRevenue') }}</span>
               <span class="mrev-total-value">฿{{ formatNumber(machineTotals.revenue) }}</span>
             </div>
             <div class="mrev-total">
-              <span class="mrev-total-label">Pours</span>
+              <span class="mrev-total-label">{{ __wt('machinesPours') }}</span>
               <span class="mrev-total-value">{{ formatInt(machineTotals.pours) }}</span>
             </div>
             <div class="mrev-total">
-              <span class="mrev-total-label">Volume</span>
+              <span class="mrev-total-label">{{ __wt('machinesVolume') }}</span>
               <span class="mrev-total-value">{{ formatVolume(machineTotals.volumeMl) }}</span>
             </div>
           </div>
@@ -368,7 +357,7 @@
 
         <div v-if="machineGroups.length === 0" class="mrev-empty">
           <i class="fas fa-beer"></i>
-          <p>No beer machine activity in this period.</p>
+          <p>{{ __wt('machinesEmpty') }}</p>
         </div>
 
         <div v-else class="mrev-branch-groups">
@@ -382,12 +371,12 @@
                 <i v-if="group.branchUnattributed" class="fas fa-question-circle"></i>
                 <i v-else class="fas fa-map-marker-alt"></i>
                 {{ group.branch }}
-                <span v-if="group.branchUnattributed" class="mrev-tag">no branch</span>
+                <span v-if="group.branchUnattributed" class="mrev-tag">{{ __wt('machinesNoBranch') }}</span>
               </div>
               <div class="mrev-branch-summary">
                 <span><strong>฿{{ formatNumber(group.revenue) }}</strong></span>
                 <span class="muted">·</span>
-                <span>{{ formatInt(group.pours) }} pours</span>
+                <span>{{ __wt('machinesPoursLabel', { count: formatInt(group.pours) }) }}</span>
                 <span class="muted">·</span>
                 <span>{{ formatVolume(group.volumeMl) }}</span>
                 <span class="muted">·</span>
@@ -398,13 +387,13 @@
             <table class="mrev-table">
               <thead>
                 <tr>
-                  <th>Machine</th>
-                  <th class="num">Pours</th>
-                  <th class="num">Volume</th>
-                  <th class="num">Revenue</th>
-                  <th class="num">Avg / pour</th>
-                  <th class="num">% of branch</th>
-                  <th>Last activity</th>
+                  <th>{{ __wt('machinesCol_machine') }}</th>
+                  <th class="num">{{ __wt('machinesCol_pours') }}</th>
+                  <th class="num">{{ __wt('machinesCol_volume') }}</th>
+                  <th class="num">{{ __wt('machinesCol_revenue') }}</th>
+                  <th class="num">{{ __wt('machinesCol_avgPerPour') }}</th>
+                  <th class="num">{{ __wt('machinesCol_branchShare') }}</th>
+                  <th>{{ __wt('machinesCol_lastActivity') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -424,10 +413,10 @@
                     <template v-else-if="m.machineId">
                       <code class="machine-id">{{ m.machineId }}</code>
                       <nuxt-link to="/wallets/machines" class="machine-name-link">
-                        <i class="fas fa-tag"></i> Name this
+                        <i class="fas fa-tag"></i> {{ __wt('machinesNameThis') }}
                       </nuxt-link>
                     </template>
-                    <span v-else class="mrev-tag">unknown machine</span>
+                    <span v-else class="mrev-tag">{{ __wt('machinesUnknown') }}</span>
                   </td>
                   <td class="num">{{ formatInt(m.pours) }}</td>
                   <td class="num">{{ formatVolume(m.volumeMl) }}</td>
@@ -450,9 +439,9 @@
               <i class="fas fa-wallet"></i>
             </div>
           </div>
-          <div class="stat-label">Total Wallet Balance</div>
+          <div class="stat-label">{{ __wt('rptTotalWalletBalance') }}</div>
           <div class="stat-value">฿{{ formatNumber(report.summary?.totalWalletBalance) }}</div>
-          <div class="stat-subtitle">Pending: ฿{{ formatNumber(report.summary?.totalPendingBalance) }}</div>
+          <div class="stat-subtitle">{{ __wt('rptPending') }}: ฿{{ formatNumber(report.summary?.totalPendingBalance) }}</div>
         </div>
 
         <div class="wallet-stat-card">
@@ -461,9 +450,9 @@
               <i class="fas fa-users"></i>
             </div>
           </div>
-          <div class="stat-label">Active Wallets</div>
+          <div class="stat-label">{{ __wt('rptActiveWallets') }}</div>
           <div class="stat-value">{{ formatNumber(report.summary?.activeWallets) }}</div>
-          <div class="stat-subtitle">Frozen: {{ report.summary?.frozenWallets || 0 }}</div>
+          <div class="stat-subtitle">{{ __wt('rptFrozen') }}: {{ report.summary?.frozenWallets || 0 }}</div>
         </div>
 
         <div class="wallet-stat-card">
@@ -472,9 +461,9 @@
               <i class="fas fa-exchange-alt"></i>
             </div>
           </div>
-          <div class="stat-label">Total Transactions</div>
+          <div class="stat-label">{{ __wt('rptTotalTransactions') }}</div>
           <div class="stat-value">{{ formatNumber(report.transactionSummary?.totalTransactions) }}</div>
-          <div class="stat-subtitle">Volume: ฿{{ formatNumber(report.transactionSummary?.totalVolume) }}</div>
+          <div class="stat-subtitle">{{ __wt('rptVolume') }}: ฿{{ formatNumber(report.transactionSummary?.totalVolume) }}</div>
         </div>
 
         <div class="wallet-stat-card">
@@ -483,9 +472,9 @@
               <i class="fas fa-coins"></i>
             </div>
           </div>
-          <div class="stat-label">Revenue</div>
+          <div class="stat-label">{{ __wt('rptRevenue') }}</div>
           <div class="stat-value">฿{{ formatNumber(report.revenue?.totalRevenue) }}</div>
-          <div class="stat-subtitle">From transaction fees</div>
+          <div class="stat-subtitle">{{ __wt('rptFromFees') }}</div>
         </div>
       </div>
 
@@ -495,34 +484,31 @@
           <div>
             <h2>
               <i class="fas fa-calendar-day"></i>
-              Daily Activity
+              {{ __wt('dailyTitle') }}
             </h2>
-            <p>
-              One row per day. Match against bank deposits (top-ups) and POS
-              daily sales (spend). Dates with no activity are omitted.
-            </p>
+            <p>{{ __wt('dailySubtitle') }}</p>
           </div>
           <div class="daily-totals">
-            <span class="daily-totals-label">{{ formatInt(report.daily.length) }} days with activity</span>
+            <span class="daily-totals-label">{{ __wt('dailyDaysActive', { count: formatInt(report.daily.length) }) }}</span>
           </div>
         </div>
 
         <div v-if="report.daily.length === 0" class="daily-empty">
           <i class="fas fa-calendar-times"></i>
-          <p>No transactions in this period.</p>
+          <p>{{ __wt('dailyEmpty') }}</p>
         </div>
 
         <div v-else class="daily-table-wrap">
           <table class="daily-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th class="num">Top-ups</th>
-                <th class="num">Bonus/Voucher</th>
-                <th class="num">Spend</th>
-                <th class="num">Refunds</th>
-                <th class="num">Transactions</th>
-                <th class="num">Net change</th>
+                <th>{{ __wt('dailyCol_date') }}</th>
+                <th class="num">{{ __wt('dailyCol_topUps') }}</th>
+                <th class="num">{{ __wt('dailyCol_bonus') }}</th>
+                <th class="num">{{ __wt('dailyCol_spend') }}</th>
+                <th class="num">{{ __wt('dailyCol_refunds') }}</th>
+                <th class="num">{{ __wt('dailyCol_transactions') }}</th>
+                <th class="num">{{ __wt('dailyCol_netChange') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -543,7 +529,7 @@
             </tbody>
             <tfoot v-if="dailyTotals">
               <tr>
-                <td><strong>Period total</strong></td>
+                <td><strong>{{ __wt('dailyPeriodTotal') }}</strong></td>
                 <td class="num"><strong>฿{{ formatNumber(dailyTotals.topUp) }}</strong></td>
                 <td class="num"><strong>฿{{ formatNumber(dailyTotals.bonus) }}</strong></td>
                 <td class="num"><strong>฿{{ formatNumber(dailyTotals.spend) }}</strong></td>
@@ -566,17 +552,15 @@
           <div>
             <h2>
               <i class="fas fa-exclamation-triangle"></i>
-              Items Requiring Attention
+              {{ __wt('attTitle') }}
             </h2>
-            <p>
-              Anything an accountant should look at before closing the period.
-            </p>
+            <p>{{ __wt('attSubtitle') }}</p>
           </div>
           <div
             :class="['attention-count', report.attentionItems.totalItems === 0 ? 'all-clear' : 'has-items']"
           >
-            <span v-if="report.attentionItems.totalItems === 0">All clear</span>
-            <span v-else>{{ formatInt(report.attentionItems.totalItems) }} items</span>
+            <span v-if="report.attentionItems.totalItems === 0">{{ __wt('attAllClear') }}</span>
+            <span v-else>{{ __wt('attItems', { count: formatInt(report.attentionItems.totalItems) }) }}</span>
           </div>
         </div>
 
@@ -585,22 +569,22 @@
           <div class="attention-section">
             <div class="attention-section-head">
               <i class="fas fa-hourglass-half"></i>
-              <span>Stuck pending top-ups</span>
+              <span>{{ __wt('attStuckPending') }}</span>
               <span class="attention-section-count">
                 {{ report.attentionItems.stuckPendingTopUps.length }}
               </span>
             </div>
             <div v-if="report.attentionItems.stuckPendingTopUps.length === 0" class="attention-empty">
-              No stuck top-ups.
+              {{ __wt('attStuckEmpty') }}
             </div>
             <table v-else class="attention-table">
               <thead>
                 <tr>
-                  <th>Transaction</th>
-                  <th>User</th>
-                  <th>Method</th>
-                  <th class="num">Amount</th>
-                  <th>Stuck since</th>
+                  <th>{{ __wt('attCol_transaction') }}</th>
+                  <th>{{ __wt('attCol_user') }}</th>
+                  <th>{{ __wt('attCol_method') }}</th>
+                  <th class="num">{{ __wt('attCol_amount') }}</th>
+                  <th>{{ __wt('attCol_stuckSince') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -619,20 +603,20 @@
           <div class="attention-section">
             <div class="attention-section-head">
               <i class="fas fa-times-circle"></i>
-              <span>Failed transactions</span>
+              <span>{{ __wt('attFailed') }}</span>
               <span class="attention-section-count">
                 {{ failedTotalCount }}
               </span>
             </div>
             <div v-if="report.attentionItems.failedByType.length === 0" class="attention-empty">
-              No failed transactions in this period.
+              {{ __wt('attFailedEmpty') }}
             </div>
             <table v-else class="attention-table">
               <thead>
                 <tr>
-                  <th>Type</th>
-                  <th class="num">Count</th>
-                  <th class="num">Volume attempted</th>
+                  <th>{{ __wt('attCol_type') }}</th>
+                  <th class="num">{{ __wt('attCol_count') }}</th>
+                  <th class="num">{{ __wt('attCol_volumeAttempted') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -649,22 +633,22 @@
           <div class="attention-section">
             <div class="attention-section-head">
               <i class="fas fa-user-shield"></i>
-              <span>Admin adjustments</span>
+              <span>{{ __wt('attAdjustments') }}</span>
               <span class="attention-section-count">
                 {{ report.attentionItems.adjustments.length }}
               </span>
             </div>
             <div v-if="report.attentionItems.adjustments.length === 0" class="attention-empty">
-              No admin adjustments in this period.
+              {{ __wt('attAdjustmentsEmpty') }}
             </div>
             <table v-else class="attention-table">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>User</th>
-                  <th class="num">Amount</th>
-                  <th>Admin</th>
-                  <th>Reason</th>
+                  <th>{{ __wt('attCol_date') }}</th>
+                  <th>{{ __wt('attCol_user') }}</th>
+                  <th class="num">{{ __wt('attCol_amount') }}</th>
+                  <th>{{ __wt('attCol_admin') }}</th>
+                  <th>{{ __wt('attCol_reason') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -685,21 +669,21 @@
           <div class="attention-section">
             <div class="attention-section-head">
               <i class="fas fa-undo"></i>
-              <span>Refunds</span>
+              <span>{{ __wt('attRefunds') }}</span>
               <span class="attention-section-count">
                 {{ report.attentionItems.refunds.length }}
               </span>
             </div>
             <div v-if="report.attentionItems.refunds.length === 0" class="attention-empty">
-              No refunds in this period.
+              {{ __wt('attRefundsEmpty') }}
             </div>
             <table v-else class="attention-table">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>User</th>
-                  <th class="num">Amount</th>
-                  <th>Description</th>
+                  <th>{{ __wt('attCol_date') }}</th>
+                  <th>{{ __wt('attCol_user') }}</th>
+                  <th class="num">{{ __wt('attCol_amount') }}</th>
+                  <th>{{ __wt('attCol_description') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -719,7 +703,7 @@
       <div style="background: white; border-radius: 16px; padding: 24px; margin-bottom: 24px; border: 1px solid #E2E8F0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);">
         <h2 style="font-size: 20px; font-weight: 700; color: #063F48; margin-bottom: 24px;">
           <i class="fas fa-chart-pie"></i>
-          Transaction Breakdown by Type
+          {{ __wt('rptTransactionBreakdown') }}
         </h2>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
           <div
@@ -731,7 +715,7 @@
               {{ formatType(type) }}
             </div>
             <div style="font-size: 12px; color: #6B7280; margin-bottom: 8px;">
-              {{ data.count }} transactions
+              {{ __wt('rptTransactionsLabel', { count: data.count }) }}
             </div>
             <div style="font-size: 22px; font-weight: 700; color: #1797AD;">
               ฿{{ formatNumber(data.volume) }}
@@ -745,11 +729,11 @@
         <div class="wallet-stat-card chart-card">
           <h3 class="chart-title">
             <i class="fas fa-chart-bar"></i>
-            Volume by Transaction Type
+            {{ __wt('rptVolumeByType') }}
           </h3>
           <div v-if="!hasTypeData" class="chart-empty">
             <i class="fas fa-chart-bar"></i>
-            <p>No transactions in this period</p>
+            <p>{{ __wt('rptChartEmpty') }}</p>
           </div>
           <div v-else class="chart-canvas-wrap">
             <canvas ref="volumeChart"></canvas>
@@ -759,11 +743,11 @@
         <div class="wallet-stat-card chart-card">
           <h3 class="chart-title">
             <i class="fas fa-chart-pie"></i>
-            Transactions by Type
+            {{ __wt('rptTransactionsByType') }}
           </h3>
           <div v-if="!hasTypeData" class="chart-empty">
             <i class="fas fa-chart-pie"></i>
-            <p>No transactions in this period</p>
+            <p>{{ __wt('rptChartEmpty') }}</p>
           </div>
           <div v-else class="chart-canvas-wrap">
             <canvas ref="countChart"></canvas>
@@ -775,54 +759,54 @@
       <div class="wallet-table-container">
         <h2 style="font-size: 20px; font-weight: 700; color: #063F48; margin-bottom: 20px; padding: 0 16px; padding-top: 16px;">
           <i class="fas fa-table"></i>
-          Detailed Statistics
+          {{ __wt('rptDetailedStats') }}
         </h2>
         <table class="wallet-table">
           <thead>
             <tr>
-              <th><i class="fas fa-tag"></i> Metric</th>
-              <th style="text-align: right;"><i class="fas fa-chart-bar"></i> Value</th>
+              <th><i class="fas fa-tag"></i> {{ __wt('rptMetric') }}</th>
+              <th style="text-align: right;"><i class="fas fa-chart-bar"></i> {{ __wt('rptValue') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>Total Wallet Balance</td>
+              <td>{{ __wt('rptStat_totalWalletBalance') }}</td>
               <td style="text-align: right; font-weight: 600; color: #1797AD;">฿{{ formatNumber(report.summary?.totalWalletBalance) }}</td>
             </tr>
             <tr>
-              <td>Total Pending Balance</td>
+              <td>{{ __wt('rptStat_totalPending') }}</td>
               <td style="text-align: right; font-weight: 600; color: #FFB800;">฿{{ formatNumber(report.summary?.totalPendingBalance) }}</td>
             </tr>
             <tr>
-              <td>Total Frozen Balance</td>
+              <td>{{ __wt('rptStat_totalFrozen') }}</td>
               <td style="text-align: right; font-weight: 600; color: #6B7280;">฿{{ formatNumber(report.summary?.totalFrozenBalance) }}</td>
             </tr>
             <tr>
-              <td>Active Wallets</td>
+              <td>{{ __wt('rptStat_activeWallets') }}</td>
               <td style="text-align: right; font-weight: 600;">{{ report.summary?.activeWallets }}</td>
             </tr>
             <tr>
-              <td>Frozen Wallets</td>
+              <td>{{ __wt('rptStat_frozenWallets') }}</td>
               <td style="text-align: right; font-weight: 600;">{{ report.summary?.frozenWallets }}</td>
             </tr>
             <tr>
-              <td>Suspended Wallets</td>
+              <td>{{ __wt('rptStat_suspendedWallets') }}</td>
               <td style="text-align: right; font-weight: 600;">{{ report.summary?.suspendedWallets }}</td>
             </tr>
             <tr>
-              <td>Total Transactions</td>
+              <td>{{ __wt('rptStat_totalTransactions') }}</td>
               <td style="text-align: right; font-weight: 600;">{{ formatNumber(report.transactionSummary?.totalTransactions) }}</td>
             </tr>
             <tr>
-              <td>Total Transaction Volume</td>
+              <td>{{ __wt('rptStat_totalVolume') }}</td>
               <td style="text-align: right; font-weight: 600; color: #1797AD;">฿{{ formatNumber(report.transactionSummary?.totalVolume) }}</td>
             </tr>
             <tr>
-              <td>Top-up Fees Revenue</td>
+              <td>{{ __wt('rptStat_topUpFees') }}</td>
               <td style="text-align: right; font-weight: 600; color: #00A862;">฿{{ formatNumber(report.revenue?.topUpFees) }}</td>
             </tr>
             <tr>
-              <td>Total Revenue</td>
+              <td>{{ __wt('rptStat_totalRevenue') }}</td>
               <td style="text-align: right; font-weight: 700; color: #00A862; font-size: 16px;">฿{{ formatNumber(report.revenue?.totalRevenue) }}</td>
             </tr>
           </tbody>
@@ -952,6 +936,7 @@ export default {
     },
   },
   async mounted() {
+    this.__hydrateWalletUiLang();
     if (process.client) {
       const chartModule = await import('chart.js');
       this.Chart = chartModule.Chart;
@@ -1077,6 +1062,32 @@ export default {
 
     printReport() {
       window.print();
+    },
+
+    toggleWalletLang() {
+      const next = this.$store.state.walletUiLang === 'th' ? 'en' : 'th';
+      this.__setWalletUiLang(next);
+    },
+
+    // Reconciliation lines arrive from the backend with a stable key.
+    // Map that key to a translation entry. Fall back to the backend's
+    // English label if a translation key isn't defined.
+    translateReconLine(line) {
+      const keyMap = {
+        top_up_in: 'reconLineTopUps',
+        bonus_in: 'reconLineBonuses',
+        refund_in: 'reconLineRefunds',
+        conversion_in: 'reconLineConversions',
+        transfer_in: 'reconLineTransfersIn',
+        adjustment_in: 'reconLineAdminCredits',
+        store_out: 'reconLineStorePayments',
+        beer_out: 'reconLineBeerPayments',
+        withdrawal_out: 'reconLineWithdrawals',
+        transfer_out: 'reconLineTransfersOut',
+        adjustment_out: 'reconLineAdminDebits',
+      };
+      const i18nKey = keyMap[line.key];
+      return i18nKey ? this.__wt(i18nKey) : line.label;
     },
 
     async exportReport() {
@@ -2677,5 +2688,10 @@ export default {
   aside {
     display: none !important;
   }
+}
+
+.wallet-lang-toggle {
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 </style>
