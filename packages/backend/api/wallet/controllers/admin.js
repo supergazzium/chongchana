@@ -614,14 +614,22 @@ module.exports = {
         reportType = 'summary',
         fromDate,
         toDate,
-        // groupBy = 'day', // Reserved for future time-series grouping
       } = ctx.query;
 
       const from = fromDate || new Date(new Date().setDate(1)).toISOString();
       const to = toDate || new Date().toISOString();
 
-      // Get wallet summary
-      const walletSummary = await strapi.connections.default.raw(`
+      // Compute previous period of equal length for delta comparison
+      const fromMs = new Date(from).getTime();
+      const toMs = new Date(to).getTime();
+      const span = toMs - fromMs;
+      const prevTo = new Date(fromMs).toISOString();
+      const prevFrom = new Date(fromMs - span).toISOString();
+
+      const knex = strapi.connections.default;
+
+      // Wallet totals (point-in-time; not period-bound)
+      const walletSummary = await knex.raw(`
         SELECT
           SUM(balance) as total_wallet_balance,
           SUM(pending_balance) as total_pending_balance,
@@ -633,11 +641,9 @@ module.exports = {
         FROM wallets
       `);
 
-      // Get transaction summary for the period
-      const transSummary = await strapi.connections.default.raw(`
+      // Period transaction breakdown by type (current period)
+      const transSummary = await knex.raw(`
         SELECT
-          COUNT(*) as total_transactions,
-          SUM(amount) as total_volume,
           type,
           COUNT(*) as count,
           SUM(amount) as volume
@@ -646,29 +652,70 @@ module.exports = {
         GROUP BY type
       `, [from, to]);
 
-      // Calculate revenue from fees
-      const revenue = await strapi.connections.default.raw(`
+      // Same breakdown for previous period (for delta calculation)
+      const prevTransSummary = await knex.raw(`
         SELECT
-          SUM(fee) as total_fees
+          type,
+          COUNT(*) as count,
+          SUM(amount) as volume
+        FROM wallet_transactions
+        WHERE created_at BETWEEN ? AND ?
+        GROUP BY type
+      `, [prevFrom, prevTo]);
+
+      // Fees revenue
+      const revenue = await knex.raw(`
+        SELECT SUM(fee) as total_fees
         FROM wallet_transactions
         WHERE created_at BETWEEN ? AND ? AND fee > 0
       `, [from, to]);
 
-      // Build response
-      const byType = {};
-      transSummary[0].forEach(t => {
-        byType[t.type] = {
-          count: t.count,
-          volume: parseFloat(t.volume) || 0,
+      // Branch spend breakdown for the period.
+      // Spend types are store_payment and beer_machine_payment (amounts are
+      // stored as negatives; ABS() to surface gross spend).
+      const branchBreakdown = await knex.raw(`
+        SELECT
+          branch,
+          COUNT(*) as transactions,
+          SUM(ABS(amount)) as volume
+        FROM wallet_transactions
+        WHERE created_at BETWEEN ? AND ?
+          AND type IN ('store_payment', 'beer_machine_payment')
+          AND branch IS NOT NULL
+          AND branch <> ''
+        GROUP BY branch
+        ORDER BY volume DESC
+      `, [from, to]);
+
+      // Helpers to project type rows into the metrics the dashboard needs
+      const projectTotals = (rows) => {
+        const map = {};
+        rows.forEach((r) => {
+          map[r.type] = {
+            count: Number(r.count) || 0,
+            volume: Math.abs(parseFloat(r.volume) || 0),
+          };
+        });
+        const get = (t) => map[t] || { count: 0, volume: 0 };
+        const spendCount = get('store_payment').count + get('beer_machine_payment').count;
+        const spendVolume = get('store_payment').volume + get('beer_machine_payment').volume;
+        return {
+          byType: map,
+          topUp: get('top_up'),
+          bonus: get('bonus'),
+          spend: { count: spendCount, volume: spendVolume },
+          totalTransactions: Object.values(map).reduce((s, v) => s + v.count, 0),
+          totalVolume: Object.values(map).reduce((s, v) => s + v.volume, 0),
         };
-      });
+      };
+
+      const current = projectTotals(transSummary[0]);
+      const previous = projectTotals(prevTransSummary[0]);
 
       ctx.send(utils.successResponse({
         reportType,
-        period: {
-          from,
-          to,
-        },
+        period: { from, to },
+        previousPeriod: { from: prevFrom, to: prevTo },
         summary: {
           totalWalletBalance: parseFloat(walletSummary[0][0].total_wallet_balance) || 0,
           totalPendingBalance: parseFloat(walletSummary[0][0].total_pending_balance) || 0,
@@ -678,10 +725,27 @@ module.exports = {
           suspendedWallets: walletSummary[0][0].suspended_wallets,
         },
         transactionSummary: {
-          totalTransactions: transSummary[0].reduce((sum, t) => sum + t.count, 0),
-          totalVolume: transSummary[0].reduce((sum, t) => sum + parseFloat(t.volume || 0), 0),
-          byType,
+          totalTransactions: current.totalTransactions,
+          totalVolume: current.totalVolume,
+          byType: current.byType,
+          topUpVolume: current.topUp.volume,
+          topUpCount: current.topUp.count,
+          bonusVolume: current.bonus.volume,
+          bonusCount: current.bonus.count,
+          spendVolume: current.spend.volume,
+          spendCount: current.spend.count,
         },
+        previousTransactionSummary: {
+          topUpVolume: previous.topUp.volume,
+          bonusVolume: previous.bonus.volume,
+          spendVolume: previous.spend.volume,
+          totalVolume: previous.totalVolume,
+        },
+        byBranch: branchBreakdown[0].map((row) => ({
+          branch: row.branch,
+          transactions: Number(row.transactions) || 0,
+          volume: parseFloat(row.volume) || 0,
+        })),
         revenue: {
           topUpFees: parseFloat(revenue[0][0].total_fees) || 0,
           withdrawalFees: 0,

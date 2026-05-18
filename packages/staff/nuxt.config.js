@@ -79,6 +79,9 @@ export default {
     '@nuxtjs/axios',
     '@nuxtjs/auth-next',
   ],
+  router: {
+    middleware: ['working-branch'],
+  },
   auth: {
     redirect: {
       login: '/signin',

@@ -275,6 +275,7 @@ module.exports = {
         amount,
         description,
         metadata, // Optional: { machineId, staffId, location, etc. }
+        workingBranchId, // Optional: branch staff is physically working at (overrides metadata.branch)
       } = ctx.request.body;
 
       // Validate inputs
@@ -371,31 +372,64 @@ module.exports = {
         // Determine transaction type
         const transactionType = purpose === 'beer_machine' ? 'beer_machine_payment' : 'store_payment';
 
-        // Extract and resolve branch from metadata
+        // Resolve branch. Precedence:
+        //   1. workingBranchId (staff-selected branch for current shift) — authoritative
+        //   2. metadata.branch (legacy: staff app sent home branch object/id/name)
         let branch = null;
-        if (metadata?.branch) {
-          // If branch is an object with name property (full branch data from staff app)
+        let resolvedBranchId = null;
+        let branchSource = null;
+
+        if (workingBranchId !== undefined && workingBranchId !== null && !isNaN(workingBranchId)) {
+          try {
+            const branchResult = await knex('branches')
+              .select('id', 'name')
+              .where({ id: workingBranchId })
+              .first();
+            if (branchResult) {
+              branch = branchResult.name;
+              resolvedBranchId = branchResult.id;
+              branchSource = 'selected';
+            } else {
+              await trx.rollback();
+              return ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', 'Invalid working branch'));
+            }
+          } catch (err) {
+            strapi.log.error('[Payment QR] Error looking up working branch:', err);
+            await trx.rollback();
+            return ctx.badRequest(utils.errorResponse('PAYMENT_ERROR', 'Failed to resolve working branch'));
+          }
+        } else if (metadata?.branch) {
+          branchSource = 'home';
           if (typeof metadata.branch === 'object' && metadata.branch.name) {
             branch = metadata.branch.name;
-          }
-          // If branch is a number (branch ID), look up the branch name
-          else if (typeof metadata.branch === 'number' || !isNaN(metadata.branch)) {
+            resolvedBranchId = metadata.branch.id || null;
+          } else if (typeof metadata.branch === 'number' || !isNaN(metadata.branch)) {
             try {
               const branchResult = await knex('branches')
-                .select('name')
+                .select('id', 'name')
                 .where({ id: metadata.branch })
                 .first();
               branch = branchResult?.name || null;
+              resolvedBranchId = branchResult?.id || null;
             } catch (err) {
               strapi.log.error('[Payment QR] Error looking up branch name:', err);
               branch = `Branch ${metadata.branch}`;
             }
-          }
-          // If it's already a string (branch name), use it directly
-          else if (typeof metadata.branch === 'string') {
+          } else if (typeof metadata.branch === 'string') {
             branch = metadata.branch;
           }
         }
+
+        // Annotate metadata with branch attribution for audit/reporting.
+        // Keeps the original payload intact and adds derived fields.
+        const homeBranchRef = metadata && metadata.branch !== undefined ? metadata.branch : null;
+        const enrichedMetadata = {
+          ...(metadata || {}),
+          branchSource,
+          resolvedBranchId,
+          resolvedBranchName: branch,
+          homeBranch: homeBranchRef,
+        };
 
         // Create transaction record with precise decimal values
         await trx('wallet_transactions').insert({
@@ -407,7 +441,7 @@ module.exports = {
           balance_after: newBalance.toFixed(2),
           status: 'completed',
           description: description || `${purpose === 'beer_machine' ? 'Beer machine' : 'Store'} payment`,
-          metadata: metadata ? JSON.stringify(metadata) : null,
+          metadata: JSON.stringify(enrichedMetadata),
           branch: branch,
           created_at: new Date(),
         });

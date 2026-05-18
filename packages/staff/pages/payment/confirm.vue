@@ -43,6 +43,27 @@
         </div>
       </div>
 
+      <div
+        class="charge-branch-banner"
+        :class="{ 'is-away': _awayFromHome }"
+        v-if="_workingBranch"
+      >
+        <div class="cbb-main">
+          <i class="fas fa-map-marker-alt"></i>
+          <div>
+            <div class="cbb-label">Charging to</div>
+            <div class="cbb-value">{{ _workingBranch.name }}</div>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="cbb-change"
+          @click="changeBranch"
+        >
+          Change
+        </button>
+      </div>
+
       <sl-form class="form-payment" @sl-submit="onSubmit">
         <sl-input
           name="amount"
@@ -107,8 +128,19 @@ export default {
     _paymentData() {
       return this.$store.state.paymentData;
     },
+    _workingBranch() {
+      return this.$store.state.workingBranch;
+    },
+    _awayFromHome() {
+      return this.$store.getters.isWorkingAwayFromHome;
+    },
   },
   methods: {
+    changeBranch() {
+      this.$router.push(
+        `/select-branch?redirect=${encodeURIComponent(this.$route.fullPath)}`
+      );
+    },
     async onSubmit(e) {
       if (!this.formData.amount || this.pending) {
         return;
@@ -136,15 +168,28 @@ export default {
 
       this.pending = true;
 
+      const workingBranch = this.$store.state.workingBranch;
+      if (!workingBranch || !workingBranch.id) {
+        this.__showToast({
+          type: 'danger',
+          title: 'No branch selected',
+          message: 'Please select the branch you are working at before charging.',
+        });
+        this.$router.push(`/select-branch?redirect=${encodeURIComponent(this.$route.fullPath)}`);
+        return;
+      }
+
       try {
         const payload = {
           nonce: this._paymentData.nonce,
           amount: amount,
           description: this.formData.description || `${this._paymentData.purpose === 'beer_machine' ? 'Beer machine' : 'Store'} payment`,
+          workingBranchId: workingBranch.id,
           metadata: {
             staffId: this.$auth.user.id,
             staffUsername: this.$auth.user.username,
-            branch: this.$auth.user.branch,
+            branch: this.$auth.user.branch, // staff's home branch — kept for audit
+            workingBranch,
             timestamp: new Date().toISOString(),
           },
         };
@@ -325,5 +370,66 @@ export default {
   padding: 24px;
   border-radius: 12px;
   border: 2px solid #e9ecef;
+}
+
+.charge-branch-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #f0f9fa;
+  border: 2px solid #1797ad;
+
+  &.is-away {
+    background: #fef3c7;
+    border-color: #f59e0b;
+  }
+
+  .cbb-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    i {
+      font-size: 20px;
+      color: #1797ad;
+    }
+  }
+
+  &.is-away .cbb-main i {
+    color: #b45309;
+  }
+
+  .cbb-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    font-weight: 600;
+  }
+
+  .cbb-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .cbb-change {
+    background: transparent;
+    border: 1px solid currentColor;
+    color: #1797ad;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  &.is-away .cbb-change {
+    color: #b45309;
+  }
 }
 </style>

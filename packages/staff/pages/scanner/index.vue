@@ -141,9 +141,16 @@ export default {
     },
     async checkIn(userID) {
       try {
+        const workingBranch = this.$store.state.workingBranch;
+        if (!workingBranch || !workingBranch.id) {
+          return {
+            success: false,
+            error: 'No branch selected. Please pick your working branch first.',
+          };
+        }
         const data = {
           userId: userID,
-          branch: this.$store.state.auth.user.branch,
+          branch: workingBranch.id,
         };
 
         const token = this.$auth.strategy.token.get();

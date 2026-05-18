@@ -15,7 +15,11 @@
         <span v-html="__successAlert.description"></span>
       </template>
     </sl-alert>
-    
+
+    <div class="working-branch-bar" v-if="showBranchBar">
+      <BranchSelector />
+    </div>
+
     <nuxt />
   </div>
 </template>
@@ -28,6 +32,11 @@ export default {
     },
     __successAlert () {
       return this.$store.state.successAlert
+    },
+    showBranchBar () {
+      if (!this.$store.state.auth || !this.$store.state.auth.loggedIn) return false
+      if (this.$route && this.$route.path === '/select-branch') return false
+      return true
     }
   },
   watch: {
@@ -42,4 +51,10 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.working-branch-bar {
+  display: flex;
+  justify-content: flex-end;
+  background: #063f48;
+  padding: 0 15px 10px;
+}
 </style>

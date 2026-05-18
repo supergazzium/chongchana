@@ -5,77 +5,177 @@
     <!-- Page Header -->
     <div class="wallet-page-header">
       <div>
-        <h1>Wallet Management</h1>
-        <p class="subtitle">Manage user wallets, balances, and transactions</p>
+        <h1>Wallet Overview</h1>
+        <p class="subtitle">Top-ups, bonuses, branch revenue, and outstanding float</p>
       </div>
       <div class="header-actions">
         <button @click="exportData" class="wallet-btn secondary">
           <i class="fas fa-download"></i>
-          Export CSV
+          Export
         </button>
-        <nuxt-link to="/wallets/settings" class="wallet-btn secondary">
-          <i class="fas fa-cog"></i>
-          Settings
-        </nuxt-link>
-        <nuxt-link to="/wallets/transactions" class="wallet-btn primary">
-          <i class="fas fa-list"></i>
-          All Transactions
-        </nuxt-link>
-        <nuxt-link to="/wallets/reports" class="wallet-btn secondary">
-          <i class="fas fa-chart-bar"></i>
-          Reports
-        </nuxt-link>
-        <nuxt-link to="/wallets/vouchers" class="wallet-btn secondary">
-          <i class="fas fa-gift"></i>
-          Vouchers
-        </nuxt-link>
+        <div class="wallet-more-menu">
+          <button @click="moreMenuOpen = !moreMenuOpen" class="wallet-btn secondary">
+            <i class="fas fa-ellipsis-h"></i>
+            More
+          </button>
+          <div v-if="moreMenuOpen" class="wallet-more-dropdown">
+            <nuxt-link to="/wallets/transactions" @click.native="closeMoreMenu">
+              <i class="fas fa-list"></i> All Transactions
+            </nuxt-link>
+            <nuxt-link to="/wallets/reports" @click.native="closeMoreMenu">
+              <i class="fas fa-chart-bar"></i> Reports
+            </nuxt-link>
+            <nuxt-link to="/wallets/vouchers" @click.native="closeMoreMenu">
+              <i class="fas fa-gift"></i> Vouchers
+            </nuxt-link>
+            <nuxt-link to="/wallets/settings" @click.native="closeMoreMenu">
+              <i class="fas fa-cog"></i> Settings
+            </nuxt-link>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Statistics Cards -->
+    <!-- Date Range Picker -->
+    <div class="wallet-period-bar">
+      <div class="period-options">
+        <button
+          v-for="opt in periodOptions"
+          :key="opt.key"
+          :class="['period-btn', { active: period === opt.key }]"
+          @click="setPeriod(opt.key)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+      <div class="period-range" v-if="period === 'custom'">
+        <input type="date" v-model="customRange.from" @change="applyCustomRange" />
+        <span>—</span>
+        <input type="date" v-model="customRange.to" @change="applyCustomRange" />
+      </div>
+      <div class="period-range-display" v-else>
+        {{ periodDisplayLabel }}
+      </div>
+    </div>
+
+    <!-- Financial KPI Cards -->
     <div class="wallet-stats-grid">
-      <div class="wallet-stat-card">
+      <div class="wallet-stat-card kpi-card kpi-positive">
+        <div class="stat-header">
+          <div class="stat-icon success">
+            <i class="fas fa-arrow-down"></i>
+          </div>
+          <span :class="['kpi-delta', deltaClass(deltas.topUp)]" v-if="deltas.topUp !== null">
+            <i :class="deltaIcon(deltas.topUp)"></i>
+            {{ formatDelta(deltas.topUp) }}
+          </span>
+        </div>
+        <div class="stat-label">Total Top-Up</div>
+        <div class="stat-value">฿{{ formatNumber(stats.topUpVolume) }}</div>
+        <div class="stat-subtitle">{{ formatInt(stats.topUpCount) }} top-ups · {{ stats.periodLabel }}</div>
+      </div>
+
+      <div class="wallet-stat-card kpi-card kpi-warn">
+        <div class="stat-header">
+          <div class="stat-icon warning">
+            <i class="fas fa-gift"></i>
+          </div>
+          <span :class="['kpi-delta', deltaClass(deltas.bonus)]" v-if="deltas.bonus !== null">
+            <i :class="deltaIcon(deltas.bonus)"></i>
+            {{ formatDelta(deltas.bonus) }}
+          </span>
+        </div>
+        <div class="stat-label">Bonus &amp; Promotion</div>
+        <div class="stat-value">฿{{ formatNumber(stats.bonusVolume) }}</div>
+        <div class="stat-subtitle">{{ formatInt(stats.bonusCount) }} bonuses · {{ stats.periodLabel }}</div>
+      </div>
+
+      <div class="wallet-stat-card kpi-card kpi-negative">
+        <div class="stat-header">
+          <div class="stat-icon info">
+            <i class="fas fa-store"></i>
+          </div>
+          <span :class="['kpi-delta', deltaClass(deltas.spend)]" v-if="deltas.spend !== null">
+            <i :class="deltaIcon(deltas.spend)"></i>
+            {{ formatDelta(deltas.spend) }}
+          </span>
+        </div>
+        <div class="stat-label">Total Spend</div>
+        <div class="stat-value">฿{{ formatNumber(stats.spendVolume) }}</div>
+        <div class="stat-subtitle">{{ formatInt(stats.spendCount) }} payments · {{ stats.periodLabel }}</div>
+      </div>
+
+      <div class="wallet-stat-card kpi-card kpi-neutral">
         <div class="stat-header">
           <div class="stat-icon info">
             <i class="fas fa-wallet"></i>
           </div>
         </div>
-        <div class="stat-label">Total Balance</div>
+        <div class="stat-label">Wallet Float</div>
         <div class="stat-value">฿{{ formatNumber(stats.totalBalance) }}</div>
-        <div class="stat-subtitle">Across {{ formatInt(stats.totalWallets) }} wallets</div>
+        <div class="stat-subtitle">
+          Outstanding liability · {{ formatInt(stats.totalWallets) }} wallets
+        </div>
+      </div>
+    </div>
+
+    <!-- Branch Spend Breakdown -->
+    <div class="branch-breakdown-card">
+      <div class="branch-breakdown-header">
+        <div>
+          <h2>Spend by Branch</h2>
+          <p>How much customers spent at each location · {{ stats.periodLabel }}</p>
+        </div>
+        <div class="branch-total">
+          <span class="branch-total-label">Total</span>
+          <span class="branch-total-value">฿{{ formatNumber(stats.spendVolume) }}</span>
+        </div>
       </div>
 
-      <div class="wallet-stat-card">
-        <div class="stat-header">
-          <div class="stat-icon success">
-            <i class="fas fa-users"></i>
-          </div>
-        </div>
-        <div class="stat-label">Active Wallets</div>
-        <div class="stat-value">{{ formatInt(stats.activeWallets) }}</div>
-        <div class="stat-subtitle">{{ stats.frozenWallets }} frozen · {{ stats.suspendedWallets }} suspended</div>
+      <div v-if="branchLoading" class="branch-empty">
+        <i class="fas fa-spinner fa-spin"></i>
+        Loading branch data…
       </div>
-
-      <div class="wallet-stat-card">
-        <div class="stat-header">
-          <div class="stat-icon info">
-            <i class="fas fa-chart-line"></i>
-          </div>
-        </div>
-        <div class="stat-label">Volume ({{ stats.periodLabel }})</div>
-        <div class="stat-value">฿{{ formatNumber(stats.periodVolume) }}</div>
-        <div class="stat-subtitle">{{ formatInt(stats.periodTransactions) }} transactions</div>
+      <div v-else-if="byBranch.length === 0" class="branch-empty">
+        <i class="fas fa-store-slash"></i>
+        No branch spend recorded for this period.
       </div>
-
-      <div class="wallet-stat-card">
-        <div class="stat-header">
-          <div class="stat-icon warning">
-            <i class="fas fa-clock"></i>
+      <div v-else class="branch-rows">
+        <div
+          v-for="row in byBranch"
+          :key="row.branch"
+          class="branch-row"
+          @click="filterByBranch(row.branch)"
+        >
+          <div class="branch-row-head">
+            <span class="branch-name">{{ row.branch }}</span>
+            <span class="branch-amount">฿{{ formatNumber(row.volume) }}</span>
+          </div>
+          <div class="branch-bar-track">
+            <div
+              class="branch-bar-fill"
+              :style="{ width: barWidth(row.volume) + '%' }"
+            ></div>
+          </div>
+          <div class="branch-row-meta">
+            <span>{{ formatInt(row.transactions) }} transactions</span>
+            <span>Avg ฿{{ formatNumber(row.transactions ? row.volume / row.transactions : 0) }}</span>
+            <span>{{ branchShare(row.volume) }}% of total</span>
           </div>
         </div>
-        <div class="stat-label">Pending Balance</div>
-        <div class="stat-value">฿{{ formatNumber(stats.pendingBalance) }}</div>
-        <div class="stat-subtitle">Frozen: ฿{{ formatNumber(stats.frozenBalance) }}</div>
+      </div>
+    </div>
+
+    <!-- Wallet Operations Section -->
+    <div class="wallet-ops-section">
+      <div class="wallet-ops-header">
+        <h2>Wallets</h2>
+        <p class="wallet-ops-sub">
+          {{ formatInt(stats.activeWallets) }} active ·
+          {{ formatInt(stats.frozenWallets) }} frozen ·
+          {{ formatInt(stats.suspendedWallets) }} suspended ·
+          ฿{{ formatNumber(stats.pendingBalance) }} pending
+        </p>
       </div>
     </div>
 
@@ -346,10 +446,12 @@ export default {
     return {
       breadcrumbs: [
         { label: 'Dashboard', path: '/dashboard' },
-        { label: 'Wallet Management' },
+        { label: 'Wallet Overview' },
       ],
       wallets: [],
       loading: false,
+      branchLoading: false,
+      moreMenuOpen: false,
       filters: {
         search: '',
         status: '',
@@ -364,18 +466,40 @@ export default {
         total: 0,
         hasMore: false,
       },
+      period: 'mtd',
+      customRange: {
+        from: '',
+        to: '',
+      },
+      periodOptions: [
+        { key: 'today', label: 'Today' },
+        { key: '7d', label: '7d' },
+        { key: 'mtd', label: 'MTD' },
+        { key: '30d', label: '30d' },
+        { key: 'custom', label: 'Custom' },
+      ],
       stats: {
         totalBalance: 0,
         totalWallets: 0,
         activeWallets: 0,
         frozenWallets: 0,
         suspendedWallets: 0,
-        periodVolume: 0,
-        periodTransactions: 0,
+        topUpVolume: 0,
+        topUpCount: 0,
+        bonusVolume: 0,
+        bonusCount: 0,
+        spendVolume: 0,
+        spendCount: 0,
         periodLabel: 'MTD',
         pendingBalance: 0,
         frozenBalance: 0,
       },
+      deltas: {
+        topUp: null,
+        bonus: null,
+        spend: null,
+      },
+      byBranch: [],
       showAdjustDialog: false,
       adjustData: {
         userId: null,
@@ -396,10 +520,26 @@ export default {
         this.adjustData.reason.trim().length > 0
       );
     },
+    periodDisplayLabel() {
+      const range = this.resolvePeriodRange();
+      if (!range) return '';
+      const from = this.$moment(range.from).tz('Asia/Bangkok');
+      const to = this.$moment(range.to).tz('Asia/Bangkok');
+      if (from.isSame(to, 'day')) return from.format('MMM D, YYYY');
+      return `${from.format('MMM D')} – ${to.format('MMM D, YYYY')}`;
+    },
+    maxBranchVolume() {
+      if (!this.byBranch.length) return 0;
+      return this.byBranch.reduce((m, r) => (r.volume > m ? r.volume : m), 0);
+    },
   },
   async mounted() {
+    document.addEventListener('click', this.handleDocumentClick);
     await this.loadWallets();
     await this.loadStats();
+  },
+  beforeDestroy() {
+    document.removeEventListener('click', this.handleDocumentClick);
   },
   methods: {
     async loadWallets() {
@@ -430,15 +570,22 @@ export default {
     },
 
     async loadStats() {
+      this.branchLoading = true;
       try {
-        const response = await this.$walletService.getReports({
-          reportType: 'summary',
-        });
+        const range = this.resolvePeriodRange();
+        const params = { reportType: 'summary' };
+        if (range) {
+          params.fromDate = range.from;
+          params.toDate = range.to;
+        }
+
+        const response = await this.$walletService.getReports(params);
 
         if (response.success) {
           const data = response.data;
           const summary = data.summary || {};
           const txSummary = data.transactionSummary || {};
+          const prevTx = data.previousTransactionSummary || {};
           const totalWallets =
             (summary.activeWallets || 0) +
             (summary.frozenWallets || 0) +
@@ -450,15 +597,128 @@ export default {
             activeWallets: summary.activeWallets || 0,
             frozenWallets: summary.frozenWallets || 0,
             suspendedWallets: summary.suspendedWallets || 0,
-            periodVolume: txSummary.totalVolume || 0,
-            periodTransactions: txSummary.totalTransactions || 0,
+            topUpVolume: txSummary.topUpVolume || 0,
+            topUpCount: txSummary.topUpCount || 0,
+            bonusVolume: txSummary.bonusVolume || 0,
+            bonusCount: txSummary.bonusCount || 0,
+            spendVolume: txSummary.spendVolume || 0,
+            spendCount: txSummary.spendCount || 0,
             periodLabel: this.derivePeriodLabel(data.period),
             pendingBalance: summary.totalPendingBalance || 0,
             frozenBalance: summary.totalFrozenBalance || 0,
           };
+
+          this.deltas = {
+            topUp: this.calcDelta(txSummary.topUpVolume, prevTx.topUpVolume),
+            bonus: this.calcDelta(txSummary.bonusVolume, prevTx.bonusVolume),
+            spend: this.calcDelta(txSummary.spendVolume, prevTx.spendVolume),
+          };
+
+          this.byBranch = Array.isArray(data.byBranch) ? data.byBranch : [];
         }
       } catch (error) {
         console.error('Error loading stats:', error);
+      } finally {
+        this.branchLoading = false;
+      }
+    },
+
+    resolvePeriodRange() {
+      const now = this.$moment().tz('Asia/Bangkok');
+      let from, to;
+      switch (this.period) {
+        case 'today':
+          from = now.clone().startOf('day');
+          to = now.clone().endOf('day');
+          break;
+        case '7d':
+          from = now.clone().subtract(6, 'days').startOf('day');
+          to = now.clone().endOf('day');
+          break;
+        case '30d':
+          from = now.clone().subtract(29, 'days').startOf('day');
+          to = now.clone().endOf('day');
+          break;
+        case 'mtd':
+          from = now.clone().startOf('month');
+          to = now.clone().endOf('day');
+          break;
+        case 'custom':
+          if (!this.customRange.from || !this.customRange.to) return null;
+          from = this.$moment.tz(this.customRange.from, 'Asia/Bangkok').startOf('day');
+          to = this.$moment.tz(this.customRange.to, 'Asia/Bangkok').endOf('day');
+          break;
+        default:
+          return null;
+      }
+      return { from: from.toISOString(), to: to.toISOString() };
+    },
+
+    setPeriod(key) {
+      this.period = key;
+      if (key !== 'custom') {
+        this.loadStats();
+      }
+    },
+
+    applyCustomRange() {
+      if (this.customRange.from && this.customRange.to) {
+        this.loadStats();
+      }
+    },
+
+    calcDelta(current, previous) {
+      const cur = parseFloat(current) || 0;
+      const prev = parseFloat(previous) || 0;
+      if (prev === 0) {
+        if (cur === 0) return 0;
+        return null;
+      }
+      return ((cur - prev) / prev) * 100;
+    },
+
+    deltaClass(value) {
+      if (value === null || value === 0) return 'flat';
+      return value > 0 ? 'up' : 'down';
+    },
+
+    deltaIcon(value) {
+      if (value === null || value === 0) return 'fas fa-minus';
+      return value > 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down';
+    },
+
+    formatDelta(value) {
+      if (value === null) return '—';
+      const abs = Math.abs(value);
+      return `${abs.toFixed(1)}%`;
+    },
+
+    barWidth(volume) {
+      if (!this.maxBranchVolume) return 0;
+      const pct = (volume / this.maxBranchVolume) * 100;
+      return Math.max(2, pct);
+    },
+
+    branchShare(volume) {
+      if (!this.stats.spendVolume) return '0.0';
+      return ((volume / this.stats.spendVolume) * 100).toFixed(1);
+    },
+
+    filterByBranch(branch) {
+      this.filters.search = branch;
+      this.pagination.offset = 0;
+      this.loadWallets();
+    },
+
+    closeMoreMenu() {
+      this.moreMenuOpen = false;
+    },
+
+    handleDocumentClick(event) {
+      if (!this.moreMenuOpen) return;
+      const menu = this.$el.querySelector('.wallet-more-menu');
+      if (menu && !menu.contains(event.target)) {
+        this.moreMenuOpen = false;
       }
     },
 
@@ -774,5 +1034,305 @@ export default {
 
 .modal-body {
   margin-top: 0;
+}
+
+.wallet-period-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+}
+
+.period-options {
+  display: inline-flex;
+  background: #f1f5f9;
+  border-radius: 999px;
+  padding: 4px;
+  gap: 2px;
+}
+
+.period-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.period-btn:hover {
+  background: rgba(23, 151, 173, 0.08);
+}
+
+.period-btn.active {
+  background: #1797AD;
+  color: #fff;
+}
+
+.period-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.period-range input {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.period-range-display {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.kpi-card {
+  position: relative;
+}
+
+.kpi-card .stat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kpi-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.kpi-delta.up {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.kpi-delta.down {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.kpi-delta.flat {
+  background: rgba(107, 114, 128, 0.12);
+  color: #4b5563;
+}
+
+.kpi-positive .stat-value {
+  color: #047857;
+}
+
+.kpi-warn .stat-value {
+  color: #b45309;
+}
+
+.kpi-negative .stat-value {
+  color: #1797AD;
+}
+
+.branch-breakdown-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.branch-breakdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.branch-breakdown-header h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: #063F48;
+}
+
+.branch-breakdown-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.branch-total {
+  text-align: right;
+}
+
+.branch-total-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.branch-total-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1797AD;
+}
+
+.branch-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.branch-empty i {
+  margin-right: 8px;
+  font-size: 18px;
+}
+
+.branch-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.branch-row {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.branch-row:hover {
+  background: #f1f5f9;
+}
+
+.branch-row:active {
+  transform: scale(0.998);
+}
+
+.branch-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.branch-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.branch-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: #063F48;
+}
+
+.branch-bar-track {
+  height: 8px;
+  background: rgba(23, 151, 173, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.branch-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1797AD 0%, #14b8a6 100%);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.branch-row-meta {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.wallet-ops-section {
+  margin-top: 8px;
+  margin-bottom: 12px;
+}
+
+.wallet-ops-header h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: #063F48;
+}
+
+.wallet-ops-sub {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.wallet-more-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.wallet-more-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  padding: 6px;
+  min-width: 200px;
+  z-index: 100;
+}
+
+.wallet-more-dropdown a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #374151;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: background 0.12s ease;
+}
+
+.wallet-more-dropdown a:hover {
+  background: #f3f4f6;
+  color: #1797AD;
+}
+
+@media (max-width: 768px) {
+  .wallet-period-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .period-options {
+    overflow-x: auto;
+  }
+
+  .branch-row-meta {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
 }
 </style>
