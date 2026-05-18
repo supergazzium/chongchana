@@ -345,6 +345,7 @@ module.exports = {
         staffId,
         machineId,
         branch,
+        branchMissing,
       } = ctx.query;
 
       let query = `
@@ -426,7 +427,9 @@ module.exports = {
       }
 
       // Filter by branch
-      if (branch) {
+      if (branchMissing === '1' || branchMissing === 'true') {
+        query += ` AND (t.branch IS NULL OR t.branch = '')`;
+      } else if (branch) {
         query += ` AND t.branch = ?`;
         params.push(branch);
       }
@@ -683,17 +686,24 @@ module.exports = {
       // Branch spend breakdown for the period.
       // Spend types are store_payment and beer_machine_payment (amounts are
       // stored as negatives; ABS() to surface gross spend).
+      // NULL-or-empty branch is bucketed under a synthetic 'Unattributed'
+      // row so the breakdown always sums to the Total Spend KPI.
       const branchBreakdown = await knex.raw(`
         SELECT
-          branch,
+          CASE
+            WHEN branch IS NULL OR branch = '' THEN '__unattributed__'
+            ELSE branch
+          END AS branch,
           COUNT(*) as transactions,
           SUM(ABS(amount)) as volume
         FROM wallet_transactions
         WHERE created_at BETWEEN ? AND ?
           AND type IN ('store_payment', 'beer_machine_payment')
-          AND branch IS NOT NULL
-          AND branch <> ''
-        GROUP BY branch
+        GROUP BY
+          CASE
+            WHEN branch IS NULL OR branch = '' THEN '__unattributed__'
+            ELSE branch
+          END
         ORDER BY volume DESC
       `, [from, to]);
 
@@ -751,11 +761,15 @@ module.exports = {
           spendVolume: previous.spend.volume,
           totalVolume: previous.totalVolume,
         },
-        byBranch: branchBreakdown[0].map((row) => ({
-          branch: row.branch,
-          transactions: Number(row.transactions) || 0,
-          volume: parseFloat(row.volume) || 0,
-        })),
+        byBranch: branchBreakdown[0].map((row) => {
+          const isUnattributed = row.branch === '__unattributed__';
+          return {
+            branch: isUnattributed ? 'Unattributed' : row.branch,
+            unattributed: isUnattributed,
+            transactions: Number(row.transactions) || 0,
+            volume: parseFloat(row.volume) || 0,
+          };
+        }),
         revenue: {
           topUpFees: parseFloat(revenue[0][0].total_fees) || 0,
           withdrawalFees: 0,

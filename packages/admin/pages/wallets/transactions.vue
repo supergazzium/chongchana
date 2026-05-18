@@ -9,7 +9,7 @@
         <span>
           Showing
           <strong v-if="fromDashboard.typeLabel">{{ fromDashboard.typeLabel }}</strong>
-          transactions<span v-if="fromDashboard.periodLabel"> for <strong>{{ fromDashboard.periodLabel }}</strong></span>
+          transactions<span v-if="fromDashboard.branchLabel"> at <strong>{{ fromDashboard.branchLabel }}</strong></span><span v-if="fromDashboard.periodLabel"> for <strong>{{ fromDashboard.periodLabel }}</strong></span>
         </span>
       </div>
       <button @click="clearDashboardFilter" class="banner-clear">
@@ -505,6 +505,7 @@ export default {
         types: '',
         status: '',
         branch: '',
+        branchMissing: '',
         staffId: '',
         machineId: '',
         minAmount: '',
@@ -614,12 +615,17 @@ export default {
         this.filters.branch = q.branch;
         usedAny = true;
       }
+      if (q.branchMissing === '1' || q.branchMissing === 'true') {
+        this.filters.branchMissing = '1';
+        usedAny = true;
+      }
 
       if (usedAny) {
         this.showFilters = true;
         this.fromDashboard = {
           periodLabel: q.periodLabel || null,
           typeLabel: this.describeIncomingTypeFilter(q),
+          branchLabel: this.describeIncomingBranchFilter(q),
         };
       }
     },
@@ -636,6 +642,14 @@ export default {
       return null;
     },
 
+    describeIncomingBranchFilter(q) {
+      if (q.branchMissing === '1' || q.branchMissing === 'true') {
+        return 'Unattributed (no branch recorded)';
+      }
+      if (q.branch) return q.branch;
+      return null;
+    },
+
     clearDashboardFilter() {
       this.fromDashboard = null;
       this.filters.type = '';
@@ -643,6 +657,7 @@ export default {
       this.filters.fromDate = '';
       this.filters.toDate = '';
       this.filters.branch = '';
+      this.filters.branchMissing = '';
       this.pagination.offset = 0;
       this.$router.replace({ path: '/wallets/transactions' });
       this.loadTransactions();

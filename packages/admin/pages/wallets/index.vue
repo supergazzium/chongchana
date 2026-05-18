@@ -176,11 +176,15 @@
         <div
           v-for="row in byBranch"
           :key="row.branch"
-          class="branch-row"
-          @click="filterByBranch(row.branch)"
+          :class="['branch-row', { 'branch-row-unattributed': row.unattributed }]"
+          @click="handleBranchRowClick(row)"
         >
           <div class="branch-row-head">
-            <span class="branch-name">{{ row.branch }}</span>
+            <span class="branch-name">
+              <i v-if="row.unattributed" class="fas fa-question-circle unattributed-icon"></i>
+              {{ row.branch }}
+              <span v-if="row.unattributed" class="unattributed-tag">no branch recorded</span>
+            </span>
             <span class="branch-amount">฿{{ formatNumber(row.volume) }}</span>
           </div>
           <div class="branch-bar-track">
@@ -193,6 +197,11 @@
             <span>{{ formatInt(row.transactions) }} transactions</span>
             <span>Avg ฿{{ formatNumber(row.transactions ? row.volume / row.transactions : 0) }}</span>
             <span>{{ branchShare(row.volume) }}% of total</span>
+          </div>
+          <div v-if="row.unattributed" class="unattributed-hint">
+            These spend transactions have no branch attribution — usually
+            legacy data or vending sessions without a branch. They are still
+            counted in Total Spend.
           </div>
         </div>
       </div>
@@ -737,10 +746,23 @@ export default {
       return ((volume / this.stats.spendVolume) * 100).toFixed(1);
     },
 
-    filterByBranch(branch) {
-      this.filters.search = branch;
-      this.pagination.offset = 0;
-      this.loadWallets();
+    handleBranchRowClick(row) {
+      const range = this.resolvePeriodRange();
+      const dateParams = range
+        ? { fromDate: range.from, toDate: range.to }
+        : {};
+
+      this.$router.push({
+        path: '/wallets/transactions',
+        query: {
+          types: 'store_payment,beer_machine_payment',
+          ...(row.unattributed
+            ? { branchMissing: '1' }
+            : { branch: row.branch }),
+          ...dateParams,
+          periodLabel: this.stats.periodLabel,
+        },
+      });
     },
 
     applyWalletQueryFilters() {
@@ -1388,6 +1410,55 @@ export default {
   margin-top: 8px;
   font-size: 12px;
   color: #6b7280;
+}
+
+.branch-row-unattributed {
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px dashed rgba(245, 158, 11, 0.45);
+}
+
+.branch-row-unattributed:hover {
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.branch-row-unattributed .branch-name {
+  color: #92400e;
+}
+
+.branch-row-unattributed .branch-amount {
+  color: #92400e;
+}
+
+.branch-row-unattributed .branch-bar-fill {
+  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+}
+
+.unattributed-icon {
+  color: #f59e0b;
+  margin-right: 6px;
+}
+
+.unattributed-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.18);
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.unattributed-hint {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(245, 158, 11, 0.4);
+  font-size: 12px;
+  color: #78350f;
+  line-height: 1.5;
 }
 
 .wallet-ops-section {
