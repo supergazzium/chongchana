@@ -707,6 +707,26 @@ module.exports = {
         ORDER BY volume DESC
       `, [from, to]);
 
+      // Daily activity. One row per (day, type) — pivoted into per-day
+      // buckets in the response. Bangkok is the operating timezone, so
+      // grouping by the calendar day there matches what POS / bank
+      // reports show. CONVERT_TZ falls back gracefully if MySQL is
+      // missing tz tables (returns NULL) — in that case the SQL would
+      // need a tz table install or we fall back to UTC day grouping.
+      const dailyActivity = await knex.raw(`
+        SELECT
+          DATE(CONVERT_TZ(created_at, '+00:00', '+07:00')) as day,
+          type,
+          SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as credit_amount,
+          SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) as debit_amount,
+          COUNT(*) as tx_count
+        FROM wallet_transactions
+        WHERE created_at BETWEEN ? AND ?
+          AND status = 'completed'
+        GROUP BY day, type
+        ORDER BY day DESC
+      `, [from, to]);
+
       // Period movements split by type AND sign. We separate credits
       // (positive amount) from debits (negative amount) so types that
       // can go either way (transfer, adjustment) are not double-counted
@@ -812,6 +832,87 @@ module.exports = {
         return { key, label, type, direction: 'debit', amount: Math.abs(mv.debit), count: mv.debitCount };
       };
 
+      // Cash position: a separate view of the same data answering
+      // "how much cash moved through the system" vs reconciliation's
+      // "how did liability change". Promotional cost is what we GAVE
+      // (bonuses + voucher redemptions, both recorded as type='bonus').
+      const cashCollected = getMovement('top_up').credit;
+      const cashCollectedCount = getMovement('top_up').creditCount;
+      const serviceDelivered =
+        Math.abs(getMovement('store_payment').debit) +
+        Math.abs(getMovement('beer_machine_payment').debit);
+      const serviceDeliveredCount =
+        getMovement('store_payment').debitCount +
+        getMovement('beer_machine_payment').debitCount;
+      const promotionalCost = getMovement('bonus').credit;
+      const promotionalCostCount = getMovement('bonus').creditCount;
+      const refundedToCustomers = getMovement('refund').credit;
+      const refundedToCustomersCount = getMovement('refund').creditCount;
+
+      const cashPosition = {
+        cashCollected,
+        cashCollectedCount,
+        serviceDelivered,
+        serviceDeliveredCount,
+        promotionalCost,
+        promotionalCostCount,
+        refundedToCustomers,
+        refundedToCustomersCount,
+        // Net cash position change for the period.
+        // Positive = we're holding more customer money than before.
+        // Negative = customers consumed more than they topped up.
+        netCashPosition: cashCollected - serviceDelivered - refundedToCustomers,
+      };
+
+      // Pivot dailyActivity rows into one entry per day. Each entry
+      // carries totals for the categories that matter in daily AR/POS
+      // reconciliation. Days with zero activity are NOT synthesized —
+      // gaps are real and accountants prefer the truth.
+      const dailyMap = new Map();
+      dailyActivity[0].forEach((row) => {
+        const day = row.day instanceof Date
+          ? row.day.toISOString().split('T')[0]
+          : String(row.day);
+        if (!dailyMap.has(day)) {
+          dailyMap.set(day, {
+            date: day,
+            topUp: 0,
+            bonus: 0,
+            spend: 0,
+            refund: 0,
+            other: 0,
+            txCount: 0,
+            netChange: 0,
+          });
+        }
+        const entry = dailyMap.get(day);
+        const credit = parseFloat(row.credit_amount) || 0;
+        const debit = parseFloat(row.debit_amount) || 0;
+        const count = Number(row.tx_count) || 0;
+        entry.txCount += count;
+        entry.netChange += credit + debit;
+        switch (row.type) {
+          case 'top_up':
+            entry.topUp += credit;
+            break;
+          case 'bonus':
+            entry.bonus += credit;
+            break;
+          case 'store_payment':
+          case 'beer_machine_payment':
+            entry.spend += Math.abs(debit);
+            break;
+          case 'refund':
+            entry.refund += credit;
+            break;
+          default:
+            entry.other += credit + debit;
+        }
+      });
+      const daily = Array.from(dailyMap.values()).sort((a, b) =>
+        b.date.localeCompare(a.date)
+      );
+
       const reconciliation = {
         openingBalance: computedOpeningBalance,
         openingMethod: 'computed', // 'computed' vs 'snapshot' for future audit upgrade
@@ -869,6 +970,8 @@ module.exports = {
           totalVolume: previous.totalVolume,
         },
         reconciliation,
+        cashPosition,
+        daily,
         byBranch: branchBreakdown[0].map((row) => {
           const isUnattributed = row.branch === '__unattributed__';
           return {

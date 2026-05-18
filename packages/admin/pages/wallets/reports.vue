@@ -176,6 +176,82 @@
         </div>
       </div>
 
+      <!-- Cash Position -->
+      <div class="cash-card" v-if="report.cashPosition">
+        <div class="cash-header">
+          <div>
+            <h2>
+              <i class="fas fa-coins"></i>
+              Cash Position
+            </h2>
+            <p>
+              Cash flowing in and out of the wallet system during the period.
+            </p>
+          </div>
+          <div
+            :class="['cash-net-pill', report.cashPosition.netCashPosition >= 0 ? 'up' : 'down']"
+          >
+            <span class="cash-net-label">Net cash held change</span>
+            <span class="cash-net-amount">
+              {{ report.cashPosition.netCashPosition >= 0 ? '+' : '−' }}฿{{ formatNumber(Math.abs(report.cashPosition.netCashPosition)) }}
+            </span>
+          </div>
+        </div>
+
+        <div class="cash-tiles">
+          <div class="cash-tile cash-tile-in">
+            <div class="cash-tile-icon">
+              <i class="fas fa-arrow-down"></i>
+            </div>
+            <div class="cash-tile-body">
+              <div class="cash-tile-label">Cash collected</div>
+              <div class="cash-tile-value">฿{{ formatNumber(report.cashPosition.cashCollected) }}</div>
+              <div class="cash-tile-sub">{{ formatInt(report.cashPosition.cashCollectedCount) }} top-ups</div>
+            </div>
+          </div>
+
+          <div class="cash-tile cash-tile-out">
+            <div class="cash-tile-icon">
+              <i class="fas fa-arrow-up"></i>
+            </div>
+            <div class="cash-tile-body">
+              <div class="cash-tile-label">Service delivered</div>
+              <div class="cash-tile-value">฿{{ formatNumber(report.cashPosition.serviceDelivered) }}</div>
+              <div class="cash-tile-sub">{{ formatInt(report.cashPosition.serviceDeliveredCount) }} payments</div>
+            </div>
+          </div>
+
+          <div class="cash-tile cash-tile-promo">
+            <div class="cash-tile-icon">
+              <i class="fas fa-gift"></i>
+            </div>
+            <div class="cash-tile-body">
+              <div class="cash-tile-label">Promotional cost</div>
+              <div class="cash-tile-value">฿{{ formatNumber(report.cashPosition.promotionalCost) }}</div>
+              <div class="cash-tile-sub">{{ formatInt(report.cashPosition.promotionalCostCount) }} bonuses / vouchers</div>
+            </div>
+          </div>
+
+          <div class="cash-tile cash-tile-refund">
+            <div class="cash-tile-icon">
+              <i class="fas fa-undo"></i>
+            </div>
+            <div class="cash-tile-body">
+              <div class="cash-tile-label">Refunded to customers</div>
+              <div class="cash-tile-value">฿{{ formatNumber(report.cashPosition.refundedToCustomers) }}</div>
+              <div class="cash-tile-sub">{{ formatInt(report.cashPosition.refundedToCustomersCount) }} refunds</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cash-footnote">
+          <i class="fas fa-info-circle"></i>
+          Net cash held change = Cash collected − Service delivered − Refunds.
+          Promotional cost reflects credit you gave away (no cash impact);
+          it's tracked separately for marketing accounting.
+        </div>
+      </div>
+
       <!-- Machine Revenue (beer machines, by branch) -->
       <div class="machine-revenue-card">
         <div class="machine-revenue-header">
@@ -312,6 +388,77 @@
           <div class="stat-label">Revenue</div>
           <div class="stat-value">฿{{ formatNumber(report.revenue?.totalRevenue) }}</div>
           <div class="stat-subtitle">From transaction fees</div>
+        </div>
+      </div>
+
+      <!-- Daily Activity -->
+      <div class="daily-card" v-if="report.daily">
+        <div class="daily-header">
+          <div>
+            <h2>
+              <i class="fas fa-calendar-day"></i>
+              Daily Activity
+            </h2>
+            <p>
+              One row per day. Match against bank deposits (top-ups) and POS
+              daily sales (spend). Dates with no activity are omitted.
+            </p>
+          </div>
+          <div class="daily-totals">
+            <span class="daily-totals-label">{{ formatInt(report.daily.length) }} days with activity</span>
+          </div>
+        </div>
+
+        <div v-if="report.daily.length === 0" class="daily-empty">
+          <i class="fas fa-calendar-times"></i>
+          <p>No transactions in this period.</p>
+        </div>
+
+        <div v-else class="daily-table-wrap">
+          <table class="daily-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th class="num">Top-ups</th>
+                <th class="num">Bonus/Voucher</th>
+                <th class="num">Spend</th>
+                <th class="num">Refunds</th>
+                <th class="num">Transactions</th>
+                <th class="num">Net change</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in report.daily" :key="row.date">
+                <td>
+                  <div class="daily-date">{{ formatDailyDate(row.date) }}</div>
+                  <div class="daily-weekday">{{ formatDailyWeekday(row.date) }}</div>
+                </td>
+                <td class="num">{{ row.topUp ? '฿' + formatNumber(row.topUp) : '—' }}</td>
+                <td class="num">{{ row.bonus ? '฿' + formatNumber(row.bonus) : '—' }}</td>
+                <td class="num">{{ row.spend ? '฿' + formatNumber(row.spend) : '—' }}</td>
+                <td class="num">{{ row.refund ? '฿' + formatNumber(row.refund) : '—' }}</td>
+                <td class="num">{{ formatInt(row.txCount) }}</td>
+                <td :class="['num', row.netChange >= 0 ? 'up' : 'down']">
+                  {{ row.netChange >= 0 ? '+' : '−' }}฿{{ formatNumber(Math.abs(row.netChange)) }}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot v-if="dailyTotals">
+              <tr>
+                <td><strong>Period total</strong></td>
+                <td class="num"><strong>฿{{ formatNumber(dailyTotals.topUp) }}</strong></td>
+                <td class="num"><strong>฿{{ formatNumber(dailyTotals.bonus) }}</strong></td>
+                <td class="num"><strong>฿{{ formatNumber(dailyTotals.spend) }}</strong></td>
+                <td class="num"><strong>฿{{ formatNumber(dailyTotals.refund) }}</strong></td>
+                <td class="num"><strong>{{ formatInt(dailyTotals.txCount) }}</strong></td>
+                <td :class="['num', dailyTotals.netChange >= 0 ? 'up' : 'down']">
+                  <strong>
+                    {{ dailyTotals.netChange >= 0 ? '+' : '−' }}฿{{ formatNumber(Math.abs(dailyTotals.netChange)) }}
+                  </strong>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
 
@@ -514,6 +661,21 @@ export default {
         { revenue: 0, pours: 0, volumeMl: 0 }
       );
     },
+    dailyTotals() {
+      const rows = this.report.daily || [];
+      if (rows.length === 0) return null;
+      return rows.reduce(
+        (acc, r) => ({
+          topUp: acc.topUp + r.topUp,
+          bonus: acc.bonus + r.bonus,
+          spend: acc.spend + r.spend,
+          refund: acc.refund + r.refund,
+          txCount: acc.txCount + r.txCount,
+          netChange: acc.netChange + r.netChange,
+        }),
+        { topUp: 0, bonus: 0, spend: 0, refund: 0, txCount: 0, netChange: 0 }
+      );
+    },
     nonZeroCredits() {
       const credits = (this.report.reconciliation && this.report.reconciliation.credits) || [];
       return credits.filter((l) => l.amount > 0 || l.count > 0);
@@ -694,6 +856,36 @@ export default {
         rows.push([]);
       }
 
+      const cash = this.report.cashPosition;
+      if (cash) {
+        rows.push(['CASH POSITION']);
+        rows.push(['Line', 'Count', 'Amount']);
+        rows.push(['Cash collected (top-ups)', cash.cashCollectedCount, cash.cashCollected.toFixed(2)]);
+        rows.push(['Service delivered (spend)', cash.serviceDeliveredCount, cash.serviceDelivered.toFixed(2)]);
+        rows.push(['Promotional cost (bonus/voucher)', cash.promotionalCostCount, cash.promotionalCost.toFixed(2)]);
+        rows.push(['Refunded to customers', cash.refundedToCustomersCount, cash.refundedToCustomers.toFixed(2)]);
+        rows.push(['Net cash position change', '', cash.netCashPosition.toFixed(2)]);
+        rows.push([]);
+      }
+
+      const daily = this.report.daily || [];
+      if (daily.length > 0) {
+        rows.push(['DAILY ACTIVITY']);
+        rows.push(['Date', 'Top-ups', 'Bonus/Voucher', 'Spend', 'Refunds', 'Transactions', 'Net change']);
+        for (const d of daily) {
+          rows.push([
+            d.date,
+            d.topUp.toFixed(2),
+            d.bonus.toFixed(2),
+            d.spend.toFixed(2),
+            d.refund.toFixed(2),
+            d.txCount,
+            d.netChange.toFixed(2),
+          ]);
+        }
+        rows.push([]);
+      }
+
       rows.push(['SUMMARY']);
       rows.push(['Total Wallet Balance', this.report.summary?.totalWalletBalance || 0]);
       rows.push(['Active Wallets', this.report.summary?.activeWallets || 0]);
@@ -770,6 +962,16 @@ export default {
     formatStatementDate(date) {
       if (!date) return '';
       return this.$moment(date).tz('Asia/Bangkok').format('MMM D, YYYY HH:mm');
+    },
+
+    formatDailyDate(date) {
+      if (!date) return '';
+      return this.$moment(date, 'YYYY-MM-DD').format('MMM D, YYYY');
+    },
+
+    formatDailyWeekday(date) {
+      if (!date) return '';
+      return this.$moment(date, 'YYYY-MM-DD').format('dddd');
     },
 
     branchShareOfTotal(branchRevenue) {
@@ -1086,6 +1288,290 @@ export default {
   .recon-label { grid-area: label; }
   .recon-amount { grid-area: amount; }
   .recon-sub { grid-area: sub; }
+}
+
+/* Cash Position card */
+.cash-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.cash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.cash-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #063F48;
+}
+
+.cash-header h2 i {
+  margin-right: 8px;
+  color: #00A862;
+}
+
+.cash-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.cash-net-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: #F7FAFC;
+  border: 2px solid #E2E8F0;
+}
+
+.cash-net-pill.up {
+  background: rgba(0, 168, 98, 0.08);
+  border-color: #00A862;
+}
+
+.cash-net-pill.down {
+  background: rgba(228, 88, 88, 0.08);
+  border-color: #E45858;
+}
+
+.cash-net-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6B7280;
+}
+
+.cash-net-amount {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.cash-net-pill.up .cash-net-amount { color: #00794a; }
+.cash-net-pill.down .cash-net-amount { color: #b03333; }
+
+.cash-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.cash-tile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+}
+
+.cash-tile-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.cash-tile-in .cash-tile-icon {
+  background: rgba(0, 168, 98, 0.12);
+  color: #00794a;
+}
+
+.cash-tile-out .cash-tile-icon {
+  background: rgba(23, 151, 173, 0.12);
+  color: #1797AD;
+}
+
+.cash-tile-promo .cash-tile-icon {
+  background: rgba(255, 184, 0, 0.18);
+  color: #92400e;
+}
+
+.cash-tile-refund .cash-tile-icon {
+  background: rgba(228, 88, 88, 0.12);
+  color: #b03333;
+}
+
+.cash-tile-body {
+  min-width: 0;
+}
+
+.cash-tile-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6B7280;
+  margin-bottom: 2px;
+}
+
+.cash-tile-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #063F48;
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-tile-sub {
+  font-size: 12px;
+  color: #9CA3AF;
+  margin-top: 2px;
+}
+
+.cash-footnote {
+  margin-top: 16px;
+  font-size: 12px;
+  color: #6B7280;
+  line-height: 1.5;
+}
+
+.cash-footnote i {
+  color: #00A862;
+  margin-right: 4px;
+}
+
+/* Daily Activity card */
+.daily-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.daily-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.daily-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #063F48;
+}
+
+.daily-header h2 i {
+  margin-right: 8px;
+  color: #7C5CFF;
+}
+
+.daily-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #6B7280;
+  max-width: 540px;
+}
+
+.daily-totals-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6B7280;
+  padding: 6px 14px;
+  background: #F7FAFC;
+  border-radius: 999px;
+}
+
+.daily-empty {
+  padding: 48px 20px;
+  text-align: center;
+  color: #6B7280;
+}
+
+.daily-empty i {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 8px;
+  color: #D1D5DB;
+}
+
+.daily-table-wrap {
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.daily-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-table thead th {
+  text-align: left;
+  padding: 12px;
+  background: #F7FAFC;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6B7280;
+  border-bottom: 1px solid #E5E7EB;
+  white-space: nowrap;
+}
+
+.daily-table th.num,
+.daily-table td.num {
+  text-align: right;
+}
+
+.daily-table tbody td {
+  padding: 12px;
+  border-bottom: 1px solid #F1F5F9;
+  color: #1F2937;
+}
+
+.daily-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.daily-table tbody tr:hover td {
+  background: #F9FAFB;
+}
+
+.daily-table tfoot td {
+  padding: 14px 12px;
+  background: #F0F9FA;
+  border-top: 2px solid #1797AD;
+  color: #063F48;
+}
+
+.daily-table td.up { color: #00794a; }
+.daily-table td.down { color: #b03333; }
+
+.daily-date {
+  font-weight: 600;
+  color: #1F2937;
+  white-space: nowrap;
+}
+
+.daily-weekday {
+  font-size: 11px;
+  color: #9CA3AF;
 }
 
 /* Machine Revenue card */
