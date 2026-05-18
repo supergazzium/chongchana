@@ -1,6 +1,7 @@
 <template>
   <div class="wallet-page-container">
     <Breadcrumb :items="breadcrumbs" />
+    <WalletSubnav />
 
     <div class="wallet-page-header">
       <div>
@@ -15,10 +16,6 @@
           <i class="fas fa-plus"></i>
           Add machine
         </button>
-        <nuxt-link to="/wallets/reports" class="wallet-btn secondary">
-          <i class="fas fa-chart-bar"></i>
-          Reports
-        </nuxt-link>
       </div>
     </div>
 

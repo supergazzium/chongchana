@@ -1,6 +1,7 @@
 <template>
   <div class="wallet-page-container">
     <Breadcrumb :items="breadcrumbs" />
+    <WalletSubnav />
 
     <!-- Page Header -->
     <div class="wallet-page-header">
@@ -21,26 +22,6 @@
           <i class="fas fa-download"></i>
           {{ __wt('export') }}
         </button>
-        <div class="wallet-more-menu">
-          <button @click="moreMenuOpen = !moreMenuOpen" class="wallet-btn secondary">
-            <i class="fas fa-ellipsis-h"></i>
-            {{ __wt('more') }}
-          </button>
-          <div v-if="moreMenuOpen" class="wallet-more-dropdown">
-            <nuxt-link to="/wallets/transactions" @click.native="closeMoreMenu">
-              <i class="fas fa-list"></i> {{ __wt('navTransactions') }}
-            </nuxt-link>
-            <nuxt-link to="/wallets/reports" @click.native="closeMoreMenu">
-              <i class="fas fa-chart-bar"></i> {{ __wt('navReports') }}
-            </nuxt-link>
-            <nuxt-link to="/wallets/vouchers" @click.native="closeMoreMenu">
-              <i class="fas fa-gift"></i> {{ __wt('navVouchers') }}
-            </nuxt-link>
-            <nuxt-link to="/wallets/settings" @click.native="closeMoreMenu">
-              <i class="fas fa-cog"></i> {{ __wt('navSettings') }}
-            </nuxt-link>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -502,7 +483,6 @@ export default {
       wallets: [],
       loading: false,
       branchLoading: false,
-      moreMenuOpen: false,
       filters: {
         search: '',
         status: '',
@@ -593,14 +573,10 @@ export default {
     },
   },
   async mounted() {
-    document.addEventListener('click', this.handleDocumentClick);
     this.__hydrateWalletUiLang();
     this.applyWalletQueryFilters();
     await this.loadWallets();
     await this.loadStats();
-  },
-  beforeDestroy() {
-    document.removeEventListener('click', this.handleDocumentClick);
   },
   methods: {
     async loadWallets() {
@@ -818,18 +794,6 @@ export default {
           periodLabel: this.stats.periodLabel,
         },
       });
-    },
-
-    closeMoreMenu() {
-      this.moreMenuOpen = false;
-    },
-
-    handleDocumentClick(event) {
-      if (!this.moreMenuOpen) return;
-      const menu = this.$el.querySelector('.wallet-more-menu');
-      if (menu && !menu.contains(event.target)) {
-        this.moreMenuOpen = false;
-      }
     },
 
     toggleWalletLang() {
@@ -1505,41 +1469,6 @@ export default {
 .wallet-lang-toggle {
   font-weight: 600;
   letter-spacing: 0.02em;
-}
-
-.wallet-more-menu {
-  position: relative;
-  display: inline-block;
-}
-
-.wallet-more-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-  padding: 6px;
-  min-width: 200px;
-  z-index: 100;
-}
-
-.wallet-more-dropdown a {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-  color: #374151;
-  text-decoration: none;
-  border-radius: 8px;
-  transition: background 0.12s ease;
-}
-
-.wallet-more-dropdown a:hover {
-  background: #f3f4f6;
-  color: #1797AD;
 }
 
 @media (max-width: 768px) {

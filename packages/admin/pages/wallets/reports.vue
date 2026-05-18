@@ -1,6 +1,7 @@
 <template>
   <div class="wallet-page-container">
     <Breadcrumb :items="breadcrumbs" />
+    <WalletSubnav />
 
     <!-- Page Header -->
     <div class="wallet-page-header">

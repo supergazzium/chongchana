@@ -1,6 +1,7 @@
 <template>
   <div class="transactions-page">
     <Breadcrumb :items="breadcrumbs" />
+    <WalletSubnav />
 
     <!-- Drill-through context banner -->
     <div v-if="fromDashboard" class="dashboard-filter-banner">
