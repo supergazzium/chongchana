@@ -82,23 +82,50 @@ export default {
       return this.homeBranch && this.homeBranch.id === branch.id;
     },
     select(branch) {
+      const firstTimeEver = !this.hasSeenPillHint();
+
       this.$store.dispatch('setWorkingBranch', {
         id: branch.id,
         name: branch.name,
       });
 
-      if (!this.isHome(branch)) {
+      if (firstTimeEver) {
+        this.markPillHintSeen();
         this.$store.commit('SET_BY_KEY', {
           key: 'successAlert',
           value: {
             title: `Working at ${branch.name}`,
-            description: 'You can change this anytime from the header.',
+            description:
+              'Tap the branch pill in the header anytime to switch.',
+          },
+        });
+      } else if (!this.isHome(branch)) {
+        this.$store.commit('SET_BY_KEY', {
+          key: 'successAlert',
+          value: {
+            title: `Working at ${branch.name}`,
+            description:
+              'Charges will be attributed here. Tap the pill to change.',
           },
         });
       }
 
       const redirect = this.$route.query.redirect || '/account';
       this.$router.replace(redirect);
+    },
+    hasSeenPillHint() {
+      if (typeof window === 'undefined' || !window.localStorage) return true;
+      try {
+        return window.localStorage.getItem('staff_pill_hint_seen_v1') === '1';
+      } catch (e) {
+        return true;
+      }
+    },
+    markPillHintSeen() {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      try {
+        window.localStorage.setItem('staff_pill_hint_seen_v1', '1');
+      } catch (e) {}
     },
   },
 };

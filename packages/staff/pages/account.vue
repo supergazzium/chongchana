@@ -21,9 +21,26 @@
       </div>
 
       <div class="setting-item -no-hover" :class="{ '-active': $route.path === '/account/email' }">
-        <h4>Branch</h4>
+        <h4>Home Branch</h4>
         <div class="_dp-f _alit-ct">
           <p v-html="_user.branch ? _user.branch.name : '-'"></p>
+        </div>
+      </div>
+
+      <div
+        class="setting-item working-branch-row -no-hover"
+        :class="{ 'is-away': _awayFromHome }"
+      >
+        <h4>Working At</h4>
+        <div class="_dp-f _alit-ct working-branch-action">
+          <p>
+            {{ _workingBranch ? _workingBranch.name : 'Not selected' }}
+            <span class="away-tag" v-if="_awayFromHome">away</span>
+          </p>
+          <button type="button" class="change-branch-btn" @click="changeBranch">
+            <i class="fas fa-exchange-alt"></i>
+            Change
+          </button>
         </div>
       </div>
     </div>
@@ -83,8 +100,19 @@ export default {
         if (this.$store.state.auth.user) return this.$store.state.auth.user
       }
     },
+    _workingBranch() {
+      return this.$store.state.workingBranch
+    },
+    _awayFromHome() {
+      return this.$store.getters.isWorkingAwayFromHome
+    },
   },
   methods: {
+    changeBranch() {
+      this.$router.push(
+        `/select-branch?redirect=${encodeURIComponent('/account')}`
+      )
+    },
     async signout() {
       this.__toastAlert('success', {
         title: 'Signout Successfully',
@@ -148,5 +176,74 @@ export default {
   background: transparent;
   border: none;
   width: 100%;
+}
+
+.working-branch-row {
+  background: rgba(#1797ad, 0.04);
+
+  &.is-away {
+    background: rgba(#f59e0b, 0.1);
+
+    p {
+      color: #b45309;
+      font-weight: 600;
+    }
+  }
+
+  h4 {
+    color: #063f48;
+  }
+}
+
+.working-branch-action {
+  gap: 12px;
+}
+
+.away-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #f59e0b;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.change-branch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1.5px solid #1797ad;
+  background: #fff;
+  color: #1797ad;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background: #1797ad;
+    color: #fff;
+  }
+
+  i {
+    font-size: 12px;
+  }
+}
+
+.working-branch-row.is-away .change-branch-btn {
+  border-color: #f59e0b;
+  color: #b45309;
+
+  &:hover {
+    background: #f59e0b;
+    color: #fff;
+  }
 }
 </style>
