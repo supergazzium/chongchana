@@ -5,31 +5,39 @@
     <!-- Page Header -->
     <div class="wallet-page-header">
       <div>
-        <h1>Wallet Overview</h1>
-        <p class="subtitle">Top-ups, bonuses, branch revenue, and outstanding float</p>
+        <h1>{{ __wt('walletOverview') }}</h1>
+        <p class="subtitle">{{ __wt('pageSubtitle') }}</p>
       </div>
       <div class="header-actions">
+        <button
+          @click="toggleWalletLang"
+          class="wallet-btn secondary wallet-lang-toggle"
+          :title="__wt('langToggle')"
+        >
+          <i class="fas fa-language"></i>
+          {{ __wt('langToggle') }}
+        </button>
         <button @click="exportData" class="wallet-btn secondary">
           <i class="fas fa-download"></i>
-          Export
+          {{ __wt('export') }}
         </button>
         <div class="wallet-more-menu">
           <button @click="moreMenuOpen = !moreMenuOpen" class="wallet-btn secondary">
             <i class="fas fa-ellipsis-h"></i>
-            More
+            {{ __wt('more') }}
           </button>
           <div v-if="moreMenuOpen" class="wallet-more-dropdown">
             <nuxt-link to="/wallets/transactions" @click.native="closeMoreMenu">
-              <i class="fas fa-list"></i> All Transactions
+              <i class="fas fa-list"></i> {{ __wt('navTransactions') }}
             </nuxt-link>
             <nuxt-link to="/wallets/reports" @click.native="closeMoreMenu">
-              <i class="fas fa-chart-bar"></i> Reports
+              <i class="fas fa-chart-bar"></i> {{ __wt('navReports') }}
             </nuxt-link>
             <nuxt-link to="/wallets/vouchers" @click.native="closeMoreMenu">
-              <i class="fas fa-gift"></i> Vouchers
+              <i class="fas fa-gift"></i> {{ __wt('navVouchers') }}
             </nuxt-link>
             <nuxt-link to="/wallets/settings" @click.native="closeMoreMenu">
-              <i class="fas fa-cog"></i> Settings
+              <i class="fas fa-cog"></i> {{ __wt('navSettings') }}
             </nuxt-link>
           </div>
         </div>
@@ -45,7 +53,7 @@
           :class="['period-btn', { active: period === opt.key }]"
           @click="setPeriod(opt.key)"
         >
-          {{ opt.label }}
+          {{ __wt(opt.i18n) }}
         </button>
       </div>
       <div class="period-range" v-if="period === 'custom'">
@@ -75,11 +83,11 @@
             {{ formatDelta(deltas.topUp) }}
           </span>
         </div>
-        <div class="stat-label">Total Top-Up</div>
+        <div class="stat-label">{{ __wt('kpiTopUp') }}</div>
         <div class="stat-value">฿{{ formatNumber(stats.topUpVolume) }}</div>
-        <div class="stat-subtitle">{{ formatInt(stats.topUpCount) }} top-ups · {{ stats.periodLabel }}</div>
+        <div class="stat-subtitle">{{ __wt('kpiTopUpHint', { count: formatInt(stats.topUpCount), period: localizedPeriodLabel }) }}</div>
         <div class="kpi-cta">
-          View transactions <i class="fas fa-arrow-right"></i>
+          {{ __wt('kpiCtaTransactions') }} <i class="fas fa-arrow-right"></i>
         </div>
       </button>
 
@@ -98,11 +106,11 @@
             {{ formatDelta(deltas.bonus) }}
           </span>
         </div>
-        <div class="stat-label">Bonus &amp; Promotion</div>
+        <div class="stat-label">{{ __wt('kpiBonus') }}</div>
         <div class="stat-value">฿{{ formatNumber(stats.bonusVolume) }}</div>
-        <div class="stat-subtitle">{{ formatInt(stats.bonusCount) }} bonuses · {{ stats.periodLabel }}</div>
+        <div class="stat-subtitle">{{ __wt('kpiBonusHint', { count: formatInt(stats.bonusCount), period: localizedPeriodLabel }) }}</div>
         <div class="kpi-cta">
-          View transactions <i class="fas fa-arrow-right"></i>
+          {{ __wt('kpiCtaTransactions') }} <i class="fas fa-arrow-right"></i>
         </div>
       </button>
 
@@ -121,11 +129,11 @@
             {{ formatDelta(deltas.spend) }}
           </span>
         </div>
-        <div class="stat-label">Total Spend</div>
+        <div class="stat-label">{{ __wt('kpiSpend') }}</div>
         <div class="stat-value">฿{{ formatNumber(stats.spendVolume) }}</div>
-        <div class="stat-subtitle">{{ formatInt(stats.spendCount) }} payments · {{ stats.periodLabel }}</div>
+        <div class="stat-subtitle">{{ __wt('kpiSpendHint', { count: formatInt(stats.spendCount), period: localizedPeriodLabel }) }}</div>
         <div class="kpi-cta">
-          View transactions <i class="fas fa-arrow-right"></i>
+          {{ __wt('kpiCtaTransactions') }} <i class="fas fa-arrow-right"></i>
         </div>
       </button>
 
@@ -140,13 +148,13 @@
             <i class="fas fa-wallet"></i>
           </div>
         </div>
-        <div class="stat-label">Wallet Float</div>
+        <div class="stat-label">{{ __wt('kpiFloat') }}</div>
         <div class="stat-value">฿{{ formatNumber(stats.totalBalance) }}</div>
         <div class="stat-subtitle">
-          Outstanding liability · {{ formatInt(stats.totalWallets) }} wallets
+          {{ __wt('kpiFloatHint', { count: formatInt(stats.totalWallets) }) }}
         </div>
         <div class="kpi-cta">
-          View wallets <i class="fas fa-arrow-right"></i>
+          {{ __wt('kpiCtaWallets') }} <i class="fas fa-arrow-right"></i>
         </div>
       </button>
     </div>
@@ -155,22 +163,22 @@
     <div class="branch-breakdown-card">
       <div class="branch-breakdown-header">
         <div>
-          <h2>Spend by Branch</h2>
-          <p>How much customers spent at each location · {{ stats.periodLabel }}</p>
+          <h2>{{ __wt('branchTitle') }}</h2>
+          <p>{{ __wt('branchSubtitle', { period: localizedPeriodLabel }) }}</p>
         </div>
         <div class="branch-total">
-          <span class="branch-total-label">Total</span>
+          <span class="branch-total-label">{{ __wt('branchTotal') }}</span>
           <span class="branch-total-value">฿{{ formatNumber(stats.spendVolume) }}</span>
         </div>
       </div>
 
       <div v-if="branchLoading" class="branch-empty">
         <i class="fas fa-spinner fa-spin"></i>
-        Loading branch data…
+        {{ __wt('branchLoading') }}
       </div>
       <div v-else-if="byBranch.length === 0" class="branch-empty">
         <i class="fas fa-store-slash"></i>
-        No branch spend recorded for this period.
+        {{ __wt('branchEmpty') }}
       </div>
       <div v-else class="branch-rows">
         <div
@@ -182,8 +190,8 @@
           <div class="branch-row-head">
             <span class="branch-name">
               <i v-if="row.unattributed" class="fas fa-question-circle unattributed-icon"></i>
-              {{ row.branch }}
-              <span v-if="row.unattributed" class="unattributed-tag">no branch recorded</span>
+              {{ row.unattributed ? __wt('branchUnattributed') : row.branch }}
+              <span v-if="row.unattributed" class="unattributed-tag">{{ __wt('branchUnattributedTag') }}</span>
             </span>
             <span class="branch-amount">฿{{ formatNumber(row.volume) }}</span>
           </div>
@@ -194,14 +202,12 @@
             ></div>
           </div>
           <div class="branch-row-meta">
-            <span>{{ formatInt(row.transactions) }} transactions</span>
-            <span>Avg ฿{{ formatNumber(row.transactions ? row.volume / row.transactions : 0) }}</span>
-            <span>{{ branchShare(row.volume) }}% of total</span>
+            <span>{{ __wt('branchTransactions', { count: formatInt(row.transactions) }) }}</span>
+            <span>{{ __wt('branchAvg', { value: formatNumber(row.transactions ? row.volume / row.transactions : 0) }) }}</span>
+            <span>{{ __wt('branchShareOfTotal', { percent: branchShare(row.volume) }) }}</span>
           </div>
           <div v-if="row.unattributed" class="unattributed-hint">
-            These spend transactions have no branch attribution — usually
-            legacy data or vending sessions without a branch. They are still
-            counted in Total Spend.
+            {{ __wt('branchUnattributedHint') }}
           </div>
         </div>
       </div>
@@ -210,12 +216,14 @@
     <!-- Wallet Operations Section -->
     <div class="wallet-ops-section">
       <div class="wallet-ops-header">
-        <h2>Wallets</h2>
+        <h2>{{ __wt('walletsTitle') }}</h2>
         <p class="wallet-ops-sub">
-          {{ formatInt(stats.activeWallets) }} active ·
-          {{ formatInt(stats.frozenWallets) }} frozen ·
-          {{ formatInt(stats.suspendedWallets) }} suspended ·
-          ฿{{ formatNumber(stats.pendingBalance) }} pending
+          {{ __wt('walletsSubtitle', {
+            active: formatInt(stats.activeWallets),
+            frozen: formatInt(stats.frozenWallets),
+            suspended: formatInt(stats.suspendedWallets),
+            pending: formatNumber(stats.pendingBalance),
+          }) }}
         </p>
       </div>
     </div>
@@ -227,7 +235,7 @@
         :class="['wallet-filter-chip', { active: filters.status === '' }]"
       >
         <i class="fas fa-list"></i>
-        All Wallets
+        {{ __wt('filterAll') }}
         <span class="chip-count">{{ formatInt(stats.totalWallets) }}</span>
       </button>
       <button
@@ -235,7 +243,7 @@
         :class="['wallet-filter-chip', { active: filters.status === 'active' }]"
       >
         <i class="fas fa-check-circle"></i>
-        Active
+        {{ __wt('filterActive') }}
         <span class="chip-count">{{ formatInt(stats.activeWallets) }}</span>
       </button>
       <button
@@ -243,7 +251,7 @@
         :class="['wallet-filter-chip', { active: filters.status === 'frozen' }]"
       >
         <i class="fas fa-snowflake"></i>
-        Frozen
+        {{ __wt('filterFrozen') }}
         <span class="chip-count">{{ formatInt(stats.frozenWallets) }}</span>
       </button>
       <button
@@ -251,12 +259,12 @@
         :class="['wallet-filter-chip', { active: filters.status === 'suspended' }]"
       >
         <i class="fas fa-ban"></i>
-        Suspended
+        {{ __wt('filterSuspended') }}
         <span class="chip-count">{{ formatInt(stats.suspendedWallets) }}</span>
       </button>
       <button @click="resetFilters" class="wallet-filter-chip">
         <i class="fas fa-redo"></i>
-        Reset
+        {{ __wt('filterReset') }}
       </button>
     </div>
 
@@ -266,12 +274,12 @@
         <div class="wallet-filter-item">
           <label>
             <i class="fas fa-search"></i>
-            Search
+            {{ __wt('filterSearch') }}
           </label>
           <input
             v-model="filters.search"
             type="text"
-            placeholder="Name, email, phone, or user ID..."
+            :placeholder="__wt('filterSearchPlaceholder')"
             @input="debouncedSearch"
           />
         </div>
@@ -279,7 +287,7 @@
         <div class="wallet-filter-item">
           <label>
             <i class="fas fa-coins"></i>
-            Min Balance
+            {{ __wt('filterMinBalance') }}
           </label>
           <input
             v-model="filters.minBalance"
@@ -292,7 +300,7 @@
         <div class="wallet-filter-item">
           <label>
             <i class="fas fa-coins"></i>
-            Max Balance
+            {{ __wt('filterMaxBalance') }}
           </label>
           <input
             v-model="filters.maxBalance"
@@ -311,35 +319,35 @@
         <thead>
           <tr>
             <th class="sortable" @click="toggleSort('user_id')">
-              <i class="fas fa-hashtag"></i> User ID
+              <i class="fas fa-hashtag"></i> {{ __wt('thUserId') }}
               <i :class="sortIcon('user_id')"></i>
             </th>
-            <th><i class="fas fa-user"></i> Name</th>
-            <th><i class="fas fa-envelope"></i> Email</th>
+            <th><i class="fas fa-user"></i> {{ __wt('thName') }}</th>
+            <th><i class="fas fa-envelope"></i> {{ __wt('thEmail') }}</th>
             <th class="sortable" @click="toggleSort('balance')">
-              <i class="fas fa-wallet"></i> Balance
+              <i class="fas fa-wallet"></i> {{ __wt('thBalance') }}
               <i :class="sortIcon('balance')"></i>
             </th>
-            <th><i class="fas fa-clock"></i> Pending</th>
-            <th><i class="fas fa-info-circle"></i> Status</th>
+            <th><i class="fas fa-clock"></i> {{ __wt('thPending') }}</th>
+            <th><i class="fas fa-info-circle"></i> {{ __wt('thStatus') }}</th>
             <th class="sortable" @click="toggleSort('last_transaction')">
-              <i class="fas fa-calendar"></i> Last Transaction
+              <i class="fas fa-calendar"></i> {{ __wt('thLastTransaction') }}
               <i :class="sortIcon('last_transaction')"></i>
             </th>
-            <th><i class="fas fa-tools"></i> Actions</th>
+            <th><i class="fas fa-tools"></i> {{ __wt('thActions') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
             <td colspan="8" class="wallet-loading">
               <i class="fas fa-spinner fa-spin"></i>
-              <p>Loading wallets...</p>
+              <p>{{ __wt('loadingWallets') }}</p>
             </td>
           </tr>
           <tr v-else-if="wallets.length === 0">
             <td colspan="8" class="wallet-empty">
               <i class="fas fa-inbox"></i>
-              <p>No wallets found</p>
+              <p>{{ __wt('noWalletsFound') }}</p>
             </td>
           </tr>
           <tr v-else v-for="wallet in wallets" :key="wallet.userId">
@@ -361,11 +369,11 @@
               <div class="actions">
                 <nuxt-link :to="`/wallets/${wallet.userId}`" class="wallet-btn secondary" style="padding: 6px 12px; font-size: 12px;">
                   <i class="fas fa-eye"></i>
-                  View
+                  {{ __wt('view') }}
                 </nuxt-link>
                 <button @click="showAdjustModal(wallet)" class="wallet-btn secondary" style="padding: 6px 12px; font-size: 12px;">
                   <i class="fas fa-edit"></i>
-                  Adjust
+                  {{ __wt('adjust') }}
                 </button>
                 <button
                   v-if="wallet.status === 'active'"
@@ -374,7 +382,7 @@
                   style="padding: 6px 12px; font-size: 12px;"
                 >
                   <i class="fas fa-snowflake"></i>
-                  Freeze
+                  {{ __wt('freeze') }}
                 </button>
                 <button
                   v-else
@@ -383,7 +391,7 @@
                   style="padding: 6px 12px; font-size: 12px;"
                 >
                   <i class="fas fa-check"></i>
-                  Unfreeze
+                  {{ __wt('unfreeze') }}
                 </button>
               </div>
             </td>
@@ -400,19 +408,21 @@
         class="wallet-btn secondary"
       >
         <i class="fas fa-chevron-left"></i>
-        Previous
+        {{ __wt('previous') }}
       </button>
       <span style="color: #6b7280; font-size: 14px;">
-        Showing {{ pagination.offset + 1 }} -
-        {{ Math.min(pagination.offset + pagination.limit, pagination.total) }}
-        of {{ pagination.total }}
+        {{ __wt('paginationShowing', {
+          from: pagination.offset + 1,
+          to: Math.min(pagination.offset + pagination.limit, pagination.total),
+          total: pagination.total,
+        }) }}
       </span>
       <button
         @click="nextPage"
         :disabled="!pagination.hasMore"
         class="wallet-btn secondary"
       >
-        Next
+        {{ __wt('next') }}
         <i class="fas fa-chevron-right"></i>
       </button>
     </div>
@@ -422,38 +432,38 @@
       <div class="modal-content" @click.stop>
         <h2 style="font-size: 22px; color: #063F48; margin-bottom: 20px;">
           <i class="fas fa-balance-scale"></i>
-          Adjust Wallet Balance
+          {{ __wt('adjustTitle') }}
         </h2>
         <div class="modal-body">
           <div style="background: #F7FAFC; padding: 16px; border-radius: 12px; margin-bottom: 20px;">
-            <p style="margin: 4px 0;"><strong>User:</strong> {{ adjustData.user?.firstName }} {{ adjustData.user?.lastName }}</p>
-            <p style="margin: 4px 0;"><strong>Current Balance:</strong> <span style="color: #1797AD; font-weight: 600;">฿{{ formatNumber(adjustData.balance) }}</span></p>
+            <p style="margin: 4px 0;"><strong>{{ __wt('adjustUser') }}:</strong> {{ adjustData.user?.firstName }} {{ adjustData.user?.lastName }}</p>
+            <p style="margin: 4px 0;"><strong>{{ __wt('adjustCurrentBalance') }}:</strong> <span style="color: #1797AD; font-weight: 600;">฿{{ formatNumber(adjustData.balance) }}</span></p>
           </div>
 
           <div class="wallet-filter-item" style="margin-bottom: 16px;">
-            <label>Adjustment Type</label>
+            <label>{{ __wt('adjustType') }}</label>
             <select v-model="adjustData.type">
-              <option value="credit">Credit (Add Money)</option>
-              <option value="debit">Debit (Deduct Money)</option>
+              <option value="credit">{{ __wt('adjustCredit') }}</option>
+              <option value="debit">{{ __wt('adjustDebit') }}</option>
             </select>
           </div>
 
           <div class="wallet-filter-item" style="margin-bottom: 16px;">
-            <label>Amount (฿)</label>
+            <label>{{ __wt('adjustAmount') }}</label>
             <input
               v-model="adjustData.amount"
               type="number"
               step="0.01"
-              placeholder="Enter amount..."
+              :placeholder="__wt('adjustAmountPlaceholder')"
             />
           </div>
 
           <div class="wallet-filter-item" style="margin-bottom: 20px;">
-            <label>Reason (Required)</label>
+            <label>{{ __wt('adjustReason') }}</label>
             <textarea
               v-model="adjustData.reason"
               rows="3"
-              placeholder="Enter reason for adjustment..."
+              :placeholder="__wt('adjustReasonPlaceholder')"
               style="width: 100%; padding: 10px 14px; border: 2px solid #E2E8F0; border-radius: 12px; font-size: 14px; font-family: inherit; resize: vertical;"
             ></textarea>
           </div>
@@ -461,11 +471,11 @@
           <div style="display: flex; justify-content: flex-end; gap: 12px;">
             <button @click="closeAdjustModal" class="wallet-btn secondary">
               <i class="fas fa-times"></i>
-              Cancel
+              {{ __wt('cancel') }}
             </button>
             <button @click="submitAdjustment" class="wallet-btn success" :disabled="!canSubmitAdjustment">
               <i class="fas fa-check"></i>
-              Adjust Balance
+              {{ __wt('adjustBalance') }}
             </button>
           </div>
         </div>
@@ -513,11 +523,11 @@ export default {
         to: '',
       },
       periodOptions: [
-        { key: 'today', label: 'Today' },
-        { key: '7d', label: '7d' },
-        { key: 'mtd', label: 'MTD' },
-        { key: '30d', label: '30d' },
-        { key: 'custom', label: 'Custom' },
+        { key: 'today', i18n: 'periodToday' },
+        { key: '7d', i18n: 'period7d' },
+        { key: 'mtd', i18n: 'periodMtd' },
+        { key: '30d', i18n: 'period30d' },
+        { key: 'custom', i18n: 'periodCustom' },
       ],
       stats: {
         totalBalance: 0,
@@ -569,6 +579,14 @@ export default {
       if (from.isSame(to, 'day')) return from.format('MMM D, YYYY');
       return `${from.format('MMM D')} – ${to.format('MMM D, YYYY')}`;
     },
+    // Localized version of the period for use inside subtitles. Uses the
+    // i18n key when the period matches a preset, otherwise echoes the
+    // server-derived label (date range).
+    localizedPeriodLabel() {
+      const opt = this.periodOptions.find((o) => o.key === this.period);
+      if (opt && this.period !== 'custom') return this.__wt(opt.i18n);
+      return this.periodDisplayLabel || this.stats.periodLabel;
+    },
     maxBranchVolume() {
       if (!this.byBranch.length) return 0;
       return this.byBranch.reduce((m, r) => (r.volume > m ? r.volume : m), 0);
@@ -576,6 +594,7 @@ export default {
   },
   async mounted() {
     document.addEventListener('click', this.handleDocumentClick);
+    this.__hydrateWalletUiLang();
     this.applyWalletQueryFilters();
     await this.loadWallets();
     await this.loadStats();
@@ -813,6 +832,11 @@ export default {
       }
     },
 
+    toggleWalletLang() {
+      const next = this.$store.state.walletUiLang === 'th' ? 'en' : 'th';
+      this.__setWalletUiLang(next);
+    },
+
     derivePeriodLabel(period) {
       if (!period || !period.from || !period.to) return 'MTD';
       const from = this.$moment(period.from).tz('Asia/Bangkok');
@@ -1043,7 +1067,7 @@ export default {
     },
 
     formatDate(date) {
-      if (!date) return 'Never';
+      if (!date) return this.__wt('never');
       return this.$moment(date).tz('Asia/Bangkok').format('MMM D, YYYY HH:mm');
     },
   },
@@ -1476,6 +1500,11 @@ export default {
   margin: 0;
   font-size: 13px;
   color: #6b7280;
+}
+
+.wallet-lang-toggle {
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .wallet-more-menu {

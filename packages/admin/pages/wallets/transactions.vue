@@ -7,32 +7,41 @@
       <div class="banner-main">
         <i class="fas fa-filter"></i>
         <span>
-          Showing
-          <strong v-if="fromDashboard.typeLabel">{{ fromDashboard.typeLabel }}</strong>
-          transactions<span v-if="fromDashboard.branchLabel"> at <strong>{{ fromDashboard.branchLabel }}</strong></span><span v-if="fromDashboard.periodLabel"> for <strong>{{ fromDashboard.periodLabel }}</strong></span>
+          {{ __wt('txDashboardBannerPrefix') }}
+          <strong v-if="fromDashboard.typeLabel">{{ __wt('txDashboardBannerType', { type: fromDashboard.typeLabel }) }}</strong>
+          <span v-if="fromDashboard.branchLabel">{{ __wt('txDashboardBannerBranch', { branch: fromDashboard.branchLabel }) }}</span>
+          <span v-if="fromDashboard.periodLabel">{{ __wt('txDashboardBannerPeriod', { period: fromDashboard.periodLabel }) }}</span>
         </span>
       </div>
       <button @click="clearDashboardFilter" class="banner-clear">
         <i class="fas fa-times"></i>
-        Clear filter
+        {{ __wt('txClearFilter') }}
       </button>
     </div>
 
     <!-- Page Header with Actions -->
     <div class="page-header">
       <div class="header-left">
-        <h1>Transactions</h1>
-        <span class="total-count">{{ pagination.total }} total</span>
+        <h1>{{ __wt('txTitle') }}</h1>
+        <span class="total-count">{{ __wt('txTotal', { count: pagination.total }) }}</span>
       </div>
       <div class="header-actions">
+        <button
+          @click="toggleWalletLang"
+          class="btn-secondary wallet-lang-toggle"
+          :title="__wt('langToggle')"
+        >
+          <i class="fas fa-language"></i>
+          {{ __wt('langToggle') }}
+        </button>
         <button @click="toggleFilters" class="btn-secondary">
           <i class="fas fa-filter"></i>
-          Filters
+          {{ __wt('txFilters') }}
           <span v-if="activeFiltersCount" class="badge">{{ activeFiltersCount }}</span>
         </button>
         <button @click="exportData" class="btn-primary">
           <i class="fas fa-download"></i>
-          Export
+          {{ __wt('export') }}
         </button>
       </div>
     </div>
@@ -45,7 +54,7 @@
         </div>
         <div class="card-content">
           <div class="card-value">{{ summary.completed }}</div>
-          <div class="card-label">Completed</div>
+          <div class="card-label">{{ __wt('txCompleted') }}</div>
         </div>
       </div>
 
@@ -55,7 +64,7 @@
         </div>
         <div class="card-content">
           <div class="card-value">{{ summary.pending }}</div>
-          <div class="card-label">Pending</div>
+          <div class="card-label">{{ __wt('txPending') }}</div>
         </div>
       </div>
 
@@ -65,7 +74,7 @@
         </div>
         <div class="card-content">
           <div class="card-value">{{ summary.failed }}</div>
-          <div class="card-label">Failed</div>
+          <div class="card-label">{{ __wt('txFailed') }}</div>
         </div>
       </div>
 
@@ -75,7 +84,7 @@
         </div>
         <div class="card-content">
           <div class="card-value">฿{{ formatNumber(summary.totalVolume) }}</div>
-          <div class="card-label">Total Volume</div>
+          <div class="card-label">{{ __wt('txTotalVolume') }}</div>
         </div>
       </div>
     </div>
@@ -583,6 +592,7 @@ export default {
   },
 
   async mounted() {
+    this.__hydrateWalletUiLang();
     this.applyQueryFilters();
     await Promise.all([
       this.loadTransactions(),
@@ -591,6 +601,11 @@ export default {
   },
 
   methods: {
+    toggleWalletLang() {
+      const next = this.$store.state.walletUiLang === 'th' ? 'en' : 'th';
+      this.__setWalletUiLang(next);
+    },
+
     applyQueryFilters() {
       const q = this.$route.query || {};
       let usedAny = false;

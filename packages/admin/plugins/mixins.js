@@ -16,6 +16,9 @@ const {
 
 const { determineSize } = require('./mixins/contentEdit')
 const { changeLocale } = require('./mixins/locale')
+const { translate: translateWallet } = require('../locales/wallet')
+
+const WALLET_LANG_STORAGE_KEY = 'wallet_ui_lang_v1'
 
 Vue.mixin({
   methods: {
@@ -42,6 +45,31 @@ Vue.mixin({
     __getTerm(slug) {
       let term = this.$store.state.terms.filter(t => t.slug === slug)
       return term.length === 0 ? slug : term[0].value
+    },
+    // Wallet-section UI translation. Looks up the key in the wallet
+    // locale bundle using the current `walletUiLang` state. Returns
+    // English fallback if a Thai string is missing.
+    __wt(key, vars) {
+      const lang = (this.$store && this.$store.state && this.$store.state.walletUiLang) || 'en'
+      return translateWallet(lang, key, vars || {})
+    },
+    __setWalletUiLang(lang) {
+      const next = lang === 'th' ? 'th' : 'en'
+      this.$store.commit('SET_WALLET_UI_LANG', next)
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          window.localStorage.setItem(WALLET_LANG_STORAGE_KEY, next)
+        } catch (e) {}
+      }
+    },
+    __hydrateWalletUiLang() {
+      if (typeof window === 'undefined' || !window.localStorage) return
+      try {
+        const stored = window.localStorage.getItem(WALLET_LANG_STORAGE_KEY)
+        if (stored === 'th' || stored === 'en') {
+          this.$store.commit('SET_WALLET_UI_LANG', stored)
+        }
+      } catch (e) {}
     },
     __capitalize(string) {
       let returnVal

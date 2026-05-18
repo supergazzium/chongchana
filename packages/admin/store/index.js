@@ -220,6 +220,8 @@ export const state = () => ({
   brandURL: 'https://chongjaroen.com',
   navLinks: menus,
   staffATKMenus,
+  // UI language for wallet pages (independent of CMS content locale)
+  walletUiLang: 'en',
   // internationalize 🌏
   // locales: [
   //   { value: 'th', label: 'Thai', flag: 'TH' },
@@ -237,6 +239,9 @@ export const mutations = {
   },
   CHANGE_LOCALE(state, newLocale) {
     state.currentLocale = newLocale
+  },
+  SET_WALLET_UI_LANG(state, lang) {
+    state.walletUiLang = lang === 'th' ? 'th' : 'en'
   },
 }
 
