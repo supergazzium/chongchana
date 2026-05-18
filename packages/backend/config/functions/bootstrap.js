@@ -329,6 +329,42 @@ module.exports = async () => {
       strapi.log.info(`[Bootstrap] Added ${createdCount} new wallet-admin permission(s).`);
     }
 
+    // CRITICAL: Strapi's users-permissions plugin gates each request by
+    // looking up { controller, action } from the route's handler string.
+    // Our wallet-admin routes use handler "api.<action>" (e.g.
+    // "api.listMachines"), so the plugin queries for
+    // controller='api', action='<lowercased>', enabled=true.
+    //
+    // Strapi auto-creates these api.* permission rows on boot when it
+    // detects new handlers in api.js exports — but with enabled=0 by
+    // default. That's why any newly-added handler returns 403 until
+    // someone manually flips the flag in the database.
+    //
+    // We enable them here for every action we ship. Idempotent — only
+    // updates rows that aren't already enabled.
+    const apiPermissionsForAdminActions = await strapi
+      .query('permission', 'users-permissions')
+      .find({
+        controller: 'api',
+        action_in: adminActionsToCreate.map((a) => a.toLowerCase()),
+        enabled: false,
+      });
+
+    let enabledCount = 0;
+    for (const perm of apiPermissionsForAdminActions) {
+      await strapi.query('permission', 'users-permissions').update(
+        { id: perm.id },
+        { enabled: true }
+      );
+      strapi.log.info(`✅ Enabled api.${perm.action} for role ${perm.role}`);
+      enabledCount++;
+    }
+    if (enabledCount === 0) {
+      strapi.log.info('[Bootstrap] All api.* wallet-admin permissions already enabled.');
+    } else {
+      strapi.log.info(`[Bootstrap] Enabled ${enabledCount} api.* permission row(s).`);
+    }
+
     // Create PUBLIC role permissions for validatePaymentQR and processPayment
     const publicQRPermissions = await strapi.query('permission', 'users-permissions').find({
       role: publicRole.id,
