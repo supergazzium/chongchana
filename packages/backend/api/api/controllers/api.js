@@ -47,6 +47,10 @@ const {
   rejectPointRedemption,
   getTransferSettings,
   updateTransferSettings,
+  listMachines,
+  createMachine,
+  updateMachine,
+  deleteMachine,
 } = require('./wallet-admin')
 const {
   transferFunds,
@@ -148,4 +152,9 @@ module.exports = {
   rejectPointRedemption,
   getTransferSettings,
   updateTransferSettings,
+  // Wallet Admin: machines lookup
+  listMachines,
+  createMachine,
+  updateMachine,
+  deleteMachine,
 }
