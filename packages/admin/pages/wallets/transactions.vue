@@ -2,6 +2,22 @@
   <div class="transactions-page">
     <Breadcrumb :items="breadcrumbs" />
 
+    <!-- Drill-through context banner -->
+    <div v-if="fromDashboard" class="dashboard-filter-banner">
+      <div class="banner-main">
+        <i class="fas fa-filter"></i>
+        <span>
+          Showing
+          <strong v-if="fromDashboard.typeLabel">{{ fromDashboard.typeLabel }}</strong>
+          transactions<span v-if="fromDashboard.periodLabel"> for <strong>{{ fromDashboard.periodLabel }}</strong></span>
+        </span>
+      </div>
+      <button @click="clearDashboardFilter" class="banner-clear">
+        <i class="fas fa-times"></i>
+        Clear filter
+      </button>
+    </div>
+
     <!-- Page Header with Actions -->
     <div class="page-header">
       <div class="header-left">
@@ -486,13 +502,17 @@ export default {
       filters: {
         search: '',
         type: '',
+        types: '',
         status: '',
         branch: '',
         staffId: '',
         machineId: '',
         minAmount: '',
         maxAmount: '',
+        fromDate: '',
+        toDate: '',
       },
+      fromDashboard: null,
 
       pagination: {
         limit: 50,
@@ -562,6 +582,7 @@ export default {
   },
 
   async mounted() {
+    this.applyQueryFilters();
     await Promise.all([
       this.loadTransactions(),
       this.loadSummary(),
@@ -569,6 +590,64 @@ export default {
   },
 
   methods: {
+    applyQueryFilters() {
+      const q = this.$route.query || {};
+      let usedAny = false;
+
+      if (q.type) {
+        this.filters.type = q.type;
+        usedAny = true;
+      }
+      if (q.types) {
+        this.filters.types = q.types;
+        usedAny = true;
+      }
+      if (q.fromDate) {
+        this.filters.fromDate = q.fromDate;
+        usedAny = true;
+      }
+      if (q.toDate) {
+        this.filters.toDate = q.toDate;
+        usedAny = true;
+      }
+      if (q.branch) {
+        this.filters.branch = q.branch;
+        usedAny = true;
+      }
+
+      if (usedAny) {
+        this.showFilters = true;
+        this.fromDashboard = {
+          periodLabel: q.periodLabel || null,
+          typeLabel: this.describeIncomingTypeFilter(q),
+        };
+      }
+    },
+
+    describeIncomingTypeFilter(q) {
+      if (q.types) {
+        const list = String(q.types).split(',');
+        if (list.includes('store_payment') && list.includes('beer_machine_payment')) {
+          return 'Spend';
+        }
+        return list.map((t) => this.formatType(t)).join(' + ');
+      }
+      if (q.type) return this.formatType(q.type);
+      return null;
+    },
+
+    clearDashboardFilter() {
+      this.fromDashboard = null;
+      this.filters.type = '';
+      this.filters.types = '';
+      this.filters.fromDate = '';
+      this.filters.toDate = '';
+      this.filters.branch = '';
+      this.pagination.offset = 0;
+      this.$router.replace({ path: '/wallets/transactions' });
+      this.loadTransactions();
+    },
+
     async loadTransactions() {
       this.loading = true;
       try {
@@ -1707,5 +1786,56 @@ export default {
 
 .text-muted {
   color: var(--gray-400);
+}
+
+.dashboard-filter-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: linear-gradient(135deg, #e0f2f5 0%, #d4eef3 100%);
+  border: 1px solid #1797AD;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.banner-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #063F48;
+  font-size: 14px;
+}
+
+.banner-main i {
+  color: #1797AD;
+  font-size: 16px;
+}
+
+.banner-main strong {
+  color: #1797AD;
+  font-weight: 700;
+}
+
+.banner-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #1797AD;
+  color: #1797AD;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.banner-clear:hover {
+  background: #1797AD;
+  color: #fff;
 }
 </style>

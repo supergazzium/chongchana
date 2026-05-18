@@ -334,6 +334,7 @@ module.exports = {
         offset = 0,
         userId,
         type,
+        types,
         status,
         minAmount,
         maxAmount,
@@ -363,7 +364,16 @@ module.exports = {
         params.push(userId);
       }
 
-      if (type) {
+      // Multi-type filter (CSV) takes precedence over single-type when both present.
+      const typeList = typeof types === 'string' && types.length > 0
+        ? types.split(',').map((t) => t.trim()).filter(Boolean)
+        : [];
+
+      if (typeList.length > 0) {
+        const placeholders = typeList.map(() => '?').join(',');
+        query += ` AND t.type IN (${placeholders})`;
+        params.push(...typeList);
+      } else if (type) {
         query += ` AND t.type = ?`;
         params.push(type);
       }

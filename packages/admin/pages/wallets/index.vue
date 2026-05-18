@@ -58,9 +58,14 @@
       </div>
     </div>
 
-    <!-- Financial KPI Cards -->
+    <!-- Financial KPI Cards (click to drill into details) -->
     <div class="wallet-stats-grid">
-      <div class="wallet-stat-card kpi-card kpi-positive">
+      <button
+        type="button"
+        class="wallet-stat-card kpi-card kpi-positive kpi-clickable"
+        @click="drillInto('topUp')"
+        :aria-label="`View top-up transactions for ${stats.periodLabel}`"
+      >
         <div class="stat-header">
           <div class="stat-icon success">
             <i class="fas fa-arrow-down"></i>
@@ -73,9 +78,17 @@
         <div class="stat-label">Total Top-Up</div>
         <div class="stat-value">฿{{ formatNumber(stats.topUpVolume) }}</div>
         <div class="stat-subtitle">{{ formatInt(stats.topUpCount) }} top-ups · {{ stats.periodLabel }}</div>
-      </div>
+        <div class="kpi-cta">
+          View transactions <i class="fas fa-arrow-right"></i>
+        </div>
+      </button>
 
-      <div class="wallet-stat-card kpi-card kpi-warn">
+      <button
+        type="button"
+        class="wallet-stat-card kpi-card kpi-warn kpi-clickable"
+        @click="drillInto('bonus')"
+        :aria-label="`View bonus transactions for ${stats.periodLabel}`"
+      >
         <div class="stat-header">
           <div class="stat-icon warning">
             <i class="fas fa-gift"></i>
@@ -88,9 +101,17 @@
         <div class="stat-label">Bonus &amp; Promotion</div>
         <div class="stat-value">฿{{ formatNumber(stats.bonusVolume) }}</div>
         <div class="stat-subtitle">{{ formatInt(stats.bonusCount) }} bonuses · {{ stats.periodLabel }}</div>
-      </div>
+        <div class="kpi-cta">
+          View transactions <i class="fas fa-arrow-right"></i>
+        </div>
+      </button>
 
-      <div class="wallet-stat-card kpi-card kpi-negative">
+      <button
+        type="button"
+        class="wallet-stat-card kpi-card kpi-negative kpi-clickable"
+        @click="drillInto('spend')"
+        :aria-label="`View spend transactions for ${stats.periodLabel}`"
+      >
         <div class="stat-header">
           <div class="stat-icon info">
             <i class="fas fa-store"></i>
@@ -103,9 +124,17 @@
         <div class="stat-label">Total Spend</div>
         <div class="stat-value">฿{{ formatNumber(stats.spendVolume) }}</div>
         <div class="stat-subtitle">{{ formatInt(stats.spendCount) }} payments · {{ stats.periodLabel }}</div>
-      </div>
+        <div class="kpi-cta">
+          View transactions <i class="fas fa-arrow-right"></i>
+        </div>
+      </button>
 
-      <div class="wallet-stat-card kpi-card kpi-neutral">
+      <button
+        type="button"
+        class="wallet-stat-card kpi-card kpi-neutral kpi-clickable"
+        @click="drillInto('float')"
+        aria-label="View wallets sorted by balance"
+      >
         <div class="stat-header">
           <div class="stat-icon info">
             <i class="fas fa-wallet"></i>
@@ -116,7 +145,10 @@
         <div class="stat-subtitle">
           Outstanding liability · {{ formatInt(stats.totalWallets) }} wallets
         </div>
-      </div>
+        <div class="kpi-cta">
+          View wallets <i class="fas fa-arrow-right"></i>
+        </div>
+      </button>
     </div>
 
     <!-- Branch Spend Breakdown -->
@@ -535,6 +567,7 @@ export default {
   },
   async mounted() {
     document.addEventListener('click', this.handleDocumentClick);
+    this.applyWalletQueryFilters();
     await this.loadWallets();
     await this.loadStats();
   },
@@ -708,6 +741,42 @@ export default {
       this.filters.search = branch;
       this.pagination.offset = 0;
       this.loadWallets();
+    },
+
+    applyWalletQueryFilters() {
+      const q = this.$route.query || {};
+      if (q.sortBy) this.filters.sortBy = q.sortBy;
+      if (q.sortOrder) this.filters.sortOrder = q.sortOrder;
+    },
+
+    drillInto(kpi) {
+      const range = this.resolvePeriodRange();
+      const dateParams = range
+        ? { fromDate: range.from, toDate: range.to }
+        : {};
+
+      if (kpi === 'float') {
+        this.$router.push({
+          path: '/wallets',
+          query: { sortBy: 'balance', sortOrder: 'desc' },
+        });
+        return;
+      }
+
+      const typeQuery = {
+        topUp: { type: 'top_up' },
+        bonus: { type: 'bonus' },
+        spend: { types: 'store_payment,beer_machine_payment' },
+      }[kpi];
+
+      this.$router.push({
+        path: '/wallets/transactions',
+        query: {
+          ...typeQuery,
+          ...dateParams,
+          periodLabel: this.stats.periodLabel,
+        },
+      });
     },
 
     closeMoreMenu() {
@@ -1105,6 +1174,59 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.kpi-clickable {
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  width: 100%;
+  border: 1px solid transparent;
+  transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.kpi-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(6, 63, 72, 0.12);
+  border-color: rgba(23, 151, 173, 0.35);
+}
+
+.kpi-clickable:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(6, 63, 72, 0.1);
+}
+
+.kpi-clickable:focus-visible {
+  outline: 2px solid #1797AD;
+  outline-offset: 2px;
+}
+
+.kpi-cta {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e5e7eb;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.15s ease;
+}
+
+.kpi-cta i {
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.kpi-clickable:hover .kpi-cta {
+  color: #1797AD;
+}
+
+.kpi-clickable:hover .kpi-cta i {
+  transform: translateX(4px);
 }
 
 .kpi-delta {
