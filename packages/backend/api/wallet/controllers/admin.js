@@ -707,6 +707,31 @@ module.exports = {
         ORDER BY volume DESC
       `, [from, to]);
 
+      // Beer machine revenue, grouped by branch and machine_id.
+      // machine_id lives inside the JSON metadata column (set by the
+      // vending controller). volume_dispensed has its own column and
+      // is in millilitres per pour.
+      const machineBreakdown = await knex.raw(`
+        SELECT
+          CASE
+            WHEN branch IS NULL OR branch = '' THEN '__unattributed__'
+            ELSE branch
+          END AS branch,
+          COALESCE(
+            JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.machineId')),
+            '__unknown_machine__'
+          ) AS machine_id,
+          COUNT(*) as pours,
+          SUM(ABS(amount)) as revenue,
+          SUM(COALESCE(volume_dispensed, 0)) as volume_ml,
+          MAX(created_at) as last_activity
+        FROM wallet_transactions
+        WHERE created_at BETWEEN ? AND ?
+          AND type = 'beer_machine_payment'
+        GROUP BY branch, machine_id
+        ORDER BY revenue DESC
+      `, [from, to]);
+
       // Helpers to project type rows into the metrics the dashboard needs
       const projectTotals = (rows) => {
         const map = {};
@@ -768,6 +793,23 @@ module.exports = {
             unattributed: isUnattributed,
             transactions: Number(row.transactions) || 0,
             volume: parseFloat(row.volume) || 0,
+          };
+        }),
+        // Beer machine revenue, one row per (branch, machine_id) pair.
+        // Frontend renders raw machineId now; once a machines lookup table
+        // exists, swap displayName via a join without changing this shape.
+        byMachine: machineBreakdown[0].map((row) => {
+          const isUnattributed = row.branch === '__unattributed__';
+          const isUnknownMachine = row.machine_id === '__unknown_machine__';
+          return {
+            branch: isUnattributed ? 'Unattributed' : row.branch,
+            branchUnattributed: isUnattributed,
+            machineId: isUnknownMachine ? null : row.machine_id,
+            machineUnknown: isUnknownMachine,
+            pours: Number(row.pours) || 0,
+            revenue: parseFloat(row.revenue) || 0,
+            volumeMl: parseFloat(row.volume_ml) || 0,
+            lastActivity: row.last_activity,
           };
         }),
         revenue: {

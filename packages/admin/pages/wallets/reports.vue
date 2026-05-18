@@ -62,6 +62,98 @@
     </div>
 
     <div v-else class="reports-content">
+      <!-- Machine Revenue (beer machines, by branch) -->
+      <div class="machine-revenue-card">
+        <div class="machine-revenue-header">
+          <div>
+            <h2>
+              <i class="fas fa-beer"></i>
+              Beer Machine Revenue
+            </h2>
+            <p>
+              Revenue, pours, and volume dispensed per machine, grouped by branch.
+            </p>
+          </div>
+          <div class="machine-revenue-totals">
+            <div class="mrev-total">
+              <span class="mrev-total-label">Revenue</span>
+              <span class="mrev-total-value">฿{{ formatNumber(machineTotals.revenue) }}</span>
+            </div>
+            <div class="mrev-total">
+              <span class="mrev-total-label">Pours</span>
+              <span class="mrev-total-value">{{ formatInt(machineTotals.pours) }}</span>
+            </div>
+            <div class="mrev-total">
+              <span class="mrev-total-label">Volume</span>
+              <span class="mrev-total-value">{{ formatVolume(machineTotals.volumeMl) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="machineGroups.length === 0" class="mrev-empty">
+          <i class="fas fa-beer"></i>
+          <p>No beer machine activity in this period.</p>
+        </div>
+
+        <div v-else class="mrev-branch-groups">
+          <div
+            v-for="group in machineGroups"
+            :key="group.branch"
+            :class="['mrev-branch-group', { unattributed: group.branchUnattributed }]"
+          >
+            <div class="mrev-branch-head">
+              <div class="mrev-branch-title">
+                <i v-if="group.branchUnattributed" class="fas fa-question-circle"></i>
+                <i v-else class="fas fa-map-marker-alt"></i>
+                {{ group.branch }}
+                <span v-if="group.branchUnattributed" class="mrev-tag">no branch</span>
+              </div>
+              <div class="mrev-branch-summary">
+                <span><strong>฿{{ formatNumber(group.revenue) }}</strong></span>
+                <span class="muted">·</span>
+                <span>{{ formatInt(group.pours) }} pours</span>
+                <span class="muted">·</span>
+                <span>{{ formatVolume(group.volumeMl) }}</span>
+                <span class="muted">·</span>
+                <span>{{ branchShareOfTotal(group.revenue) }}%</span>
+              </div>
+            </div>
+
+            <table class="mrev-table">
+              <thead>
+                <tr>
+                  <th>Machine</th>
+                  <th class="num">Pours</th>
+                  <th class="num">Volume</th>
+                  <th class="num">Revenue</th>
+                  <th class="num">Avg / pour</th>
+                  <th class="num">% of branch</th>
+                  <th>Last activity</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="m in group.machines"
+                  :key="`${group.branch}-${m.machineId || 'unknown'}`"
+                  :class="{ 'mrev-unknown': m.machineUnknown }"
+                >
+                  <td>
+                    <code class="machine-id" v-if="m.machineId">{{ m.machineId }}</code>
+                    <span v-else class="mrev-tag">unknown machine</span>
+                  </td>
+                  <td class="num">{{ formatInt(m.pours) }}</td>
+                  <td class="num">{{ formatVolume(m.volumeMl) }}</td>
+                  <td class="num"><strong>฿{{ formatNumber(m.revenue) }}</strong></td>
+                  <td class="num">฿{{ formatNumber(m.pours ? m.revenue / m.pours : 0) }}</td>
+                  <td class="num">{{ machineShareOfBranch(m.revenue, group.revenue) }}%</td>
+                  <td>{{ formatRelativeDate(m.lastActivity) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- Summary Cards -->
       <div class="wallet-stats-grid">
         <div class="wallet-stat-card">
@@ -252,6 +344,7 @@ export default {
         summary: {},
         transactionSummary: {},
         revenue: {},
+        byMachine: [],
       },
       Chart: null,
       volumeChartInstance: null,
@@ -265,6 +358,47 @@ export default {
     },
     hasTypeData() {
       return this.typeEntries.length > 0;
+    },
+    // Re-group the flat byMachine array into per-branch buckets, each
+    // carrying its own machines list and aggregate totals. Sorted so
+    // the highest-grossing branch shows first.
+    machineGroups() {
+      const rows = this.report.byMachine || [];
+      const groups = new Map();
+      rows.forEach((row) => {
+        const key = row.branch;
+        if (!groups.has(key)) {
+          groups.set(key, {
+            branch: row.branch,
+            branchUnattributed: row.branchUnattributed,
+            machines: [],
+            revenue: 0,
+            pours: 0,
+            volumeMl: 0,
+          });
+        }
+        const g = groups.get(key);
+        g.machines.push(row);
+        g.revenue += row.revenue;
+        g.pours += row.pours;
+        g.volumeMl += row.volumeMl;
+      });
+      return Array.from(groups.values())
+        .map((g) => ({
+          ...g,
+          machines: g.machines.slice().sort((a, b) => b.revenue - a.revenue),
+        }))
+        .sort((a, b) => b.revenue - a.revenue);
+    },
+    machineTotals() {
+      return (this.report.byMachine || []).reduce(
+        (acc, r) => ({
+          revenue: acc.revenue + r.revenue,
+          pours: acc.pours + r.pours,
+          volumeMl: acc.volumeMl + r.volumeMl,
+        }),
+        { revenue: 0, pours: 0, volumeMl: 0 }
+      );
     },
   },
   async mounted() {
@@ -425,8 +559,35 @@ export default {
       for (const [type, data] of Object.entries(this.report.transactionSummary?.byType || {})) {
         rows.push([type, data.count, data.volume]);
       }
+      rows.push([]);
+
+      rows.push(['BEER MACHINE REVENUE']);
+      rows.push(['Branch', 'Machine ID', 'Pours', 'Volume (ml)', 'Revenue', 'Avg per pour', 'Last activity']);
+      for (const m of this.report.byMachine || []) {
+        const avg = m.pours ? m.revenue / m.pours : 0;
+        const last = m.lastActivity
+          ? this.$moment(m.lastActivity).tz('Asia/Bangkok').format('YYYY-MM-DD HH:mm')
+          : '';
+        rows.push([
+          this.csvCell(m.branch),
+          this.csvCell(m.machineId || 'unknown'),
+          m.pours,
+          Math.round(m.volumeMl),
+          m.revenue.toFixed(2),
+          avg.toFixed(2),
+          last,
+        ]);
+      }
 
       return rows.map((row) => row.join(',')).join('\n');
+    },
+
+    csvCell(value) {
+      const s = value === null || value === undefined ? '' : String(value);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
     },
 
     formatNumber(value) {
@@ -435,6 +596,39 @@ export default {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
       });
+    },
+
+    formatInt(value) {
+      if (value === null || value === undefined) return '0';
+      return parseInt(value, 10).toLocaleString('en-US');
+    },
+
+    // Pours are stored in millilitres. Show ml under 1L and L above.
+    formatVolume(ml) {
+      const n = parseFloat(ml) || 0;
+      if (n >= 1000) {
+        return `${(n / 1000).toLocaleString('en-US', {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 2,
+        })} L`;
+      }
+      return `${Math.round(n).toLocaleString('en-US')} ml`;
+    },
+
+    formatRelativeDate(date) {
+      if (!date) return '—';
+      return this.$moment(date).tz('Asia/Bangkok').fromNow();
+    },
+
+    branchShareOfTotal(branchRevenue) {
+      const total = this.machineTotals.revenue;
+      if (!total) return '0.0';
+      return ((branchRevenue / total) * 100).toFixed(1);
+    },
+
+    machineShareOfBranch(machineRevenue, branchRevenue) {
+      if (!branchRevenue) return '0.0';
+      return ((machineRevenue / branchRevenue) * 100).toFixed(1);
     },
 
     formatType(type) {
@@ -511,6 +705,246 @@ export default {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Machine Revenue card */
+.machine-revenue-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.machine-revenue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.machine-revenue-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #063F48;
+}
+
+.machine-revenue-header h2 i {
+  margin-right: 8px;
+  color: #F59E0B;
+}
+
+.machine-revenue-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.machine-revenue-totals {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.mrev-total {
+  text-align: right;
+}
+
+.mrev-total-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6B7280;
+}
+
+.mrev-total-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1797AD;
+}
+
+.mrev-empty {
+  padding: 48px 20px;
+  text-align: center;
+  color: #6B7280;
+}
+
+.mrev-empty i {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 8px;
+  color: #D1D5DB;
+}
+
+.mrev-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.mrev-branch-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.mrev-branch-group {
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.mrev-branch-group.unattributed {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.04);
+}
+
+.mrev-branch-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  background: #F9FAFB;
+  border-bottom: 1px solid #E5E7EB;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mrev-branch-group.unattributed .mrev-branch-head {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.mrev-branch-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #063F48;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mrev-branch-title i {
+  color: #1797AD;
+}
+
+.mrev-branch-group.unattributed .mrev-branch-title i {
+  color: #92400E;
+}
+
+.mrev-branch-summary {
+  font-size: 13px;
+  color: #4B5563;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mrev-branch-summary strong {
+  color: #1797AD;
+  font-size: 14px;
+}
+
+.mrev-branch-summary .muted {
+  color: #D1D5DB;
+}
+
+.mrev-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #92400E;
+  background: rgba(245, 158, 11, 0.18);
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.mrev-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.mrev-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #F7FAFC;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6B7280;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.mrev-table th.num,
+.mrev-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mrev-table tbody td {
+  padding: 12px;
+  border-bottom: 1px solid #F1F5F9;
+  color: #1F2937;
+}
+
+.mrev-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.mrev-table tbody tr:hover td {
+  background: #F9FAFB;
+}
+
+.mrev-table tr.mrev-unknown td {
+  background: rgba(245, 158, 11, 0.04);
+}
+
+.machine-id {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  padding: 2px 8px;
+  background: #F1F5F9;
+  border-radius: 6px;
+  color: #0F172A;
+}
+
+@media (max-width: 768px) {
+  .machine-revenue-header {
+    flex-direction: column;
+  }
+
+  .machine-revenue-totals {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .mrev-total {
+    text-align: left;
+  }
+
+  .mrev-branch-summary {
+    flex-wrap: wrap;
+  }
+
+  .mrev-table {
+    font-size: 12px;
+  }
+
+  .mrev-table thead th,
+  .mrev-table tbody td {
+    padding: 8px;
   }
 }
 </style>
