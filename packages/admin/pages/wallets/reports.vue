@@ -62,6 +62,120 @@
     </div>
 
     <div v-else class="reports-content">
+      <!-- Wallet Liability Reconciliation -->
+      <div class="recon-card" v-if="report.reconciliation">
+        <div class="recon-header">
+          <div>
+            <h2>
+              <i class="fas fa-balance-scale-right"></i>
+              Wallet Liability Reconciliation
+            </h2>
+            <p>
+              Movement of customer wallet balances during the period.
+              Opening + movements should equal the live wallet total.
+            </p>
+          </div>
+          <div
+            :class="['recon-status', report.reconciliation.reconciled ? 'ok' : 'mismatch']"
+          >
+            <i :class="report.reconciliation.reconciled ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle'"></i>
+            <span v-if="report.reconciliation.reconciled">Reconciled</span>
+            <span v-else>Mismatch ฿{{ formatNumber(Math.abs(report.reconciliation.gap)) }}</span>
+          </div>
+        </div>
+
+        <div class="recon-statement">
+          <div class="recon-row recon-opening">
+            <span class="recon-label">Opening balance</span>
+            <span class="recon-sub">{{ formatStatementDate(report.period.from) }}</span>
+            <span class="recon-amount">฿{{ formatNumber(report.reconciliation.openingBalance) }}</span>
+          </div>
+
+          <div class="recon-section-head">
+            <i class="fas fa-plus-circle"></i> Credits (money in)
+          </div>
+          <div
+            v-for="line in nonZeroCredits"
+            :key="line.key"
+            class="recon-row recon-credit"
+          >
+            <span class="recon-label">{{ line.label }}</span>
+            <span class="recon-sub">{{ line.count }} {{ line.count === 1 ? 'transaction' : 'transactions' }}</span>
+            <span class="recon-amount">+฿{{ formatNumber(line.amount) }}</span>
+          </div>
+          <div v-if="nonZeroCredits.length === 0" class="recon-row recon-empty">
+            <span class="recon-label">No credits in this period</span>
+            <span class="recon-amount muted">฿0.00</span>
+          </div>
+          <div class="recon-row recon-subtotal">
+            <span class="recon-label">Total credits</span>
+            <span class="recon-amount">+฿{{ formatNumber(totalCredits) }}</span>
+          </div>
+
+          <div class="recon-section-head">
+            <i class="fas fa-minus-circle"></i> Debits (money out)
+          </div>
+          <div
+            v-for="line in nonZeroDebits"
+            :key="line.key"
+            class="recon-row recon-debit"
+          >
+            <span class="recon-label">{{ line.label }}</span>
+            <span class="recon-sub">{{ line.count }} {{ line.count === 1 ? 'transaction' : 'transactions' }}</span>
+            <span class="recon-amount">−฿{{ formatNumber(line.amount) }}</span>
+          </div>
+          <div v-if="nonZeroDebits.length === 0" class="recon-row recon-empty">
+            <span class="recon-label">No debits in this period</span>
+            <span class="recon-amount muted">฿0.00</span>
+          </div>
+          <div class="recon-row recon-subtotal">
+            <span class="recon-label">Total debits</span>
+            <span class="recon-amount">−฿{{ formatNumber(totalDebits) }}</span>
+          </div>
+
+          <div class="recon-row recon-net">
+            <span class="recon-label">Net change</span>
+            <span :class="['recon-amount', report.reconciliation.netChange >= 0 ? 'up' : 'down']">
+              {{ report.reconciliation.netChange >= 0 ? '+' : '−' }}฿{{ formatNumber(Math.abs(report.reconciliation.netChange)) }}
+            </span>
+          </div>
+
+          <div class="recon-row recon-closing">
+            <span class="recon-label">Computed closing balance</span>
+            <span class="recon-sub">opening + net change</span>
+            <span class="recon-amount">฿{{ formatNumber(report.reconciliation.computedClosingBalance) }}</span>
+          </div>
+
+          <div class="recon-row recon-actual">
+            <span class="recon-label">Actual closing balance</span>
+            <span class="recon-sub">live sum of all wallets</span>
+            <span class="recon-amount">฿{{ formatNumber(report.reconciliation.actualClosingBalance) }}</span>
+          </div>
+
+          <div
+            v-if="!report.reconciliation.reconciled"
+            class="recon-row recon-gap"
+          >
+            <span class="recon-label">
+              <i class="fas fa-exclamation-triangle"></i>
+              Unexplained gap
+            </span>
+            <span class="recon-sub">
+              Investigate: backdated transactions, schema drift, or direct wallet edits
+            </span>
+            <span class="recon-amount">฿{{ formatNumber(report.reconciliation.gap) }}</span>
+          </div>
+        </div>
+
+        <div class="recon-footnote">
+          <i class="fas fa-info-circle"></i>
+          Opening balance is computed as
+          <code>actual closing − net period movements</code>.
+          For an audit-grade snapshot, capture a daily balance snapshot
+          and reconcile against that instead.
+        </div>
+      </div>
+
       <!-- Machine Revenue (beer machines, by branch) -->
       <div class="machine-revenue-card">
         <div class="machine-revenue-header">
@@ -400,6 +514,20 @@ export default {
         { revenue: 0, pours: 0, volumeMl: 0 }
       );
     },
+    nonZeroCredits() {
+      const credits = (this.report.reconciliation && this.report.reconciliation.credits) || [];
+      return credits.filter((l) => l.amount > 0 || l.count > 0);
+    },
+    nonZeroDebits() {
+      const debits = (this.report.reconciliation && this.report.reconciliation.debits) || [];
+      return debits.filter((l) => l.amount > 0 || l.count > 0);
+    },
+    totalCredits() {
+      return this.nonZeroCredits.reduce((s, l) => s + l.amount, 0);
+    },
+    totalDebits() {
+      return this.nonZeroDebits.reduce((s, l) => s + l.amount, 0);
+    },
   },
   async mounted() {
     if (process.client) {
@@ -547,6 +675,25 @@ export default {
       rows.push([`Period: ${this.filters.fromDate} to ${this.filters.toDate}`]);
       rows.push([]);
 
+      const recon = this.report.reconciliation;
+      if (recon) {
+        rows.push(['WALLET LIABILITY RECONCILIATION']);
+        rows.push(['Line', 'Direction', 'Count', 'Amount']);
+        rows.push(['Opening balance', '', '', (recon.openingBalance || 0).toFixed(2)]);
+        for (const l of recon.credits || []) {
+          rows.push([this.csvCell(l.label), 'credit', l.count, l.amount.toFixed(2)]);
+        }
+        for (const l of recon.debits || []) {
+          rows.push([this.csvCell(l.label), 'debit', l.count, l.amount.toFixed(2)]);
+        }
+        rows.push(['Net change', '', '', (recon.netChange || 0).toFixed(2)]);
+        rows.push(['Computed closing balance', '', '', (recon.computedClosingBalance || 0).toFixed(2)]);
+        rows.push(['Actual closing balance', '', '', (recon.actualClosingBalance || 0).toFixed(2)]);
+        rows.push(['Gap', '', '', (recon.gap || 0).toFixed(2)]);
+        rows.push(['Reconciled', '', '', recon.reconciled ? 'YES' : 'NO']);
+        rows.push([]);
+      }
+
       rows.push(['SUMMARY']);
       rows.push(['Total Wallet Balance', this.report.summary?.totalWalletBalance || 0]);
       rows.push(['Active Wallets', this.report.summary?.activeWallets || 0]);
@@ -618,6 +765,11 @@ export default {
     formatRelativeDate(date) {
       if (!date) return '—';
       return this.$moment(date).tz('Asia/Bangkok').fromNow();
+    },
+
+    formatStatementDate(date) {
+      if (!date) return '';
+      return this.$moment(date).tz('Asia/Bangkok').format('MMM D, YYYY HH:mm');
     },
 
     branchShareOfTotal(branchRevenue) {
@@ -706,6 +858,234 @@ export default {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Reconciliation Statement */
+.recon-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.recon-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.recon-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #063F48;
+}
+
+.recon-header h2 i {
+  margin-right: 8px;
+  color: #1797AD;
+}
+
+.recon-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #6B7280;
+  max-width: 540px;
+}
+
+.recon-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.recon-status.ok {
+  background: rgba(0, 168, 98, 0.12);
+  color: #00794a;
+}
+
+.recon-status.mismatch {
+  background: rgba(228, 88, 88, 0.12);
+  color: #b03333;
+}
+
+.recon-statement {
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+
+.recon-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 16px;
+  align-items: baseline;
+  padding: 12px 18px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.recon-row:last-child {
+  border-bottom: none;
+}
+
+.recon-label {
+  font-size: 14px;
+  color: #1F2937;
+}
+
+.recon-sub {
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+.recon-amount {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1F2937;
+  text-align: right;
+}
+
+.recon-amount.muted {
+  color: #9CA3AF;
+  font-weight: 500;
+}
+
+.recon-amount.up { color: #00794a; }
+.recon-amount.down { color: #b03333; }
+
+.recon-section-head {
+  padding: 10px 18px;
+  background: #F7FAFC;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #4B5563;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.recon-section-head i {
+  margin-right: 6px;
+  color: #1797AD;
+}
+
+.recon-credit .recon-amount { color: #00794a; }
+.recon-debit .recon-amount { color: #b03333; }
+
+.recon-opening {
+  background: #F0F9FA;
+}
+
+.recon-opening .recon-label {
+  font-weight: 700;
+  color: #063F48;
+}
+
+.recon-opening .recon-amount {
+  font-weight: 700;
+  color: #063F48;
+}
+
+.recon-subtotal {
+  background: #F9FAFB;
+  border-top: 1px solid #E5E7EB;
+}
+
+.recon-subtotal .recon-label {
+  font-weight: 600;
+}
+
+.recon-net {
+  background: #F0F9FA;
+  border-top: 2px solid #1797AD;
+  border-bottom: 2px solid #1797AD;
+}
+
+.recon-net .recon-label {
+  font-weight: 700;
+  color: #063F48;
+  font-size: 15px;
+}
+
+.recon-net .recon-amount {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.recon-closing,
+.recon-actual {
+  background: #F7FAFC;
+}
+
+.recon-actual .recon-label,
+.recon-actual .recon-amount {
+  font-weight: 700;
+  color: #063F48;
+  font-size: 15px;
+}
+
+.recon-gap {
+  background: rgba(228, 88, 88, 0.08);
+  border-top: 2px dashed #b03333;
+}
+
+.recon-gap .recon-label {
+  font-weight: 700;
+  color: #b03333;
+}
+
+.recon-gap .recon-amount {
+  font-weight: 800;
+  color: #b03333;
+  font-size: 16px;
+}
+
+.recon-empty .recon-label {
+  color: #9CA3AF;
+  font-style: italic;
+}
+
+.recon-footnote {
+  margin-top: 16px;
+  font-size: 12px;
+  color: #6B7280;
+  line-height: 1.5;
+}
+
+.recon-footnote i {
+  color: #1797AD;
+  margin-right: 4px;
+}
+
+.recon-footnote code {
+  background: #F1F5F9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .recon-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "label amount"
+      "sub   amount";
+    row-gap: 4px;
+  }
+
+  .recon-label { grid-area: label; }
+  .recon-amount { grid-area: amount; }
+  .recon-sub { grid-area: sub; }
 }
 
 /* Machine Revenue card */

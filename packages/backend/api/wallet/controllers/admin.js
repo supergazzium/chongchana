@@ -707,6 +707,23 @@ module.exports = {
         ORDER BY volume DESC
       `, [from, to]);
 
+      // Period movements split by type AND sign. We separate credits
+      // (positive amount) from debits (negative amount) so types that
+      // can go either way (transfer, adjustment) are not double-counted
+      // or netted. The reconciliation statement below sums these.
+      const movements = await knex.raw(`
+        SELECT
+          type,
+          SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as credit_amount,
+          SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) as debit_amount,
+          SUM(CASE WHEN amount > 0 THEN 1 ELSE 0 END) as credit_count,
+          SUM(CASE WHEN amount < 0 THEN 1 ELSE 0 END) as debit_count
+        FROM wallet_transactions
+        WHERE created_at BETWEEN ? AND ?
+          AND status = 'completed'
+        GROUP BY type
+      `, [from, to]);
+
       // Beer machine revenue, grouped by branch and machine_id.
       // machine_id lives inside the JSON metadata column (set by the
       // vending controller). volume_dispensed has its own column and
@@ -757,6 +774,71 @@ module.exports = {
       const current = projectTotals(transSummary[0]);
       const previous = projectTotals(prevTransSummary[0]);
 
+      // Liability reconciliation.
+      // Closing balance is the live SUM(balance) from wallets right now.
+      // (Caveat: if `to` is in the past, this is approximate — wallets
+      // moved since then. For the common "as-of today" usage it's exact.)
+      // Opening balance is computed as closing − net period movements.
+      const actualClosingBalance =
+        parseFloat(walletSummary[0][0].total_wallet_balance) || 0;
+
+      const movementMap = {};
+      let netChange = 0;
+      movements[0].forEach((m) => {
+        const credit = parseFloat(m.credit_amount) || 0;
+        const debit = parseFloat(m.debit_amount) || 0; // negative
+        movementMap[m.type] = {
+          credit,
+          debit,
+          creditCount: Number(m.credit_count) || 0,
+          debitCount: Number(m.debit_count) || 0,
+        };
+        netChange += credit + debit;
+      });
+
+      const getMovement = (type) =>
+        movementMap[type] || { credit: 0, debit: 0, creditCount: 0, debitCount: 0 };
+
+      const computedOpeningBalance = actualClosingBalance - netChange;
+
+      // Line items in display order. Each line carries amount (absolute,
+      // signed by direction), count, and a `direction` for the frontend
+      // ('credit' shows as +, 'debit' as -).
+      const lineItem = (label, key, type, kind) => {
+        const mv = getMovement(type);
+        if (kind === 'credit') {
+          return { key, label, type, direction: 'credit', amount: mv.credit, count: mv.creditCount };
+        }
+        return { key, label, type, direction: 'debit', amount: Math.abs(mv.debit), count: mv.debitCount };
+      };
+
+      const reconciliation = {
+        openingBalance: computedOpeningBalance,
+        openingMethod: 'computed', // 'computed' vs 'snapshot' for future audit upgrade
+        credits: [
+          lineItem('Top-ups', 'top_up_in', 'top_up', 'credit'),
+          lineItem('Bonuses & Vouchers', 'bonus_in', 'bonus', 'credit'),
+          lineItem('Refunds', 'refund_in', 'refund', 'credit'),
+          lineItem('Conversions (points → wallet)', 'conversion_in', 'conversion', 'credit'),
+          lineItem('Transfers in', 'transfer_in', 'transfer', 'credit'),
+          lineItem('Admin credits', 'adjustment_in', 'adjustment', 'credit'),
+        ],
+        debits: [
+          lineItem('Store payments', 'store_out', 'store_payment', 'debit'),
+          lineItem('Beer machine payments', 'beer_out', 'beer_machine_payment', 'debit'),
+          lineItem('Withdrawals', 'withdrawal_out', 'withdrawal', 'debit'),
+          lineItem('Transfers out', 'transfer_out', 'transfer', 'debit'),
+          lineItem('Admin debits', 'adjustment_out', 'adjustment', 'debit'),
+        ],
+        netChange,
+        computedClosingBalance: computedOpeningBalance + netChange,
+        actualClosingBalance,
+        gap: actualClosingBalance - (computedOpeningBalance + netChange),
+        // Sub-cent rounding noise should not flag a real mismatch.
+        reconciled:
+          Math.abs(actualClosingBalance - (computedOpeningBalance + netChange)) < 0.01,
+      };
+
       ctx.send(utils.successResponse({
         reportType,
         period: { from, to },
@@ -786,6 +868,7 @@ module.exports = {
           spendVolume: previous.spend.volume,
           totalVolume: previous.totalVolume,
         },
+        reconciliation,
         byBranch: branchBreakdown[0].map((row) => {
           const isUnattributed = row.branch === '__unattributed__';
           return {
