@@ -954,6 +954,10 @@ module.exports = {
       // bound — these are point-in-time problems.
       // Joins users for display, branches for branch name, and
       // wallet_machines for the friendly machine label.
+      // Schema uses started_at / expires_at (not created_at). A session
+      // is "stuck" when it's still active past its expires_at — the cron
+      // releases on that boundary, so anything still active past expiry
+      // means the cron hasn't gotten to it yet.
       const stuckSessions = await knex.raw(`
         SELECT
           s.id as session_id,
@@ -961,7 +965,8 @@ module.exports = {
           s.reserved_amount,
           s.machine_id,
           s.branch_id,
-          s.created_at,
+          s.started_at,
+          s.expires_at,
           u.email,
           TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) as full_name,
           b.name as branch_name,
@@ -971,8 +976,8 @@ module.exports = {
         LEFT JOIN branches b ON b.id = s.branch_id
         LEFT JOIN wallet_machines m ON m.id = s.machine_id
         WHERE s.status = 'active'
-          AND s.created_at < (NOW() - INTERVAL 5 MINUTE)
-        ORDER BY s.created_at ASC
+          AND s.expires_at < NOW()
+        ORDER BY s.started_at ASC
         LIMIT 50
       `);
 
@@ -1070,7 +1075,8 @@ module.exports = {
           machineDisplayName: r.machine_display_name,
           branchId: r.branch_id,
           branchName: r.branch_name,
-          createdAt: r.created_at,
+          startedAt: r.started_at,
+          expiresAt: r.expires_at,
         })),
       };
 

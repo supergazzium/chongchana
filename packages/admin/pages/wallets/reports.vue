@@ -742,7 +742,7 @@
                     <span v-else>—</span>
                   </td>
                   <td class="num"><strong>฿{{ formatNumber(s.reservedAmount) }}</strong></td>
-                  <td>{{ formatRelativeDate(s.createdAt) }}</td>
+                  <td>{{ formatRelativeDate(s.startedAt) }}</td>
                   <td>
                     <button
                       class="wallet-btn danger release-btn"
