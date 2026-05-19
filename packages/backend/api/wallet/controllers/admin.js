@@ -458,8 +458,17 @@ module.exports = {
         params.push(branch);
       }
 
-      // Get total count
-      const countQuery = query.replace('t.*, u.email, u.first_name as firstName, u.last_name as lastName', 'COUNT(*) as total');
+      // Get total count.
+      // Previously this did a literal .replace() looking for
+      // 't.*, u.email, u.first_name as firstName, u.last_name as lastName'
+      // — but the SELECT list spans multiple lines with indentation,
+      // so the replace silently failed and the "count" query returned
+      // full rows, leaving total = 0 for everyone. Using a regex that
+      // matches the full SELECT list across whitespace.
+      const countQuery = query.replace(
+        /SELECT\s+t\.\*[\s\S]+?FROM/,
+        'SELECT COUNT(*) as total FROM'
+      );
       const countResult = await strapi.connections.default.raw(countQuery, params);
       const total = Number(rawRows(countResult)[0]?.total) || 0;
 
