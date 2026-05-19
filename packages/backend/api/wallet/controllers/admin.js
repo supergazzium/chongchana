@@ -948,6 +948,34 @@ module.exports = {
         LIMIT 100
       `, [from, to]);
 
+      // 5. Stuck vending sessions: status='active' older than 5 minutes.
+      // The cron job auto-releases these but the operator should see them
+      // while they wait, with a one-click manual override. NOT period-
+      // bound — these are point-in-time problems.
+      // Joins users for display, branches for branch name, and
+      // wallet_machines for the friendly machine label.
+      const stuckSessions = await knex.raw(`
+        SELECT
+          s.id as session_id,
+          s.user_id,
+          s.reserved_amount,
+          s.machine_id,
+          s.branch_id,
+          s.created_at,
+          u.email,
+          TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) as full_name,
+          b.name as branch_name,
+          m.display_name as machine_display_name
+        FROM wallet_vending_sessions s
+        LEFT JOIN \`users-permissions_user\` u ON u.id = s.user_id
+        LEFT JOIN branches b ON b.id = s.branch_id
+        LEFT JOIN wallet_machines m ON m.id = s.machine_id
+        WHERE s.status = 'active'
+          AND s.created_at < (NOW() - INTERVAL 5 MINUTE)
+        ORDER BY s.created_at ASC
+        LIMIT 50
+      `);
+
       // Cash position: a separate view of the same data answering
       // "how much cash moved through the system" vs reconciliation's
       // "how did liability change". Promotional cost is what we GAVE
@@ -1032,6 +1060,18 @@ module.exports = {
           description: r.description,
           createdAt: r.created_at,
         })),
+        stuckVendingSessions: stuckSessions[0].map((r) => ({
+          sessionId: r.session_id,
+          userId: r.user_id,
+          userName: r.full_name || r.email || `User #${r.user_id}`,
+          userEmail: r.email,
+          reservedAmount: parseFloat(r.reserved_amount) || 0,
+          machineId: r.machine_id,
+          machineDisplayName: r.machine_display_name,
+          branchId: r.branch_id,
+          branchName: r.branch_name,
+          createdAt: r.created_at,
+        })),
       };
 
       // Aggregate counts for the panel header.
@@ -1039,7 +1079,8 @@ module.exports = {
         attentionItems.stuckPendingTopUps.length +
         attentionItems.failedByType.reduce((s, f) => s + f.count, 0) +
         attentionItems.adjustments.length +
-        attentionItems.refunds.length;
+        attentionItems.refunds.length +
+        attentionItems.stuckVendingSessions.length;
 
       // Pivot dailyActivity rows into one entry per day. Each entry
       // carries totals for the categories that matter in daily AR/POS

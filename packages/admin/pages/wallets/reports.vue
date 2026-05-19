@@ -696,6 +696,67 @@
               </tbody>
             </table>
           </div>
+
+          <!-- Stuck vending sessions (point-in-time, not period-bound) -->
+          <div class="attention-section" v-if="report.attentionItems.stuckVendingSessions">
+            <div class="attention-section-head">
+              <i class="fas fa-beer"></i>
+              <span>{{ __wt('attStuckVending') }}</span>
+              <span class="attention-section-count">
+                {{ report.attentionItems.stuckVendingSessions.length }}
+              </span>
+            </div>
+            <div v-if="report.attentionItems.stuckVendingSessions.length === 0" class="attention-empty">
+              {{ __wt('attStuckVendingEmpty') }}
+            </div>
+            <table v-else class="attention-table">
+              <thead>
+                <tr>
+                  <th>{{ __wt('attCol_session') }}</th>
+                  <th>{{ __wt('attCol_user') }}</th>
+                  <th>{{ __wt('attCol_branch') }}</th>
+                  <th>{{ __wt('attCol_machine') }}</th>
+                  <th class="num">{{ __wt('attCol_reserved') }}</th>
+                  <th>{{ __wt('attCol_stuckSince') }}</th>
+                  <th>{{ __wt('attCol_action') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="s in report.attentionItems.stuckVendingSessions"
+                  :key="s.sessionId"
+                >
+                  <td><code class="tx-id">{{ s.sessionId }}</code></td>
+                  <td>
+                    <nuxt-link :to="`/wallets/${s.userId}`" class="user-link">
+                      {{ s.userName }}
+                    </nuxt-link>
+                  </td>
+                  <td>{{ s.branchName || '—' }}</td>
+                  <td>
+                    <template v-if="s.machineDisplayName">
+                      {{ s.machineDisplayName }}
+                      <div class="muted-small">{{ s.machineId }}</div>
+                    </template>
+                    <code v-else-if="s.machineId" class="tx-id">{{ s.machineId }}</code>
+                    <span v-else>—</span>
+                  </td>
+                  <td class="num"><strong>฿{{ formatNumber(s.reservedAmount) }}</strong></td>
+                  <td>{{ formatRelativeDate(s.createdAt) }}</td>
+                  <td>
+                    <button
+                      class="wallet-btn danger release-btn"
+                      :disabled="releasingSessionId === s.sessionId"
+                      @click="releaseStuckSession(s)"
+                    >
+                      <i class="fas fa-unlock"></i>
+                      {{ releasingSessionId === s.sessionId ? __wt('releasing') : __wt('release') }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -846,6 +907,7 @@ export default {
       },
       Chart: null,
       volumeChartInstance: null,
+      releasingSessionId: null,
       countChartInstance: null,
     };
   },
@@ -1067,6 +1129,46 @@ export default {
     toggleWalletLang() {
       const next = this.$store.state.walletUiLang === 'th' ? 'en' : 'th';
       this.__setWalletUiLang(next);
+    },
+
+    async releaseStuckSession(session) {
+      const confirm = await this.$swal({
+        icon: 'warning',
+        title: this.__wt('releaseConfirmTitle'),
+        html: this.__wt('releaseConfirmBody', {
+          amount: this.formatNumber(session.reservedAmount),
+          user: session.userName,
+        }),
+        input: 'textarea',
+        inputPlaceholder: this.__wt('releaseReasonPlaceholder'),
+        inputValidator: (value) => {
+          if (!value || !value.trim()) return this.__wt('releaseReasonRequired');
+        },
+        showCancelButton: true,
+        confirmButtonText: this.__wt('release'),
+        confirmButtonColor: '#cb2731',
+      });
+      if (!confirm.isConfirmed) return;
+
+      this.releasingSessionId = session.sessionId;
+      try {
+        await this.$walletService.releaseVendingSession(session.sessionId, confirm.value);
+        this.$swal({
+          icon: 'success',
+          title: this.__wt('releaseSuccess'),
+          timer: 1500,
+          showConfirmButton: false,
+        });
+        await this.loadReports();
+      } catch (e) {
+        this.$swal({
+          icon: 'error',
+          title: this.__wt('releaseFailed'),
+          text: e.response?.data?.error?.message || e.message || '',
+        });
+      } finally {
+        this.releasingSessionId = null;
+      }
     },
 
     // Reconciliation lines arrive from the backend with a stable key.
@@ -2007,6 +2109,26 @@ export default {
   color: #6B7280;
   font-size: 12px;
 }
+
+.user-link {
+  color: #1797AD;
+  font-weight: 600;
+  text-decoration: none;
+}
+.user-link:hover { text-decoration: underline; }
+
+.muted-small {
+  font-size: 10px;
+  color: #9CA3AF;
+  margin-top: 2px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.release-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+.release-btn[disabled] { opacity: 0.6; cursor: wait; }
 
 @media (max-width: 640px) {
   .promo-split {
