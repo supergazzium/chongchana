@@ -958,7 +958,14 @@ module.exports = {
       // is "stuck" when it's still active past its expires_at — the cron
       // releases on that boundary, so anything still active past expiry
       // means the cron hasn't gotten to it yet.
-      const stuckSessions = await knex.raw(`
+      //
+      // wallet_vending_sessions.machine_id and wallet_machines.id are on
+      // different collations in production (utf8mb4_0900_ai_ci vs
+      // utf8mb4_unicode_ci), which crashes a direct JOIN. Two-step
+      // approach: fetch sessions first, then resolve machine names
+      // separately and merge in JS. Side benefit: keeps working if
+      // wallet_machines ever goes missing.
+      const stuckSessionRowsResult = await knex.raw(`
         SELECT
           s.id as session_id,
           s.user_id,
@@ -969,17 +976,44 @@ module.exports = {
           s.expires_at,
           u.email,
           TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) as full_name,
-          b.name as branch_name,
-          m.display_name as machine_display_name
+          b.name as branch_name
         FROM wallet_vending_sessions s
         LEFT JOIN \`users-permissions_user\` u ON u.id = s.user_id
         LEFT JOIN branches b ON b.id = s.branch_id
-        LEFT JOIN wallet_machines m ON m.id = s.machine_id
         WHERE s.status = 'active'
           AND s.expires_at < NOW()
         ORDER BY s.started_at ASC
         LIMIT 50
       `);
+
+      const machineNameMap = {};
+      const machineIds = [...new Set(
+        stuckSessionRowsResult[0]
+          .map((r) => r.machine_id)
+          .filter((id) => id !== null && id !== undefined && id !== '')
+      )];
+      if (machineIds.length > 0) {
+        try {
+          const machineRows = await knex('wallet_machines')
+            .whereIn('id', machineIds)
+            .select('id', 'display_name');
+          machineRows.forEach((m) => {
+            machineNameMap[m.id] = m.display_name;
+          });
+        } catch (err) {
+          strapi.log.warn(
+            '[WalletAdmin] wallet_machines lookup failed for stuck sessions; using raw IDs:',
+            err.message
+          );
+        }
+      }
+
+      const stuckSessions = [
+        stuckSessionRowsResult[0].map((r) => ({
+          ...r,
+          machine_display_name: machineNameMap[r.machine_id] || null,
+        })),
+      ];
 
       // Cash position: a separate view of the same data answering
       // "how much cash moved through the system" vs reconciliation's
