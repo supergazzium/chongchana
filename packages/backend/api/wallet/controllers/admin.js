@@ -752,9 +752,8 @@ module.exports = {
       `, [from, to]);
 
       // Staff revenue. Group spend transactions by staffId from metadata.
-      // Resolved against users-permissions_user in a second query to
-      // dodge the same collation issue we hit on machines. Branch is the
-      // staff's "most-used" branch in the period (mode by tx count).
+      // Per-branch distribution is exposed on the drill-down endpoint;
+      // here we only need totals per staff.
       const staffBreakdownRaw = await knex.raw(`
         SELECT
           COALESCE(
@@ -765,10 +764,6 @@ module.exports = {
             JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.staffUsername')),
             ''
           ) AS staff_username,
-          CASE
-            WHEN branch IS NULL OR branch = '' THEN '__unattributed__'
-            ELSE branch
-          END AS branch_name,
           COUNT(*) as tx_count,
           SUM(ABS(amount)) as total_charged,
           MAX(created_at) as last_activity
@@ -776,12 +771,13 @@ module.exports = {
         WHERE created_at BETWEEN ? AND ?
           AND type IN ('store_payment', 'beer_machine_payment')
           AND status = 'completed'
-        GROUP BY staff_id, staff_username, branch_name
+        GROUP BY staff_id, staff_username
       `, [from, to]);
 
-      // Roll up per-staff totals (across branches) and figure out the
-      // most-used branch for each. The SQL groups by (staff, branch) so
-      // we can see distribution; we collapse that here.
+      // Resolve into per-staff entries. Same staffId may appear under
+      // multiple usernames historically (rename, app version drift) —
+      // collapse those into a single row preferring the most recent
+      // username.
       const staffMap = new Map();
       staffBreakdownRaw[0].forEach((row) => {
         const id = row.staff_id;
@@ -793,20 +789,15 @@ module.exports = {
             txCount: 0,
             totalCharged: 0,
             lastActivity: null,
-            branchTallies: new Map(),
           });
         }
         const s = staffMap.get(id);
-        const txCount = Number(row.tx_count) || 0;
-        const charged = parseFloat(row.total_charged) || 0;
-        s.txCount += txCount;
-        s.totalCharged += charged;
+        s.txCount += Number(row.tx_count) || 0;
+        s.totalCharged += parseFloat(row.total_charged) || 0;
         if (!s.lastActivity || (row.last_activity && row.last_activity > s.lastActivity)) {
           s.lastActivity = row.last_activity;
+          if (row.staff_username) s.staffUsername = row.staff_username;
         }
-        const branch = row.branch_name === '__unattributed__' ? null : row.branch_name;
-        const prior = s.branchTallies.get(branch) || 0;
-        s.branchTallies.set(branch, prior + txCount);
       });
 
       // Resolve usernames + display names from the users table for any
@@ -835,14 +826,6 @@ module.exports = {
 
       const byStaff = [...staffMap.values()]
         .map((s) => {
-          let topBranch = null;
-          let topCount = -1;
-          s.branchTallies.forEach((count, branch) => {
-            if (count > topCount) {
-              topCount = count;
-              topBranch = branch;
-            }
-          });
           const userInfo = s.staffId != null ? staffUserMap[Number(s.staffId)] || null : null;
           return {
             staffId: s.staffId,
@@ -850,8 +833,6 @@ module.exports = {
             username: userInfo?.username || s.staffUsername || null,
             fullName: userInfo?.fullName || null,
             email: userInfo?.email || null,
-            topBranch,
-            branchCount: s.branchTallies.size,
             txCount: s.txCount,
             totalCharged: s.totalCharged,
             avgPerTx: s.txCount ? s.totalCharged / s.txCount : 0,
@@ -2401,6 +2382,35 @@ module.exports = {
       `, isUnattributed ? [] : [staffId]);
       const lifetime = lifetimeRows[0][0] || {};
 
+      // Per-branch breakdown within the period. Bucket unattributed
+      // branches the same way the byBranch report does.
+      const branchRows = await knex.raw(`
+        SELECT
+          CASE
+            WHEN branch IS NULL OR branch = '' THEN '__unattributed__'
+            ELSE branch
+          END AS branch_name,
+          COUNT(*) as tx_count,
+          SUM(ABS(amount)) as total_charged,
+          MAX(created_at) as last_activity
+        FROM wallet_transactions
+        WHERE type IN ('store_payment', 'beer_machine_payment')
+          AND status = 'completed'
+          AND ${where}${dateClause}
+        GROUP BY branch_name
+        ORDER BY total_charged DESC
+      `, valueParams);
+      const branchBreakdown = branchRows[0].map((b) => {
+        const unattr = b.branch_name === '__unattributed__';
+        return {
+          branch: unattr ? 'Unattributed' : b.branch_name,
+          unattributed: unattr,
+          txCount: Number(b.tx_count) || 0,
+          totalCharged: parseFloat(b.total_charged) || 0,
+          lastActivity: b.last_activity,
+        };
+      });
+
       // Transactions (paginated, newest first).
       const txRows = await knex.raw(`
         SELECT
@@ -2481,6 +2491,7 @@ module.exports = {
           firstActivity: lifetime.first_activity,
           lastActivity: lifetime.last_activity,
         },
+        branchBreakdown,
         transactions: txRows[0].map((r) => {
           const customer = userMap[r.user_id] || null;
           return {

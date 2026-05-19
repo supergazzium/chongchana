@@ -510,7 +510,6 @@
             <thead>
               <tr>
                 <th>{{ __wt('staffCol_staff') }}</th>
-                <th>{{ __wt('staffCol_topBranch') }}</th>
                 <th class="num">{{ __wt('staffCol_transactions') }}</th>
                 <th class="num">{{ __wt('staffCol_totalCharged') }}</th>
                 <th class="num">{{ __wt('staffCol_avgPerTx') }}</th>
@@ -538,12 +537,6 @@
                     </div>
                     <code class="staff-id muted">{{ s.username ? `@${s.username}` : `#${s.staffId}` }}</code>
                   </template>
-                </td>
-                <td>
-                  {{ s.topBranch || '—' }}
-                  <span v-if="s.branchCount > 1" class="branch-count-tag">
-                    +{{ s.branchCount - 1 }}
-                  </span>
                 </td>
                 <td class="num">{{ formatInt(s.txCount) }}</td>
                 <td class="num"><strong>฿{{ formatNumber(s.totalCharged) }}</strong></td>

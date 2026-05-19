@@ -34,6 +34,28 @@
       </div>
     </div>
 
+    <!-- Date range picker (defaults from URL on first load, then editable) -->
+    <div class="wallet-period-bar">
+      <div class="period-options">
+        <button
+          v-for="opt in periodOptions"
+          :key="opt.key"
+          :class="['period-btn', { active: period === opt.key }]"
+          @click="setPeriod(opt.key)"
+        >
+          {{ __wt(opt.i18n) }}
+        </button>
+      </div>
+      <div class="period-range" v-if="period === 'custom'">
+        <input type="date" v-model="customRange.from" @change="applyCustomRange" />
+        <span>—</span>
+        <input type="date" v-model="customRange.to" @change="applyCustomRange" />
+      </div>
+      <div class="period-range-display" v-else-if="periodDisplayLabel">
+        {{ periodDisplayLabel }}
+      </div>
+    </div>
+
     <div v-if="loading && !data" class="wallet-loading">
       <i class="fas fa-spinner fa-spin"></i>
       <p>Loading…</p>
@@ -88,6 +110,44 @@
             {{ data.lifetimeTotals.lastActivity ? formatDate(data.lifetimeTotals.lastActivity) : '—' }}
           </div>
         </div>
+      </div>
+
+      <!-- Per-branch breakdown -->
+      <div class="staff-branch-card" v-if="data.branchBreakdown && data.branchBreakdown.length">
+        <h2>
+          <i class="fas fa-map-marker-alt"></i>
+          {{ __wt('staffBranchBreakdownTitle') }}
+          <span class="staff-tx-count">{{ formatInt(data.branchBreakdown.length) }}</span>
+        </h2>
+        <table class="staff-branch-table">
+          <thead>
+            <tr>
+              <th>{{ __wt('staffBranchCol_branch') }}</th>
+              <th class="num">{{ __wt('staffBranchCol_transactions') }}</th>
+              <th class="num">{{ __wt('staffBranchCol_totalCharged') }}</th>
+              <th class="num">{{ __wt('staffBranchCol_share') }}</th>
+              <th>{{ __wt('staffBranchCol_lastActivity') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="b in data.branchBreakdown"
+              :key="b.branch"
+              :class="{ 'branch-row-unattributed': b.unattributed }"
+            >
+              <td>
+                <span v-if="b.unattributed" class="staff-tag-amber-inline">
+                  <i class="fas fa-question-circle"></i> {{ b.branch }}
+                </span>
+                <span v-else>{{ b.branch }}</span>
+              </td>
+              <td class="num">{{ formatInt(b.txCount) }}</td>
+              <td class="num"><strong>฿{{ formatNumber(b.totalCharged) }}</strong></td>
+              <td class="num">{{ branchShareOfStaff(b.totalCharged) }}%</td>
+              <td>{{ formatRelativeDate(b.lastActivity) }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <!-- Transactions table -->
@@ -181,6 +241,15 @@ export default {
       data: null,
       offset: 0,
       limit: 50,
+      period: 'custom',
+      customRange: { from: '', to: '' },
+      periodOptions: [
+        { key: 'today', i18n: 'periodToday' },
+        { key: '7d', i18n: 'period7d' },
+        { key: 'mtd', i18n: 'periodMtd' },
+        { key: '30d', i18n: 'period30d' },
+        { key: 'custom', i18n: 'periodCustom' },
+      ],
     };
   },
   computed: {
@@ -199,28 +268,42 @@ export default {
         { label: this.staff?.unattributed ? this.__wt('staffUnattributed') : label },
       ];
     },
+    periodDisplayLabel() {
+      const range = this.resolvePeriodRange();
+      if (!range) return '';
+      const from = this.$moment(range.from).tz('Asia/Bangkok');
+      const to = this.$moment(range.to).tz('Asia/Bangkok');
+      if (from.isSame(to, 'day')) return from.format('MMM D, YYYY');
+      return `${from.format('MMM D')} – ${to.format('MMM D, YYYY')}`;
+    },
   },
   async mounted() {
     this.__hydrateWalletUiLang();
+    // Seed period state from the URL query (passed by the reports
+    // page's drill-through). After this, the picker is the source of
+    // truth — URL changes are pushed by the picker itself.
+    const q = this.$route.query || {};
+    if (q.fromDate && q.toDate) {
+      this.period = 'custom';
+      this.customRange = { from: q.fromDate, to: q.toDate };
+    } else {
+      this.period = 'mtd';
+    }
     await this.load();
-  },
-  watch: {
-    '$route.query'() {
-      this.offset = 0;
-      this.load();
-    },
   },
   methods: {
     async load() {
       this.loading = true;
       try {
-        const q = this.$route.query || {};
         const params = {
           limit: this.limit,
           offset: this.offset,
         };
-        if (q.fromDate) params.fromDate = q.fromDate;
-        if (q.toDate) params.toDate = q.toDate;
+        const range = this.resolvePeriodRange();
+        if (range) {
+          params.fromDate = range.from;
+          params.toDate = range.to;
+        }
 
         const response = await this.$walletService.getStaffTransactions(this.staffIdParam, params);
         if (response.success) {
@@ -235,6 +318,64 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+
+    resolvePeriodRange() {
+      const now = this.$moment().tz('Asia/Bangkok');
+      let from;
+      let to;
+      switch (this.period) {
+        case 'today':
+          from = now.clone().startOf('day');
+          to = now.clone().endOf('day');
+          break;
+        case '7d':
+          from = now.clone().subtract(6, 'days').startOf('day');
+          to = now.clone().endOf('day');
+          break;
+        case '30d':
+          from = now.clone().subtract(29, 'days').startOf('day');
+          to = now.clone().endOf('day');
+          break;
+        case 'mtd':
+          from = now.clone().startOf('month');
+          to = now.clone().endOf('day');
+          break;
+        case 'custom':
+          if (!this.customRange.from || !this.customRange.to) return null;
+          from = this.$moment.tz(this.customRange.from, 'Asia/Bangkok').startOf('day');
+          to = this.$moment.tz(this.customRange.to, 'Asia/Bangkok').endOf('day');
+          break;
+        default:
+          return null;
+      }
+      return { from: from.toISOString(), to: to.toISOString() };
+    },
+
+    setPeriod(key) {
+      this.period = key;
+      this.offset = 0;
+      if (key !== 'custom') {
+        this.load();
+      }
+    },
+
+    applyCustomRange() {
+      if (this.customRange.from && this.customRange.to) {
+        this.offset = 0;
+        this.load();
+      }
+    },
+
+    branchShareOfStaff(amount) {
+      const total = this.data?.periodTotals?.totalCharged || 0;
+      if (!total) return '0.0';
+      return ((amount / total) * 100).toFixed(1);
+    },
+
+    formatRelativeDate(date) {
+      if (!date) return '—';
+      return this.$moment(date).tz('Asia/Bangkok').fromNow();
     },
 
     prevPage() {
@@ -426,4 +567,114 @@ export default {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+
+.wallet-period-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+}
+
+.period-options {
+  display: inline-flex;
+  background: #f1f5f9;
+  border-radius: 999px;
+  padding: 4px;
+  gap: 2px;
+}
+
+.period-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.period-btn:hover { background: rgba(23, 151, 173, 0.08); }
+.period-btn.active { background: #1797AD; color: #fff; }
+
+.period-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.period-range input {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.period-range-display {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.staff-branch-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+.staff-branch-card h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  color: #063F48;
+}
+.staff-branch-card h2 i {
+  margin-right: 8px;
+  color: #1797AD;
+}
+
+.staff-branch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.staff-branch-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #F7FAFC;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6B7280;
+  border-bottom: 1px solid #E5E7EB;
+}
+.staff-branch-table th.num,
+.staff-branch-table td.num { text-align: right; }
+.staff-branch-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #F1F5F9;
+  color: #1F2937;
+}
+.staff-branch-table tbody tr:last-child td { border-bottom: none; }
+.staff-branch-table tbody tr:hover td { background: #F9FAFB; }
+
+.branch-row-unattributed {
+  background: rgba(245, 158, 11, 0.04);
+}
+.branch-row-unattributed:hover td { background: rgba(245, 158, 11, 0.1); }
+
+.staff-tag-amber-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #92400E;
+}
+.staff-tag-amber-inline i { color: #F59E0B; }
 </style>

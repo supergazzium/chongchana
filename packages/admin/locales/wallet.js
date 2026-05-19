@@ -268,7 +268,6 @@ const en = {
   staffEmpty: 'No staff-attributed spend in this period.',
   staffUnattributed: 'Unattributed (no staff recorded)',
   staffCol_staff: 'Staff',
-  staffCol_topBranch: 'Branch',
   staffCol_transactions: 'Transactions',
   staffCol_totalCharged: 'Total charged',
   staffCol_avgPerTx: 'Avg / tx',
@@ -289,6 +288,12 @@ const en = {
   staffDetailCol_type: 'Type',
   staffDetailCol_amount: 'Amount',
   staffDetailCol_description: 'Description',
+  staffBranchBreakdownTitle: 'Charges by Branch',
+  staffBranchCol_branch: 'Branch',
+  staffBranchCol_transactions: 'Transactions',
+  staffBranchCol_totalCharged: 'Total charged',
+  staffBranchCol_share: '% of staff total',
+  staffBranchCol_lastActivity: 'Last activity',
 
   // reports — legacy summary cards
   rptTotalWalletBalance: 'Total Wallet Balance',
@@ -589,7 +594,6 @@ const th = {
   staffEmpty: 'ไม่มีรายการที่ระบุพนักงานในช่วงเวลานี้',
   staffUnattributed: 'ไม่ระบุพนักงาน',
   staffCol_staff: 'พนักงาน',
-  staffCol_topBranch: 'สาขา',
   staffCol_transactions: 'จำนวนธุรกรรม',
   staffCol_totalCharged: 'รวมที่เรียกเก็บ',
   staffCol_avgPerTx: 'เฉลี่ย / รายการ',
@@ -610,6 +614,12 @@ const th = {
   staffDetailCol_type: 'ประเภท',
   staffDetailCol_amount: 'จำนวน',
   staffDetailCol_description: 'คำอธิบาย',
+  staffBranchBreakdownTitle: 'ยอดเก็บแยกตามสาขา',
+  staffBranchCol_branch: 'สาขา',
+  staffBranchCol_transactions: 'จำนวนธุรกรรม',
+  staffBranchCol_totalCharged: 'รวมที่เรียกเก็บ',
+  staffBranchCol_share: '% ของพนักงาน',
+  staffBranchCol_lastActivity: 'ใช้งานล่าสุด',
 
   // reports — legacy summary cards
   rptTotalWalletBalance: 'ยอดรวมในกระเป๋า',
