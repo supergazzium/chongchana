@@ -63,7 +63,7 @@
               </div>
               <div>
                 <h3>{{ promotion.campaignName }}</h3>
-                <span :class="['wallet-status-badge', promotion.status]">{{ promotion.status }}</span>
+                <span :class="['wallet-status-badge', displayStatus(promotion)]">{{ displayStatusLabel(promotion) }}</span>
               </div>
             </div>
             <button class="wallet-btn secondary" style="padding: 8px 16px;" @click="editPromotion(promotion)">
@@ -218,7 +218,7 @@
               </span>
             </div>
             <div>
-              <span :class="['wallet-status-badge', voucher.status]">{{ voucher.status }}</span>
+              <span :class="['wallet-status-badge', displayStatus(voucher)]">{{ displayStatusLabel(voucher) }}</span>
             </div>
           </div>
           <div class="voucher-actions">
@@ -226,9 +226,16 @@
               <i class="fas fa-chart-bar"></i>
               View Stats
             </button>
-            <button @click="toggleVoucherStatus(voucher)" class="wallet-btn" :class="voucher.status === 'active' ? 'danger' : 'success'" style="flex: 1; font-size: 12px; padding: 8px 12px;">
-              <i :class="voucher.status === 'active' ? 'fas fa-ban' : 'fas fa-check-circle'"></i>
-              {{ voucher.status === 'active' ? 'Deactivate' : 'Activate' }}
+            <button
+              @click="toggleVoucherStatus(voucher)"
+              class="wallet-btn"
+              :class="displayStatus(voucher) === 'active' ? 'danger' : 'success'"
+              :disabled="['expired', 'exhausted'].includes(displayStatus(voucher))"
+              :title="['expired','exhausted'].includes(displayStatus(voucher)) ? 'Cannot toggle a voucher that has expired or run out of redemptions' : ''"
+              style="flex: 1; font-size: 12px; padding: 8px 12px;"
+            >
+              <i :class="displayStatus(voucher) === 'active' ? 'fas fa-ban' : 'fas fa-check-circle'"></i>
+              {{ displayStatus(voucher) === 'active' ? 'Deactivate' : 'Activate' }}
             </button>
           </div>
         </div>
@@ -899,7 +906,9 @@ export default {
         if (this.voucherFilters.search && !v.code.includes(this.voucherFilters.search.toUpperCase())) {
           return false;
         }
-        if (this.voucherFilters.status && v.status !== this.voucherFilters.status) {
+        // Filter against the date-aware effective status so picking
+        // "Active" in the dropdown doesn't include expired rows.
+        if (this.voucherFilters.status && this.displayStatus(v) !== this.voucherFilters.status) {
           return false;
         }
         return true;
@@ -908,6 +917,57 @@ export default {
   },
 
   methods: {
+    // Derive the effective status of a promotion or voucher from its
+    // dates and (where present) redemption usage. The stored `status`
+    // field is admin intent (active / inactive / expired-by-admin);
+    // dates expire silently and need to be reflected at render time.
+    //
+    // Precedence (highest first):
+    //   1. Admin set 'inactive' / 'cancelled' / 'expired' → respect it
+    //   2. validUntil < today → 'expired'
+    //   3. validFrom > today → 'scheduled' (future-dated, not yet live)
+    //   4. maxRedemptions reached → 'exhausted'
+    //   5. Otherwise → 'active'
+    displayStatus(item) {
+      if (!item) return '';
+      const stored = (item.status || '').toLowerCase();
+      // Admin-set non-active states are respected as-is.
+      if (stored && stored !== 'active') return stored;
+
+      const now = this.$moment ? this.$moment().tz('Asia/Bangkok') : null;
+      const until = item.validUntil
+        ? (this.$moment ? this.$moment(item.validUntil).tz('Asia/Bangkok').endOf('day') : null)
+        : null;
+      const from = item.validFrom
+        ? (this.$moment ? this.$moment(item.validFrom).tz('Asia/Bangkok').startOf('day') : null)
+        : null;
+
+      if (until && now && now.isAfter(until)) return 'expired';
+      if (from && now && now.isBefore(from)) return 'scheduled';
+
+      // Voucher only: cap on redemptions
+      if (item.maxRedemptions != null
+          && item.currentRedemptions != null
+          && item.currentRedemptions >= item.maxRedemptions) {
+        return 'exhausted';
+      }
+
+      return 'active';
+    },
+
+    displayStatusLabel(item) {
+      const s = this.displayStatus(item);
+      const labels = {
+        active: 'Active',
+        expired: 'Expired',
+        scheduled: 'Scheduled',
+        exhausted: 'Exhausted',
+        inactive: 'Inactive',
+        cancelled: 'Cancelled',
+      };
+      return labels[s] || s;
+    },
+
     getPromotionIcon(type) {
       const icons = {
         top_up_bonus: 'fas fa-percentage',
@@ -1058,7 +1118,7 @@ export default {
       const rows = data.map((v) => [
         v.code,
         v.amount,
-        v.status,
+        this.displayStatus(v),
         v.maxRedemptions || 'Unlimited',
         v.currentRedemptions,
         v.validFrom,
