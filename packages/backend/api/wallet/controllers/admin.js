@@ -754,6 +754,8 @@ module.exports = {
       // Staff revenue. Group spend transactions by staffId from metadata.
       // Per-branch distribution is exposed on the drill-down endpoint;
       // here we only need totals per staff.
+      // GROUP BY must repeat the full expressions (not aliases) under
+      // ONLY_FULL_GROUP_BY (MySQL 8 default).
       const staffBreakdownRaw = await knex.raw(`
         SELECT
           COALESCE(
@@ -771,7 +773,9 @@ module.exports = {
         WHERE created_at BETWEEN ? AND ?
           AND type IN ('store_payment', 'beer_machine_payment')
           AND status = 'completed'
-        GROUP BY staff_id, staff_username
+        GROUP BY
+          COALESCE(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.staffId')), '__unknown_staff__'),
+          COALESCE(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.staffUsername')), '')
       `, [from, to]);
 
       // Resolve into per-staff entries. Same staffId may appear under
