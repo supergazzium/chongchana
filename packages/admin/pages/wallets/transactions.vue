@@ -1447,6 +1447,9 @@ export default {
   font-family: monospace;
   font-size: 15px;
   font-weight: 700;
+  /* Keep sign + ฿ + digits on one line; without this, narrow columns
+     wrap "+" onto its own line above the value (BUG-07). */
+  white-space: nowrap;
 }
 
 .amount.positive {

@@ -269,13 +269,19 @@
     <div class="wallet-ops-section">
       <div class="wallet-ops-header">
         <h2>{{ __wt('walletsTitle') }}</h2>
-        <p class="wallet-ops-sub">
-          {{ __wt('walletsSubtitle', {
-            active: formatInt(stats.activeWallets),
-            frozen: formatInt(stats.frozenWallets),
-            suspended: formatInt(stats.suspendedWallets),
-            pending: formatNumber(stats.pendingBalance),
-          }) }}
+        <p class="wallet-ops-sub" :class="{ 'is-loading': statsLoading }">
+          <template v-if="statsLoading">
+            <i class="fas fa-spinner fa-spin"></i>
+            Loading wallet statistics…
+          </template>
+          <template v-else>
+            {{ __wt('walletsSubtitle', {
+              active: formatInt(stats.activeWallets),
+              frozen: formatInt(stats.frozenWallets),
+              suspended: formatInt(stats.suspendedWallets),
+              pending: formatNumber(stats.pendingBalance),
+            }) }}
+          </template>
         </p>
       </div>
     </div>
@@ -288,7 +294,10 @@
       >
         <i class="fas fa-list"></i>
         {{ __wt('filterAll') }}
-        <span class="chip-count">{{ formatInt(stats.totalWallets) }}</span>
+        <span class="chip-count" :class="{ loading: statsLoading }">
+          <template v-if="statsLoading">…</template>
+          <template v-else>{{ formatInt(stats.totalWallets) }}</template>
+        </span>
       </button>
       <button
         @click="setStatus('active')"
@@ -296,7 +305,10 @@
       >
         <i class="fas fa-check-circle"></i>
         {{ __wt('filterActive') }}
-        <span class="chip-count">{{ formatInt(stats.activeWallets) }}</span>
+        <span class="chip-count" :class="{ loading: statsLoading }">
+          <template v-if="statsLoading">…</template>
+          <template v-else>{{ formatInt(stats.activeWallets) }}</template>
+        </span>
       </button>
       <button
         @click="setStatus('frozen')"
@@ -304,7 +316,10 @@
       >
         <i class="fas fa-snowflake"></i>
         {{ __wt('filterFrozen') }}
-        <span class="chip-count">{{ formatInt(stats.frozenWallets) }}</span>
+        <span class="chip-count" :class="{ loading: statsLoading }">
+          <template v-if="statsLoading">…</template>
+          <template v-else>{{ formatInt(stats.frozenWallets) }}</template>
+        </span>
       </button>
       <button
         @click="setStatus('suspended')"
@@ -312,7 +327,10 @@
       >
         <i class="fas fa-ban"></i>
         {{ __wt('filterSuspended') }}
-        <span class="chip-count">{{ formatInt(stats.suspendedWallets) }}</span>
+        <span class="chip-count" :class="{ loading: statsLoading }">
+          <template v-if="statsLoading">…</template>
+          <template v-else>{{ formatInt(stats.suspendedWallets) }}</template>
+        </span>
       </button>
       <button @click="resetFilters" class="wallet-filter-chip">
         <i class="fas fa-redo"></i>
@@ -496,6 +514,10 @@ export default {
       wallets: [],
       loading: false,
       branchLoading: false,
+      // True between first mount and the first loadStats() resolve.
+      // Prevents the Overview from rendering stale zero counts before
+      // the real data arrives.
+      statsLoading: true,
       filters: {
         search: '',
         status: '',
@@ -659,6 +681,7 @@ export default {
         console.error('Error loading stats:', error);
       } finally {
         this.branchLoading = false;
+        this.statsLoading = false;
       }
     },
 
@@ -1017,6 +1040,19 @@ export default {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.chip-count.loading {
+  opacity: 0.6;
+  font-style: italic;
+  letter-spacing: 0.5px;
+}
+
+.wallet-ops-sub.is-loading {
+  opacity: 0.7;
+  font-style: italic;
+
+  i { margin-right: 6px; }
 }
 
 .chip-count {
