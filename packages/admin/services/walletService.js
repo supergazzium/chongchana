@@ -35,21 +35,6 @@ export default ($axios) => ({
   },
 
   /**
-   * Manually adjust user wallet balance
-   * @param {object} data - Adjustment data
-   * @returns {Promise} Adjustment response
-   */
-  async adjustBalance(data) {
-    try {
-      const response = await $axios.post('/api/wallet-admin/wallet/adjust', data);
-      return response.data;
-    } catch (error) {
-      console.error('[WalletService] adjustBalance error:', error);
-      throw error;
-    }
-  },
-
-  /**
    * Freeze or unfreeze user wallet
    * @param {object} data - Freeze data
    * @returns {Promise} Freeze response

@@ -5,7 +5,6 @@
     <div class="page-header">
       <h1>Wallet Detail</h1>
       <div class="header-actions">
-        <button @click="showAdjustDialog = true" class="btn-primary">Adjust Balance</button>
         <button
           v-if="wallet.wallet?.status === 'active'"
           @click="freezeWallet"
@@ -175,51 +174,6 @@
       </div>
     </div>
 
-    <!-- Adjust Balance Modal -->
-    <div v-if="showAdjustDialog" class="modal-overlay" @click="showAdjustDialog = false">
-      <div class="modal-content" @click.stop>
-        <h2>Adjust Wallet Balance</h2>
-        <div class="modal-body">
-          <p><strong>Current Balance:</strong> ฿{{ formatNumber(wallet.wallet.balance) }}</p>
-
-          <div class="form-group">
-            <label>Type</label>
-            <select v-model="adjustForm.type" class="form-control">
-              <option value="credit">Credit (Add)</option>
-              <option value="debit">Debit (Deduct)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Amount (฿)</label>
-            <input
-              v-model="adjustForm.amount"
-              type="number"
-              step="0.01"
-              class="form-control"
-              placeholder="Enter amount"
-            />
-          </div>
-
-          <div class="form-group">
-            <label>Reason (Required)</label>
-            <textarea
-              v-model="adjustForm.reason"
-              class="form-control"
-              rows="3"
-              placeholder="Enter reason for adjustment..."
-            ></textarea>
-          </div>
-
-          <div class="modal-actions">
-            <button @click="showAdjustDialog = false" class="btn-secondary">Cancel</button>
-            <button @click="submitAdjustment" class="btn-primary" :disabled="!canSubmit">
-              Adjust Balance
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -242,12 +196,6 @@ export default {
         recentTransactions: [],
       },
       loading: false,
-      showAdjustDialog: false,
-      adjustForm: {
-        type: 'credit',
-        amount: '',
-        reason: '',
-      },
       vendingSessions: [],
       vendingTotalUnreleased: 0,
       releasingSessionId: null,
@@ -264,13 +212,6 @@ export default {
         { label: 'Wallet Management', path: '/wallets' },
         { label: userName },
       ];
-    },
-    canSubmit() {
-      return (
-        this.adjustForm.amount &&
-        parseFloat(this.adjustForm.amount) > 0 &&
-        this.adjustForm.reason.trim().length > 0
-      );
     },
   },
   async mounted() {
@@ -341,35 +282,6 @@ export default {
         this.$swal('Error', message, 'error');
       } finally {
         this.releasingSessionId = null;
-      }
-    },
-
-    async submitAdjustment() {
-      try {
-        const response = await this.$walletService.adjustBalance({
-          userId: this.wallet.userId,
-          amount: parseFloat(this.adjustForm.amount),
-          type: this.adjustForm.type,
-          reason: this.adjustForm.reason,
-        });
-
-        if (response.success) {
-          this.$swal({
-            icon: 'success',
-            title: 'Success',
-            text: 'Wallet balance adjusted successfully',
-          });
-          this.showAdjustDialog = false;
-          this.adjustForm = { type: 'credit', amount: '', reason: '' };
-          await this.loadWalletDetail();
-        }
-      } catch (error) {
-        console.error('Error adjusting balance:', error);
-        this.$swal({
-          icon: 'error',
-          title: 'Error',
-          text: error.response?.data?.error?.message || 'Failed to adjust balance',
-        });
       }
     },
 

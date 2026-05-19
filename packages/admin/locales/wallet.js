@@ -78,7 +78,6 @@ const en = {
 
   // actions
   view: 'View',
-  adjust: 'Adjust',
   freeze: 'Freeze',
   unfreeze: 'Unfreeze',
 
@@ -87,19 +86,7 @@ const en = {
   previous: 'Previous',
   next: 'Next',
 
-  // adjust modal
-  adjustTitle: 'Adjust Wallet Balance',
-  adjustUser: 'User',
-  adjustCurrentBalance: 'Current Balance',
-  adjustType: 'Adjustment Type',
-  adjustCredit: 'Credit (Add Money)',
-  adjustDebit: 'Debit (Deduct Money)',
-  adjustAmount: 'Amount (฿)',
-  adjustAmountPlaceholder: 'Enter amount...',
-  adjustReason: 'Reason (Required)',
-  adjustReasonPlaceholder: 'Enter reason for adjustment...',
   cancel: 'Cancel',
-  adjustBalance: 'Adjust Balance',
 
   // misc
   never: 'Never',
@@ -407,7 +394,6 @@ const th = {
   noWalletsFound: 'ไม่พบกระเป๋าเงิน',
 
   view: 'ดู',
-  adjust: 'ปรับยอด',
   freeze: 'ระงับ',
   unfreeze: 'ปลดระงับ',
 
@@ -415,18 +401,7 @@ const th = {
   previous: 'ก่อนหน้า',
   next: 'ถัดไป',
 
-  adjustTitle: 'ปรับยอดเงินในกระเป๋า',
-  adjustUser: 'ผู้ใช้',
-  adjustCurrentBalance: 'ยอดเงินปัจจุบัน',
-  adjustType: 'ประเภทการปรับยอด',
-  adjustCredit: 'เพิ่มเงิน (Credit)',
-  adjustDebit: 'หักเงิน (Debit)',
-  adjustAmount: 'จำนวนเงิน (฿)',
-  adjustAmountPlaceholder: 'ใส่จำนวนเงิน...',
-  adjustReason: 'เหตุผล (จำเป็นต้องระบุ)',
-  adjustReasonPlaceholder: 'ใส่เหตุผลในการปรับยอด...',
   cancel: 'ยกเลิก',
-  adjustBalance: 'ปรับยอดเงิน',
 
   never: 'ไม่เคย',
 

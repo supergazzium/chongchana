@@ -423,10 +423,6 @@
                   <i class="fas fa-eye"></i>
                   {{ __wt('view') }}
                 </nuxt-link>
-                <button @click="showAdjustModal(wallet)" class="wallet-btn secondary" style="padding: 6px 12px; font-size: 12px;">
-                  <i class="fas fa-edit"></i>
-                  {{ __wt('adjust') }}
-                </button>
                 <button
                   v-if="wallet.status === 'active'"
                   @click="freezeWallet(wallet.userId)"
@@ -479,60 +475,6 @@
       </button>
     </div>
 
-    <!-- Adjust Balance Modal -->
-    <div v-if="showAdjustDialog" class="modal-overlay" @click="closeAdjustModal">
-      <div class="modal-content" @click.stop>
-        <h2 style="font-size: 22px; color: #063F48; margin-bottom: 20px;">
-          <i class="fas fa-balance-scale"></i>
-          {{ __wt('adjustTitle') }}
-        </h2>
-        <div class="modal-body">
-          <div style="background: #F7FAFC; padding: 16px; border-radius: 12px; margin-bottom: 20px;">
-            <p style="margin: 4px 0;"><strong>{{ __wt('adjustUser') }}:</strong> {{ adjustData.user?.firstName }} {{ adjustData.user?.lastName }}</p>
-            <p style="margin: 4px 0;"><strong>{{ __wt('adjustCurrentBalance') }}:</strong> <span style="color: #1797AD; font-weight: 600;">฿{{ formatNumber(adjustData.balance) }}</span></p>
-          </div>
-
-          <div class="wallet-filter-item" style="margin-bottom: 16px;">
-            <label>{{ __wt('adjustType') }}</label>
-            <select v-model="adjustData.type">
-              <option value="credit">{{ __wt('adjustCredit') }}</option>
-              <option value="debit">{{ __wt('adjustDebit') }}</option>
-            </select>
-          </div>
-
-          <div class="wallet-filter-item" style="margin-bottom: 16px;">
-            <label>{{ __wt('adjustAmount') }}</label>
-            <input
-              v-model="adjustData.amount"
-              type="number"
-              step="0.01"
-              :placeholder="__wt('adjustAmountPlaceholder')"
-            />
-          </div>
-
-          <div class="wallet-filter-item" style="margin-bottom: 20px;">
-            <label>{{ __wt('adjustReason') }}</label>
-            <textarea
-              v-model="adjustData.reason"
-              rows="3"
-              :placeholder="__wt('adjustReasonPlaceholder')"
-              style="width: 100%; padding: 10px 14px; border: 2px solid #E2E8F0; border-radius: 12px; font-size: 14px; font-family: inherit; resize: vertical;"
-            ></textarea>
-          </div>
-
-          <div style="display: flex; justify-content: flex-end; gap: 12px;">
-            <button @click="closeAdjustModal" class="wallet-btn secondary">
-              <i class="fas fa-times"></i>
-              {{ __wt('cancel') }}
-            </button>
-            <button @click="submitAdjustment" class="wallet-btn success" :disabled="!canSubmitAdjustment">
-              <i class="fas fa-check"></i>
-              {{ __wt('adjustBalance') }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -603,26 +545,10 @@ export default {
       },
       byBranch: [],
       byStaff: [],
-      showAdjustDialog: false,
-      adjustData: {
-        userId: null,
-        user: null,
-        balance: 0,
-        type: 'credit',
-        amount: '',
-        reason: '',
-      },
       searchTimeout: null,
     };
   },
   computed: {
-    canSubmitAdjustment() {
-      return (
-        this.adjustData.amount &&
-        parseFloat(this.adjustData.amount) > 0 &&
-        this.adjustData.reason.trim().length > 0
-      );
-    },
     periodDisplayLabel() {
       const range = this.resolvePeriodRange();
       if (!range) return '';
@@ -965,59 +891,6 @@ export default {
       }
     },
 
-    showAdjustModal(wallet) {
-      this.adjustData = {
-        userId: wallet.userId,
-        user: wallet.user,
-        balance: wallet.balance,
-        type: 'credit',
-        amount: '',
-        reason: '',
-      };
-      this.showAdjustDialog = true;
-    },
-
-    closeAdjustModal() {
-      this.showAdjustDialog = false;
-      this.adjustData = {
-        userId: null,
-        user: null,
-        balance: 0,
-        type: 'credit',
-        amount: '',
-        reason: '',
-      };
-    },
-
-    async submitAdjustment() {
-      try {
-        const response = await this.$walletService.adjustBalance({
-          userId: this.adjustData.userId,
-          amount: parseFloat(this.adjustData.amount),
-          type: this.adjustData.type,
-          reason: this.adjustData.reason,
-        });
-
-        if (response.success) {
-          this.$swal({
-            icon: 'success',
-            title: 'Success',
-            text: 'Wallet balance adjusted successfully',
-          });
-          this.closeAdjustModal();
-          this.loadWallets();
-          this.loadStats();
-        }
-      } catch (error) {
-        console.error('Error adjusting balance:', error);
-        this.$swal({
-          icon: 'error',
-          title: 'Error',
-          text: error.response?.data?.error?.message || 'Failed to adjust balance',
-        });
-      }
-    },
-
     async freezeWallet(userId) {
       const result = await this.$swal({
         icon: 'warning',
@@ -1186,34 +1059,6 @@ export default {
 
 .sort-icon.active {
   color: #1797AD;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  max-width: 600px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-}
-
-.modal-body {
-  margin-top: 0;
 }
 
 .wallet-period-bar {
