@@ -1104,27 +1104,42 @@ export default {
 .filter-chip {
   padding: 10px 20px;
   border-radius: 20px;
-  background: white;
-  border: 2px solid var(--gray-200);
-  color: var(--gray-700);
+  background: #FFFFFF;
+  border: 2px solid #E2E8F0;
+  /* Hardcoded gray instead of var(--gray-700) — the :root vars are
+     defined inside <style scoped> which Vue rewrites to
+     :root[data-v-xxxxx], matching nothing. Some chips ended up
+     inheriting near-invisible colors. */
+  color: #4A5568;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.filter-chip i {
+  /* Force consistent icon contrast regardless of inherited opacity. */
+  color: inherit;
+  opacity: 1;
 }
 
 .filter-chip:hover {
-  border-color: var(--primary);
-  background: #eff6ff;
+  border-color: #1797AD;
+  background: #EFF9FB;
+  color: #1797AD;
 }
 
 .filter-chip.active {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
+  background: #1797AD;
+  color: #FFFFFF;
+  border-color: #1797AD;
+}
+
+.filter-chip.active i {
+  color: #FFFFFF;
 }
 
 /* Advanced Filters */
