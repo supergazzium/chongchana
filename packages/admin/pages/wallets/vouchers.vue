@@ -9,16 +9,6 @@
         <h1>Promotions & Vouchers</h1>
         <p class="subtitle">Manage wallet promotions and voucher campaigns</p>
       </div>
-      <div class="header-actions">
-        <button @click="activeTab = 'promotions'" class="wallet-btn secondary">
-          <i class="fas fa-bullhorn"></i>
-          Promotions
-        </button>
-        <button @click="activeTab = 'vouchers'" class="wallet-btn secondary">
-          <i class="fas fa-ticket-alt"></i>
-          Vouchers
-        </button>
-      </div>
     </div>
 
     <!-- Tabs -->
@@ -46,7 +36,7 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
         <h2 style="font-size: 20px; font-weight: 700; color: #063F48; margin: 0;">
           <i class="fas fa-bullhorn"></i>
-          Active Campaigns
+          All Campaigns
         </h2>
         <button @click="showPromotionDialog = true" class="wallet-btn primary">
           <i class="fas fa-plus-circle"></i>
@@ -222,10 +212,6 @@
             </div>
           </div>
           <div class="voucher-actions">
-            <button @click="viewRedemptions(voucher)" class="wallet-btn secondary" style="flex: 1; font-size: 12px; padding: 8px 12px;">
-              <i class="fas fa-chart-bar"></i>
-              View Stats
-            </button>
             <button
               @click="toggleVoucherStatus(voucher)"
               class="wallet-btn"
@@ -1088,14 +1074,6 @@ export default {
           text: 'Failed to generate vouchers',
         });
       }
-    },
-
-    viewRedemptions(voucher) {
-      this.$swal({
-        icon: 'info',
-        title: `Redemptions for ${voucher.code}`,
-        text: `${voucher.currentRedemptions} redemptions. Detail view coming soon.`,
-      });
     },
 
     toggleVoucherStatus(voucher) {

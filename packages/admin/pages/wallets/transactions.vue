@@ -230,8 +230,8 @@
             </td>
 
             <td class="td-right">
-              <div :class="['amount', getAmountClass(transaction.type)]">
-                {{ getAmountPrefix(transaction.type) }}฿{{ formatNumber(transaction.amount) }}
+              <div :class="['amount', getAmountClass(transaction)]">
+                {{ getAmountPrefix(transaction) }}฿{{ formatNumber(transaction.amount) }}
               </div>
             </td>
 
@@ -332,8 +332,8 @@
 
               <div class="detail-item full-width">
                 <label>Amount</label>
-                <div :class="['value', 'amount-large', getAmountClass(selectedTransaction.type)]">
-                  {{ getAmountPrefix(selectedTransaction.type) }}฿{{ formatNumber(selectedTransaction.amount) }}
+                <div :class="['value', 'amount-large', getAmountClass(selectedTransaction)]">
+                  {{ getAmountPrefix(selectedTransaction) }}฿{{ formatNumber(selectedTransaction.amount) }}
                 </div>
               </div>
 
@@ -812,18 +812,40 @@ export default {
         bonus: 'Bonus',
         adjustment: 'Adjustment',
         withdrawal: 'Withdrawal',
+        transfer: 'Transfer',
+        conversion: 'Conversion',
       };
       return types[type] || type;
     },
 
-    getAmountClass(type) {
-      const creditTypes = ['top_up', 'refund', 'bonus'];
-      return creditTypes.includes(type) ? 'positive' : 'negative';
+    // Direction comes from the actual sign on amount for types that
+    // can go either way (transfer is the obvious one — sender row is
+    // negative, receiver row positive). Fall back to type-based for
+    // older rows where the sign might be omitted.
+    isCreditByAmount(transaction) {
+      if (transaction && transaction.amount != null) {
+        const n = parseFloat(transaction.amount);
+        if (!Number.isNaN(n) && n !== 0) return n > 0;
+      }
+      const creditTypes = ['top_up', 'refund', 'bonus', 'conversion'];
+      return creditTypes.includes(transaction?.type);
     },
 
-    getAmountPrefix(type) {
-      const creditTypes = ['top_up', 'refund', 'bonus'];
-      return creditTypes.includes(type) ? '+' : '-';
+    getAmountClass(transactionOrType) {
+      // Back-compat: accept either a type string or a transaction object.
+      if (typeof transactionOrType === 'string') {
+        const creditTypes = ['top_up', 'refund', 'bonus', 'conversion'];
+        return creditTypes.includes(transactionOrType) ? 'positive' : 'negative';
+      }
+      return this.isCreditByAmount(transactionOrType) ? 'positive' : 'negative';
+    },
+
+    getAmountPrefix(transactionOrType) {
+      if (typeof transactionOrType === 'string') {
+        const creditTypes = ['top_up', 'refund', 'bonus', 'conversion'];
+        return creditTypes.includes(transactionOrType) ? '+' : '-';
+      }
+      return this.isCreditByAmount(transactionOrType) ? '+' : '-';
     },
 
     formatNumber(value) {
@@ -1428,6 +1450,26 @@ export default {
 .type-bonus {
   background: #e0e7ff;
   color: #3730a3;
+}
+
+.type-transfer {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.type-withdrawal {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.type-conversion {
+  background: #cffafe;
+  color: #155e75;
+}
+
+.type-adjustment {
+  background: #f3f4f6;
+  color: #374151;
 }
 
 /* Branch Tag */

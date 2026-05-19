@@ -646,26 +646,32 @@ export default {
           const summary = data.summary || {};
           const txSummary = data.transactionSummary || {};
           const prevTx = data.previousTransactionSummary || {};
-          const totalWallets =
-            (summary.activeWallets || 0) +
-            (summary.frozenWallets || 0) +
-            (summary.suspendedWallets || 0);
+          // MySQL returns SUM() / COUNT() results as DECIMAL/BIGINT
+          // strings via mysql2. Without Number() coercion, the "+" in
+          // the totalWallets computation below concatenates strings
+          // ("133641" + "0" + "0" = "13364100") instead of adding —
+          // which is what produced BUG-09's 100× inflation. Coerce
+          // every numeric stat at the boundary.
+          const activeWallets = Number(summary.activeWallets) || 0;
+          const frozenWallets = Number(summary.frozenWallets) || 0;
+          const suspendedWallets = Number(summary.suspendedWallets) || 0;
+          const totalWallets = activeWallets + frozenWallets + suspendedWallets;
 
           this.stats = {
-            totalBalance: summary.totalWalletBalance || 0,
+            totalBalance: Number(summary.totalWalletBalance) || 0,
             totalWallets,
-            activeWallets: summary.activeWallets || 0,
-            frozenWallets: summary.frozenWallets || 0,
-            suspendedWallets: summary.suspendedWallets || 0,
-            topUpVolume: txSummary.topUpVolume || 0,
-            topUpCount: txSummary.topUpCount || 0,
-            bonusVolume: txSummary.bonusVolume || 0,
-            bonusCount: txSummary.bonusCount || 0,
-            spendVolume: txSummary.spendVolume || 0,
-            spendCount: txSummary.spendCount || 0,
+            activeWallets,
+            frozenWallets,
+            suspendedWallets,
+            topUpVolume: Number(txSummary.topUpVolume) || 0,
+            topUpCount: Number(txSummary.topUpCount) || 0,
+            bonusVolume: Number(txSummary.bonusVolume) || 0,
+            bonusCount: Number(txSummary.bonusCount) || 0,
+            spendVolume: Number(txSummary.spendVolume) || 0,
+            spendCount: Number(txSummary.spendCount) || 0,
             periodLabel: this.derivePeriodLabel(data.period),
-            pendingBalance: summary.totalPendingBalance || 0,
-            frozenBalance: summary.totalFrozenBalance || 0,
+            pendingBalance: Number(summary.totalPendingBalance) || 0,
+            frozenBalance: Number(summary.totalFrozenBalance) || 0,
           };
 
           this.deltas = {
