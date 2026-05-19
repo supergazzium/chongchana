@@ -284,6 +284,14 @@
     },
     {
       "method": "GET",
+      "path": "/api/wallet-admin/staff/:staffId/transactions",
+      "handler": "api.getStaffTransactions",
+      "config": {
+        "policies": ["global::wallet-admin-access"]
+      }
+    },
+    {
+      "method": "GET",
       "path": "/api/wallet-admin/wallet/:userId",
       "handler": "api.getWalletDetail",
       "config": {

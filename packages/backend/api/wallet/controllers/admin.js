@@ -751,6 +751,115 @@ module.exports = {
         ORDER BY day DESC
       `, [from, to]);
 
+      // Staff revenue. Group spend transactions by staffId from metadata.
+      // Resolved against users-permissions_user in a second query to
+      // dodge the same collation issue we hit on machines. Branch is the
+      // staff's "most-used" branch in the period (mode by tx count).
+      const staffBreakdownRaw = await knex.raw(`
+        SELECT
+          COALESCE(
+            JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.staffId')),
+            '__unknown_staff__'
+          ) AS staff_id,
+          COALESCE(
+            JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.staffUsername')),
+            ''
+          ) AS staff_username,
+          CASE
+            WHEN branch IS NULL OR branch = '' THEN '__unattributed__'
+            ELSE branch
+          END AS branch_name,
+          COUNT(*) as tx_count,
+          SUM(ABS(amount)) as total_charged,
+          MAX(created_at) as last_activity
+        FROM wallet_transactions
+        WHERE created_at BETWEEN ? AND ?
+          AND type IN ('store_payment', 'beer_machine_payment')
+          AND status = 'completed'
+        GROUP BY staff_id, staff_username, branch_name
+      `, [from, to]);
+
+      // Roll up per-staff totals (across branches) and figure out the
+      // most-used branch for each. The SQL groups by (staff, branch) so
+      // we can see distribution; we collapse that here.
+      const staffMap = new Map();
+      staffBreakdownRaw[0].forEach((row) => {
+        const id = row.staff_id;
+        if (!staffMap.has(id)) {
+          staffMap.set(id, {
+            staffId: id === '__unknown_staff__' ? null : id,
+            unattributed: id === '__unknown_staff__',
+            staffUsername: row.staff_username || null,
+            txCount: 0,
+            totalCharged: 0,
+            lastActivity: null,
+            branchTallies: new Map(),
+          });
+        }
+        const s = staffMap.get(id);
+        const txCount = Number(row.tx_count) || 0;
+        const charged = parseFloat(row.total_charged) || 0;
+        s.txCount += txCount;
+        s.totalCharged += charged;
+        if (!s.lastActivity || (row.last_activity && row.last_activity > s.lastActivity)) {
+          s.lastActivity = row.last_activity;
+        }
+        const branch = row.branch_name === '__unattributed__' ? null : row.branch_name;
+        const prior = s.branchTallies.get(branch) || 0;
+        s.branchTallies.set(branch, prior + txCount);
+      });
+
+      // Resolve usernames + display names from the users table for any
+      // staff IDs we have but no username (older transactions may not
+      // have stamped staffUsername in metadata).
+      const numericStaffIds = [...staffMap.keys()]
+        .filter((id) => id !== '__unknown_staff__' && /^\d+$/.test(id))
+        .map((id) => Number(id));
+      const staffUserMap = {};
+      if (numericStaffIds.length > 0) {
+        try {
+          const userRows = await knex('users-permissions_user')
+            .whereIn('id', numericStaffIds)
+            .select('id', 'username', 'first_name', 'last_name', 'email');
+          userRows.forEach((u) => {
+            staffUserMap[u.id] = {
+              username: u.username,
+              fullName: [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || null,
+              email: u.email,
+            };
+          });
+        } catch (err) {
+          strapi.log.warn('[WalletAdmin] staff user lookup failed; falling back to metadata names:', err.message);
+        }
+      }
+
+      const byStaff = [...staffMap.values()]
+        .map((s) => {
+          let topBranch = null;
+          let topCount = -1;
+          s.branchTallies.forEach((count, branch) => {
+            if (count > topCount) {
+              topCount = count;
+              topBranch = branch;
+            }
+          });
+          const userInfo = s.staffId != null ? staffUserMap[Number(s.staffId)] || null : null;
+          return {
+            staffId: s.staffId,
+            unattributed: s.unattributed,
+            username: userInfo?.username || s.staffUsername || null,
+            fullName: userInfo?.fullName || null,
+            email: userInfo?.email || null,
+            topBranch,
+            branchCount: s.branchTallies.size,
+            txCount: s.txCount,
+            totalCharged: s.totalCharged,
+            avgPerTx: s.txCount ? s.totalCharged / s.txCount : 0,
+            lastActivity: s.lastActivity,
+          };
+        })
+        .sort((a, b) => b.totalCharged - a.totalCharged);
+
       // Period movements split by type AND sign. We separate credits
       // (positive amount) from debits (negative amount) so types that
       // can go either way (transfer, adjustment) are not double-counted
@@ -1232,6 +1341,7 @@ module.exports = {
         promotionalCostDetail,
         attentionItems,
         daily,
+        byStaff,
         byBranch: branchBreakdown[0].map((row) => {
           const isUnattributed = row.branch === '__unattributed__';
           return {
@@ -2219,6 +2329,180 @@ module.exports = {
       ctx.send(utils.successResponse({ id }));
     } catch (error) {
       strapi.log.error('[WalletAdmin] deleteMachine error:', error);
+      ctx.badRequest(utils.errorResponse('WALLET_ERROR', error.message));
+    }
+  },
+
+  /**
+   * GET /api/wallet-admin/staff/:staffId/transactions
+   * Staff detail view: header info + paginated spend transactions
+   * attributed to that staff via metadata.staffId.
+   * Supports fromDate, toDate, limit, offset query params.
+   */
+  async getStaffTransactions(ctx) {
+    try {
+      const knex = strapi.connections.default;
+      const { staffId } = ctx.params;
+      const {
+        fromDate,
+        toDate,
+        limit = 50,
+        offset = 0,
+      } = ctx.query;
+
+      const lim = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500);
+      const off = Math.max(parseInt(offset, 10) || 0, 0);
+
+      // Special staff id '__unattributed__' surfaces spend without a
+      // staffId in metadata — useful for auditing the gap.
+      const isUnattributed = staffId === '__unattributed__';
+      const where = isUnattributed
+        ? "(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.staffId')) IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.staffId')) = '')"
+        : "JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.staffId')) = ?";
+
+      const params = [];
+      let dateClause = '';
+      if (fromDate) {
+        dateClause += ' AND created_at >= ?';
+        params.push(fromDate);
+      }
+      if (toDate) {
+        dateClause += ' AND created_at <= ?';
+        params.push(toDate);
+      }
+
+      const valueParams = isUnattributed ? params : [staffId, ...params];
+
+      // Aggregate totals for the period.
+      const totalsRows = await knex.raw(`
+        SELECT
+          COUNT(*) as tx_count,
+          SUM(ABS(amount)) as total_charged,
+          MAX(created_at) as last_activity,
+          MIN(created_at) as first_activity
+        FROM wallet_transactions
+        WHERE type IN ('store_payment', 'beer_machine_payment')
+          AND status = 'completed'
+          AND ${where}${dateClause}
+      `, valueParams);
+      const totals = totalsRows[0][0] || {};
+
+      // Lifetime totals (no date filter) for context.
+      const lifetimeRows = await knex.raw(`
+        SELECT
+          COUNT(*) as tx_count,
+          SUM(ABS(amount)) as total_charged,
+          MIN(created_at) as first_activity,
+          MAX(created_at) as last_activity
+        FROM wallet_transactions
+        WHERE type IN ('store_payment', 'beer_machine_payment')
+          AND status = 'completed'
+          AND ${where}
+      `, isUnattributed ? [] : [staffId]);
+      const lifetime = lifetimeRows[0][0] || {};
+
+      // Transactions (paginated, newest first).
+      const txRows = await knex.raw(`
+        SELECT
+          t.id,
+          t.user_id,
+          t.type,
+          t.amount,
+          t.status,
+          t.branch,
+          t.description,
+          t.created_at,
+          t.metadata
+        FROM wallet_transactions t
+        WHERE t.type IN ('store_payment', 'beer_machine_payment')
+          AND t.status = 'completed'
+          AND ${where}${dateClause}
+        ORDER BY t.created_at DESC
+        LIMIT ${lim} OFFSET ${off}
+      `, valueParams);
+
+      // Resolve customer names for the rows we're returning.
+      const userIds = [...new Set(txRows[0].map((r) => r.user_id).filter(Boolean))];
+      const userMap = {};
+      if (userIds.length > 0) {
+        try {
+          const userRows = await knex('users-permissions_user')
+            .whereIn('id', userIds)
+            .select('id', 'username', 'first_name', 'last_name', 'email');
+          userRows.forEach((u) => {
+            userMap[u.id] = {
+              username: u.username,
+              fullName: [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || null,
+              email: u.email,
+            };
+          });
+        } catch (err) {
+          strapi.log.warn('[WalletAdmin] customer lookup failed in staff transactions:', err.message);
+        }
+      }
+
+      // Resolve staff info from the users table (best effort).
+      let staffInfo = null;
+      if (!isUnattributed && /^\d+$/.test(staffId)) {
+        try {
+          const staffRow = await knex('users-permissions_user')
+            .where({ id: Number(staffId) })
+            .select('id', 'username', 'first_name', 'last_name', 'email')
+            .first();
+          if (staffRow) {
+            staffInfo = {
+              id: staffRow.id,
+              username: staffRow.username,
+              fullName: [staffRow.first_name, staffRow.last_name].filter(Boolean).join(' ').trim() || null,
+              email: staffRow.email,
+            };
+          }
+        } catch (err) {
+          strapi.log.warn('[WalletAdmin] staff lookup failed:', err.message);
+        }
+      }
+
+      ctx.send(utils.successResponse({
+        staff: {
+          staffId: isUnattributed ? null : staffId,
+          unattributed: isUnattributed,
+          ...(staffInfo || {}),
+        },
+        period: { from: fromDate || null, to: toDate || null },
+        periodTotals: {
+          txCount: Number(totals.tx_count) || 0,
+          totalCharged: parseFloat(totals.total_charged) || 0,
+          firstActivity: totals.first_activity,
+          lastActivity: totals.last_activity,
+        },
+        lifetimeTotals: {
+          txCount: Number(lifetime.tx_count) || 0,
+          totalCharged: parseFloat(lifetime.total_charged) || 0,
+          firstActivity: lifetime.first_activity,
+          lastActivity: lifetime.last_activity,
+        },
+        transactions: txRows[0].map((r) => {
+          const customer = userMap[r.user_id] || null;
+          return {
+            id: r.id,
+            userId: r.user_id,
+            customerName: customer?.fullName || customer?.username || customer?.email || `User #${r.user_id}`,
+            type: r.type,
+            amount: Math.abs(parseFloat(r.amount) || 0),
+            status: r.status,
+            branch: r.branch,
+            description: r.description,
+            createdAt: r.created_at,
+          };
+        }),
+        pagination: {
+          limit: lim,
+          offset: off,
+          hasMore: txRows[0].length === lim,
+        },
+      }));
+    } catch (error) {
+      strapi.log.error('[WalletAdmin] getStaffTransactions error:', error);
       ctx.badRequest(utils.errorResponse('WALLET_ERROR', error.message));
     }
   },

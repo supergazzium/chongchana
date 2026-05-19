@@ -478,6 +478,84 @@
         </div>
       </div>
 
+      <!-- Staff Revenue -->
+      <div class="staff-card" v-if="report.byStaff">
+        <div class="staff-header">
+          <div>
+            <h2>
+              <i class="fas fa-user-tie"></i>
+              {{ __wt('staffTitle') }}
+            </h2>
+            <p>{{ __wt('staffSubtitle') }}</p>
+          </div>
+          <div class="staff-totals">
+            <div class="staff-tot">
+              <span class="staff-tot-label">{{ __wt('staffTotalCharged') }}</span>
+              <span class="staff-tot-value">฿{{ formatNumber(staffGrandTotal) }}</span>
+            </div>
+            <div class="staff-tot">
+              <span class="staff-tot-label">{{ __wt('staffTotalStaff') }}</span>
+              <span class="staff-tot-value">{{ formatInt(report.byStaff.length) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="report.byStaff.length === 0" class="staff-empty">
+          <i class="fas fa-user-slash"></i>
+          <p>{{ __wt('staffEmpty') }}</p>
+        </div>
+
+        <div v-else class="staff-table-wrap">
+          <table class="staff-table">
+            <thead>
+              <tr>
+                <th>{{ __wt('staffCol_staff') }}</th>
+                <th>{{ __wt('staffCol_topBranch') }}</th>
+                <th class="num">{{ __wt('staffCol_transactions') }}</th>
+                <th class="num">{{ __wt('staffCol_totalCharged') }}</th>
+                <th class="num">{{ __wt('staffCol_avgPerTx') }}</th>
+                <th class="num">{{ __wt('staffCol_share') }}</th>
+                <th>{{ __wt('staffCol_lastActivity') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="s in report.byStaff"
+                :key="s.staffId || 'unattributed'"
+                :class="['staff-row', { 'staff-row-unattributed': s.unattributed }]"
+                @click="goToStaff(s)"
+              >
+                <td>
+                  <template v-if="s.unattributed">
+                    <span class="staff-tag-amber">
+                      <i class="fas fa-question-circle"></i>
+                      {{ __wt('staffUnattributed') }}
+                    </span>
+                  </template>
+                  <template v-else>
+                    <div class="staff-name">
+                      {{ s.fullName || s.username || `Staff #${s.staffId}` }}
+                    </div>
+                    <code class="staff-id muted">{{ s.username ? `@${s.username}` : `#${s.staffId}` }}</code>
+                  </template>
+                </td>
+                <td>
+                  {{ s.topBranch || '—' }}
+                  <span v-if="s.branchCount > 1" class="branch-count-tag">
+                    +{{ s.branchCount - 1 }}
+                  </span>
+                </td>
+                <td class="num">{{ formatInt(s.txCount) }}</td>
+                <td class="num"><strong>฿{{ formatNumber(s.totalCharged) }}</strong></td>
+                <td class="num">฿{{ formatNumber(s.avgPerTx) }}</td>
+                <td class="num">{{ staffShareOfTotal(s.totalCharged) }}%</td>
+                <td>{{ formatRelativeDate(s.lastActivity) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Daily Activity -->
       <div class="daily-card" v-if="report.daily">
         <div class="daily-header">
@@ -960,6 +1038,12 @@ export default {
         { revenue: 0, pours: 0, volumeMl: 0 }
       );
     },
+    staffGrandTotal() {
+      return (this.report.byStaff || []).reduce(
+        (s, r) => s + (r.totalCharged || 0),
+        0
+      );
+    },
     generatedAt() {
       return this.$moment().tz('Asia/Bangkok').format('MMM D, YYYY HH:mm');
     },
@@ -1435,6 +1519,24 @@ export default {
     machineShareOfBranch(machineRevenue, branchRevenue) {
       if (!branchRevenue) return '0.0';
       return ((machineRevenue / branchRevenue) * 100).toFixed(1);
+    },
+
+    staffShareOfTotal(amount) {
+      const total = this.staffGrandTotal;
+      if (!total) return '0.0';
+      return ((amount / total) * 100).toFixed(1);
+    },
+
+    goToStaff(staff) {
+      const id = staff.unattributed ? '__unattributed__' : staff.staffId;
+      const query = {};
+      const range = this.filters || {};
+      if (range.fromDate) query.fromDate = range.fromDate;
+      if (range.toDate) query.toDate = range.toDate;
+      this.$router.push({
+        path: `/wallets/staff/${encodeURIComponent(id)}`,
+        query,
+      });
     },
 
     promoShare(amount) {
@@ -2129,6 +2231,161 @@ export default {
   font-size: 12px;
 }
 .release-btn[disabled] { opacity: 0.6; cursor: wait; }
+
+/* Staff Revenue card */
+.staff-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.staff-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.staff-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #063F48;
+}
+
+.staff-header h2 i {
+  margin-right: 8px;
+  color: #7C5CFF;
+}
+
+.staff-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.staff-totals {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.staff-tot {
+  text-align: right;
+}
+
+.staff-tot-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6B7280;
+  font-weight: 600;
+}
+
+.staff-tot-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  color: #7C5CFF;
+}
+
+.staff-empty {
+  padding: 48px 20px;
+  text-align: center;
+  color: #6B7280;
+}
+.staff-empty i {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 8px;
+  color: #D1D5DB;
+}
+
+.staff-table-wrap {
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.staff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-table thead th {
+  text-align: left;
+  padding: 12px;
+  background: #F7FAFC;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6B7280;
+  border-bottom: 1px solid #E5E7EB;
+  white-space: nowrap;
+}
+
+.staff-table th.num,
+.staff-table td.num { text-align: right; }
+
+.staff-table tbody td {
+  padding: 12px;
+  border-bottom: 1px solid #F1F5F9;
+  color: #1F2937;
+}
+
+.staff-row {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.staff-row:hover td { background: #F9FAFB; }
+
+.staff-row-unattributed {
+  background: rgba(245, 158, 11, 0.04);
+}
+.staff-row-unattributed:hover td { background: rgba(245, 158, 11, 0.1); }
+
+.staff-name {
+  font-weight: 600;
+  color: #063F48;
+}
+
+.staff-id {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: #9CA3AF;
+}
+
+.branch-count-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #6B7280;
+  background: #F1F5F9;
+  border-radius: 999px;
+}
+
+.staff-tag-amber {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #92400E;
+  background: rgba(245, 158, 11, 0.15);
+  border-radius: 999px;
+}
 
 @media (max-width: 640px) {
   .promo-split {

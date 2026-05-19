@@ -27,4 +27,5 @@ module.exports = {
   createMachine: adminController.createMachine,
   updateMachine: adminController.updateMachine,
   deleteMachine: adminController.deleteMachine,
+  getStaffTransactions: adminController.getStaffTransactions,
 };

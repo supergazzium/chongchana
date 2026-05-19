@@ -295,6 +295,8 @@ module.exports = async () => {
       'rejectPointRedemption',
       // Machines lookup (added PR5)
       'listMachines', 'createMachine', 'updateMachine', 'deleteMachine',
+      // Staff revenue detail
+      'getStaffTransactions',
       // Vending session admin
       'listUserVendingSessions', 'releaseVendingSession',
     ];

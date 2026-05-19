@@ -139,6 +139,19 @@ export default ($axios) => ({
     }
   },
 
+  async getStaffTransactions(staffId, params = {}) {
+    try {
+      const response = await $axios.get(
+        `/api/wallet-admin/staff/${encodeURIComponent(staffId)}/transactions`,
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('[WalletService] getStaffTransactions error:', error);
+      throw error;
+    }
+  },
+
   async listMachines(params = {}) {
     try {
       const response = await $axios.get('/api/wallet-admin/machines', { params });

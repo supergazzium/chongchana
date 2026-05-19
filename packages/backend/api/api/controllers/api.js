@@ -51,6 +51,7 @@ const {
   createMachine,
   updateMachine,
   deleteMachine,
+  getStaffTransactions,
 } = require('./wallet-admin')
 const {
   transferFunds,
@@ -157,4 +158,6 @@ module.exports = {
   createMachine,
   updateMachine,
   deleteMachine,
+  // Wallet Admin: staff revenue detail
+  getStaffTransactions,
 }
