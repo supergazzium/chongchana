@@ -1301,10 +1301,13 @@ module.exports = {
           Math.abs(actualClosingBalance - (computedOpeningBalance + netChange)) < 0.01,
       };
 
+      const commissionPercentage = await strapi.services.commission.getPercentage();
+
       ctx.send(utils.successResponse({
         reportType,
         period: { from, to },
         previousPeriod: { from: prevFrom, to: prevTo },
+        commissionPercentage,
         summary: {
           totalWalletBalance: parseFloat(walletSummary[0][0].total_wallet_balance) || 0,
           totalPendingBalance: parseFloat(walletSummary[0][0].total_pending_balance) || 0,
@@ -1621,6 +1624,8 @@ module.exports = {
         autoPlayInterval: billboardAutoPlayInterval,
       });
 
+      const commissionPercentage = await strapi.services.commission.getPercentage();
+
       // Provide defaults if settings are missing
       ctx.send(utils.successResponse({
         settings: {
@@ -1632,6 +1637,7 @@ module.exports = {
           pointConversionRate: redemptionSettings.point_conversion_rate || 1,
           pointMinRedemption: redemptionSettings.point_min_redemption || 100,
           pointRedemptionRequiresApproval: redemptionSettings.point_redemption_requires_approval || false,
+          commissionPercentage,
           billboard: {
             enabled: billboardEnabled,
             images: billboardImages,
@@ -1693,9 +1699,14 @@ module.exports = {
         await strapi.services.redemption.updateSettings(redemptionUpdates);
       }
 
+      if (updates.commissionPercentage !== undefined) {
+        await strapi.services.commission.setPercentage(updates.commissionPercentage);
+      }
+
       // Get updated settings
       const transferSettings = await strapi.services.transfer.getSettings();
       const redemptionSettings = await strapi.services.redemption.getSettings();
+      const commissionPercentage = await strapi.services.commission.getPercentage();
 
       ctx.send(utils.successResponse({
         message: 'Settings updated successfully',
@@ -1708,6 +1719,7 @@ module.exports = {
           pointConversionRate: redemptionSettings.point_conversion_rate,
           pointMinRedemption: redemptionSettings.point_min_redemption,
           pointRedemptionRequiresApproval: redemptionSettings.point_redemption_requires_approval,
+          commissionPercentage,
         },
       }));
     } catch (error) {
