@@ -620,8 +620,13 @@ export default {
         const response = await this.$walletService.getTransferSettings();
 
         if (response.success) {
-          this.settings = { ...response.data.settings };
-          this.originalSettings = { ...response.data.settings };
+          // Merge into data() defaults rather than replace. JSON.stringify
+          // drops undefined keys, so a field that exists in defaults but is
+          // absent from the API response would make settings vs
+          // originalSettings look equal even after edits, leaving the Save
+          // button permanently disabled.
+          this.settings = { ...this.settings, ...response.data.settings };
+          this.originalSettings = { ...this.settings };
 
           // Load billboard settings from the main settings response
           if (response.data.settings.billboard) {
