@@ -163,7 +163,7 @@
       </div>
       <div v-else class="branch-rows">
         <div
-          v-for="row in byBranch"
+          v-for="row in branchRows"
           :key="row.branch"
           :class="['branch-row', { 'branch-row-unattributed': row.unattributed }]"
           @click="handleBranchRowClick(row)"
@@ -187,8 +187,34 @@
             <span>{{ __wt('branchAvg', { value: formatNumber(row.transactions ? row.volume / row.transactions : 0) }) }}</span>
             <span>{{ __wt('branchShareOfTotal', { percent: branchShare(row.volume) }) }}</span>
           </div>
+          <div v-if="commissionEnabled" class="branch-commission">
+            <span class="branch-commission-line">
+              {{ __wt('branchCommission', { percent: commissionRateLabel, value: formatNumber(row.commission) }) }}
+            </span>
+            <span class="branch-net-payable">
+              {{ __wt('branchNetPayable', { value: formatNumber(row.netPayable) }) }}
+            </span>
+          </div>
           <div v-if="row.unattributed" class="unattributed-hint">
             {{ __wt('branchUnattributedHint') }}
+          </div>
+        </div>
+
+        <div v-if="commissionEnabled" class="branch-totals-row">
+          <span class="branch-totals-label">{{ __wt('branchTotalsLabel') }}</span>
+          <div class="branch-totals-values">
+            <span>
+              <span class="branch-totals-key">{{ __wt('branchTotal') }}</span>
+              <span class="branch-totals-amount">฿{{ formatNumber(branchTotals.volume) }}</span>
+            </span>
+            <span>
+              <span class="branch-totals-key">{{ __wt('branchTotalCommission') }}</span>
+              <span class="branch-totals-amount">฿{{ formatNumber(branchTotals.commission) }}</span>
+            </span>
+            <span>
+              <span class="branch-totals-key">{{ __wt('branchTotalNetPayable') }}</span>
+              <span class="branch-totals-amount branch-totals-amount-strong">฿{{ formatNumber(branchTotals.netPayable) }}</span>
+            </span>
           </div>
         </div>
       </div>
@@ -567,6 +593,7 @@ export default {
       },
       byBranch: [],
       byStaff: [],
+      commissionPercentage: 0,
       searchTimeout: null,
     };
   },
@@ -593,6 +620,41 @@ export default {
     },
     staffGrandTotal() {
       return (this.byStaff || []).reduce((s, r) => s + (r.totalCharged || 0), 0);
+    },
+    // True when admin has configured a non-zero commission. Drives whether
+    // commission columns and totals render on the branch breakdown card.
+    commissionEnabled() {
+      return Number(this.commissionPercentage) > 0;
+    },
+    // Display string for the rate (trims trailing zeros: 10 vs 10.50).
+    commissionRateLabel() {
+      const pct = Number(this.commissionPercentage) || 0;
+      return Number.isInteger(pct) ? String(pct) : pct.toFixed(2).replace(/\.?0+$/, '');
+    },
+    // byBranch enriched with derived commission and net payable. Raw numbers
+    // (not pre-rounded) so totals sum correctly.
+    branchRows() {
+      const pct = Number(this.commissionPercentage) || 0;
+      return (this.byBranch || []).map((row) => {
+        const volume = Number(row.volume) || 0;
+        const commission = (volume * pct) / 100;
+        return {
+          ...row,
+          commission,
+          netPayable: volume - commission,
+        };
+      });
+    },
+    branchTotals() {
+      return this.branchRows.reduce(
+        (acc, r) => {
+          acc.volume += r.volume || 0;
+          acc.commission += r.commission || 0;
+          acc.netPayable += r.netPayable || 0;
+          return acc;
+        },
+        { volume: 0, commission: 0, netPayable: 0 }
+      );
     },
   },
   async mounted() {
@@ -682,6 +744,7 @@ export default {
 
           this.byBranch = Array.isArray(data.byBranch) ? data.byBranch : [];
           this.byStaff = Array.isArray(data.byStaff) ? data.byStaff : [];
+          this.commissionPercentage = Number(data.commissionPercentage) || 0;
         }
       } catch (error) {
         console.error('Error loading stats:', error);
@@ -1435,6 +1498,74 @@ export default {
   font-size: 12px;
   color: #78350f;
   line-height: 1.5;
+}
+
+.branch-commission {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(6, 63, 72, 0.18);
+  font-size: 12px;
+}
+
+.branch-commission-line {
+  color: #b45309;
+  font-weight: 500;
+}
+
+.branch-net-payable {
+  color: #047857;
+  font-weight: 600;
+}
+
+.branch-totals-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-top: 4px;
+  background: rgba(6, 63, 72, 0.04);
+  border: 1px solid rgba(6, 63, 72, 0.12);
+  border-radius: 8px;
+}
+
+.branch-totals-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #063F48;
+}
+
+.branch-totals-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+}
+
+.branch-totals-values > span {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+}
+
+.branch-totals-key {
+  color: #6b7280;
+}
+
+.branch-totals-amount {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.branch-totals-amount-strong {
+  color: #047857;
+  font-size: 14px;
 }
 
 .wallet-ops-section {

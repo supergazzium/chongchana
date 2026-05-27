@@ -44,6 +44,11 @@ const en = {
   branchTransactions: '{count} transactions',
   branchAvg: 'Avg ฿{value}',
   branchShareOfTotal: '{percent}% of total',
+  branchCommission: 'Commission ({percent}%): ฿{value}',
+  branchNetPayable: 'Net payable: ฿{value}',
+  branchTotalsLabel: 'Totals',
+  branchTotalCommission: 'Total commission',
+  branchTotalNetPayable: 'Total net payable',
 
   // wallet ops section
   walletsTitle: 'Wallets',
@@ -366,6 +371,11 @@ const th = {
   branchTransactions: '{count} ธุรกรรม',
   branchAvg: 'เฉลี่ย ฿{value}',
   branchShareOfTotal: '{percent}% ของทั้งหมด',
+  branchCommission: 'ค่าคอมมิชชั่น ({percent}%): ฿{value}',
+  branchNetPayable: 'จ่ายให้สาขาสุทธิ: ฿{value}',
+  branchTotalsLabel: 'รวมทั้งหมด',
+  branchTotalCommission: 'ค่าคอมมิชชั่นรวม',
+  branchTotalNetPayable: 'จ่ายสุทธิรวม',
 
   walletsTitle: 'กระเป๋าเงิน',
   walletsSubtitle: 'ใช้งาน {active} · ระงับ {frozen} · ถูกพักการใช้งาน {suspended} · รอดำเนินการ ฿{pending}',

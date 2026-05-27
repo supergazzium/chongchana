@@ -328,6 +328,49 @@
         </div>
       </div>
 
+      <!-- Branch Commission Settings -->
+      <div class="settings-section">
+        <div class="section-header">
+          <div class="section-title">
+            <div class="section-icon info">
+              <i class="fas fa-percentage"></i>
+            </div>
+            <div>
+              <h2>Branch Commission</h2>
+              <p class="section-description">
+                Applied to store payments and beer machine sales across all branches.
+                Used for payout calculations on the Wallet Overview. Display-only —
+                does not alter underlying transactions. The current rate is applied
+                to every transaction in the selected period when viewing reports.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <div class="form-group">
+            <label for="commissionPercentage">
+              <i class="fas fa-percentage"></i>
+              Commission Rate (%)
+            </label>
+            <div class="input-with-unit">
+              <input
+                id="commissionPercentage"
+                v-model.number="settings.commissionPercentage"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                class="form-control"
+                placeholder="0"
+              />
+              <span class="unit">%</span>
+            </div>
+            <p class="help-text">Set to 0 to disable commission display on the overview.</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Billboard Settings -->
       <div class="settings-section">
         <div class="section-header">
@@ -546,6 +589,7 @@ export default {
         transferMinAmount: 1,
         transferMaxAmount: 100000,
         transferDailyLimit: 1000000,
+        commissionPercentage: 0,
       },
       originalSettings: null,
       previewPoints: 100,
@@ -691,6 +735,12 @@ export default {
       }
       if (this.settings.transferDailyLimit < this.settings.transferMaxAmount) {
         errors.push('Daily Transfer Limit should be greater than or equal to Maximum Transfer Amount');
+      }
+
+      // Branch Commission Validation
+      const commission = Number(this.settings.commissionPercentage);
+      if (!Number.isFinite(commission) || commission < 0 || commission > 100) {
+        errors.push('Branch Commission must be a number between 0 and 100');
       }
 
       return {
