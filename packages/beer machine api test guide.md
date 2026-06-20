@@ -9,6 +9,64 @@
   - Testing tool (curl, Postman, or browser)
 
   ---
+  What Changed Recently (June 2026)
+
+  Beer name capture on finalize:
+  - /wallet/vending/finalize now accepts an optional `beerName` string
+    (max 120 chars). The customer can only pour ONE beer per transaction,
+    so this is a single scalar — not an array.
+  - Stored both in a dedicated indexed column
+    `wallet_transactions.beer_name` and inside `metadata.beerName` for
+    audit. Run the migration
+    `database/migrations/add_beer_name_to_wallet_transactions.sql` once.
+  - The wallet admin transactions page surfaces the beer name on the row
+    (under the transaction id) and inside the detail sidebar, and exposes
+    a new "Beer Name" filter input (LIKE match, case-insensitive).
+  - GET /api/wallet-admin/transactions now accepts `?beerName=<substring>`
+    and returns `beerName` + `volumeDispensed` on each row.
+  - Push notification body includes the beer name when present, e.g.
+    `฿120.00 - Singha (330ml)`.
+
+  ---
+  What Changed Recently (May 2026)
+
+  This iteration hardened the beer-machine flow against stuck sessions,
+  oversized locks, and cross-flow payment bugs. If you have integrated
+  against an older version of this guide, the relevant deltas are:
+
+  1. Reserve now accepts a price band: { minAmount, maxAmount }
+     - maxAmount caps the lock at the machine's expected ceiling instead
+       of the user's whole wallet. Strongly recommended.
+     - minAmount declares the floor; finalize rejects any charge below it.
+     - Both are optional. Omitting them keeps legacy behavior.
+     See Step 2.3 and 3.5c–3.5d.
+
+  2. Session timeout dropped from 10 minutes to 5 minutes.
+     Reserve responses now return expiresIn: 300.
+
+  3. A periodic cron sweeper runs every minute. Any active session whose
+     expires_at has passed is automatically marked expired and its
+     reserved funds returned to the user, without requiring the customer
+     to come back. Worst-case stranding: ~6 minutes total (5 min timeout
+     + ≤1 min cron lag).
+
+  4. Admin escape hatch for support staff:
+     GET  /api/wallet-admin/wallet/:userId/vending-sessions
+     POST /api/wallet-admin/wallet/vending-session/release
+     Lets a support agent immediately release any stuck session without
+     waiting for the cron. Each release stamps the acting admin and the
+     reason into the session metadata for audit. See Phase 5.
+
+  5. QR payment / vending separation (Bug #4 + #5 fix):
+     - The "vending" eligibility block in /payment-qr/validate is now
+       attached only when purpose = beer_machine. Previously it bled
+       into store payments, blocking small in-store charges for users
+       with low available balance.
+     - /payment-qr/pay now reads availableBalance (balance - reserved)
+       instead of raw balance. A beer-machine session no longer lets a
+       store charge over-spend the user.
+
+  ---
   Phase 1: Setup & Preparation
 
   Step 1.1: Find or Create Test User
@@ -317,11 +375,16 @@
       "volumeDispensed": 200,
       "amount": 400.00,
       "machineId": "BVM-TEST-001",
+      "beerName": "Singha",
       "metadata": {
         "pourDuration": 15,
         "temperature": 4
       }
     }'
+
+  Note: `beerName` is optional (max 120 chars). Send the human-readable
+  beer name the customer selected — the admin transactions list filters
+  on this. Customer pours one beer per transaction.
 
   Expected Response:
   {
@@ -862,6 +925,172 @@
   LIMIT 5;
 
   ---
+  Phase 5: Auto-Recovery & Admin Escape Hatch
+
+  These tests cover the two paths that release a stuck session without
+  the customer needing to come back to the app.
+
+  ---
+  Step 5.1: Cron Auto-Sweep on Expired Active Sessions
+
+  A backend cron task ("*/1 * * * *") sweeps every user's expired-but-
+  still-active sessions, decrements wallets.reserved_balance by the
+  unreleased amount, and marks each session status='expired'. This is
+  the safety net for customers who lost connection and never returned.
+
+  Setup:
+  1. Steps 2.1 → 2.3 to create a session with reservedAmount, e.g. ฿150
+  2. Note the sessionId — DO NOT call finalize or end-session
+  3. Wait 5 minutes (the session timeout) + up to 1 minute (cron lag)
+
+  Verify session state moves from active → expired automatically:
+
+  curl -s https://wallet-backend-test-pc-ndd56.ondigitalocean.app/wallet/vending/session/YOUR_SESSION_ID
+
+  Expected within 6 minutes of reserve:
+  {
+    "success": true,
+    "data": {
+      "sessionId": "VS-...",
+      "status": "expired",
+      "endedAt": "2026-05-09T08:11:00.000Z",
+      "expiresAt": "2026-05-09T08:10:42.000Z"
+      ...
+    }
+  }
+
+  Verify in DB:
+  SELECT user_id, balance, reserved_balance
+  FROM wallets
+  WHERE user_id = YOUR_USER_ID;
+
+  Expected: reserved_balance returned to 0 without any further action.
+
+  Backend logs (when at least one session is swept) will include:
+  [Task][releaseExpiredVending] released: { sweptSessions: N, ... }
+
+  Checklist:
+  - Session status flips active → expired automatically
+  - endedAt timestamp is within ~1 minute after expires_at
+  - wallets.reserved_balance is reduced by reserved_amount - total_charged
+  - No 500/error in backend logs around the cron tick
+
+  ---
+  Step 5.2: Admin Force-Release (Support Path)
+
+  When a customer reports a stuck balance and you do not want to wait
+  for the cron, an admin can list their active sessions and release
+  one immediately. Each release is audited inside session.metadata.
+
+  Prerequisites:
+  - Admin user with role.type IN ('admin','superadmin','super-admin')
+  - Strapi permissions enabled for actions:
+      admin.listuservendingsessions
+      admin.releasevendingsession
+    (One-time DB toggle — see "Permissions Setup" note below.)
+
+  List active sessions for a user:
+
+  curl -X GET https://wallet-backend-test-pc-ndd56.ondigitalocean.app/api/wallet-admin/wallet/YOUR_USER_ID/vending-sessions \
+    -H "Authorization: Bearer ADMIN_JWT"
+
+  Expected Response:
+  {
+    "success": true,
+    "data": {
+      "userId": 123,
+      "activeSessions": [
+        {
+          "sessionId": "VS-1744717200000-A1B2C3D4",
+          "machineId": "BVM-TEST-001",
+          "branchId": 1,
+          "reservedAmount": 150,
+          "totalCharged": 0,
+          "unreleasedAmount": 150,
+          "startedAt": "2026-05-09T08:53:04.000Z",
+          "expiresAt": "2026-05-09T08:58:04.000Z",
+          "isExpired": false
+        }
+      ],
+      "totalUnreleased": 150
+    }
+  }
+
+  Force-release a session:
+
+  curl -X POST https://wallet-backend-test-pc-ndd56.ondigitalocean.app/api/wallet-admin/wallet/vending-session/release \
+    -H "Authorization: Bearer ADMIN_JWT" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "sessionId": "VS-1744717200000-A1B2C3D4",
+      "reason": "customer reported stranded balance after disconnect"
+    }'
+
+  Expected Response:
+  {
+    "success": true,
+    "data": {
+      "ok": true,
+      "sessionId": "VS-1744717200000-A1B2C3D4",
+      "userId": 123,
+      "releasedAmount": 150,
+      "finalReserved": 0
+    }
+  }
+
+  Verify audit trail in DB:
+  SELECT id, status, ended_at,
+         JSON_EXTRACT(metadata, '$.adminRelease') AS audit
+  FROM wallet_vending_sessions
+  WHERE id = 'VS-1744717200000-A1B2C3D4';
+
+  Expected: status='cancelled', ended_at set, and audit JSON contains
+  { adminId, adminEmail, reason, releasedAt }.
+
+  Checklist:
+  - GET endpoint returns only status='active' sessions for the user
+  - unreleasedAmount = reservedAmount - totalCharged
+  - isExpired flag mirrors expires_at < NOW()
+  - POST releases the lock atomically (wallet + session in one trx)
+  - reserved_balance is decremented (clamped at 0 — never negative)
+  - metadata.adminRelease records who, when, and why
+  - Calling release on an already-ended session returns ALREADY_ENDED
+
+  Admin UI (alternative to direct API):
+  The wallet detail page at /wallets/:userId in the admin app surfaces
+  this automatically as a yellow "Active Vending Sessions" panel with
+  per-row "Force Release" buttons. Click → reason prompt → confirm.
+
+  Permissions Setup (one-time after deploying new admin endpoints):
+
+  Strapi v3 gates every controller action via the
+  users-permissions_permission table. New admin actions need rows
+  enabled for whatever roles should see them. The isWalletAdmin policy
+  still gates execution, so granting all roles is harmless. Run once:
+
+    INSERT INTO `users-permissions_permission`
+      (type, controller, action, enabled, policy, role)
+    SELECT 'application', 'admin', a.action, 1, '', r.id
+    FROM `users-permissions_role` r
+    CROSS JOIN (
+      SELECT 'listuservendingsessions' AS action
+      UNION ALL
+      SELECT 'releasevendingsession'
+    ) a
+    WHERE NOT EXISTS (
+      SELECT 1 FROM `users-permissions_permission` p
+      WHERE p.role = r.id AND p.controller = 'admin'
+        AND p.action = a.action
+    );
+    UPDATE `users-permissions_permission`
+    SET enabled = 1
+    WHERE controller = 'admin'
+      AND action IN ('listuservendingsessions','releasevendingsession');
+
+  (Some MySQL/Strapi versions ignore the literal "1" on insert and
+  default enabled to 0 — the UPDATE step is the safety net.)
+
+  ---
   ✅ Testing Checklist Summary
 
   - Setup Complete
@@ -870,29 +1099,45 @@
     - Database permissions verified
   - Happy Path Works
     - Generate QR → Returns token
-    - Validate QR → Includes vending info (Universal QR!)
-    - Reserve funds → Creates session, locks balance
+    - Validate QR → vending info ONLY for purpose=beer_machine
+    - Reserve with minAmount/maxAmount → locks min(maxAmount, available)
+    - Reserve without bounds (legacy) → still works, locks full available
     - Finalize → Charges correct amount, releases remainder
     - Get session → Returns correct details
   - Error Handling Works
-    - Insufficient balance rejected
+    - Insufficient balance rejected (global 500 floor)
+    - Insufficient balance for machine's minAmount rejected
     - Expired QR rejected
     - Invalid session rejected
     - Machine ID mismatch rejected
     - Excess volume rejected
+    - Charge below session minAmount rejected
+    - Charge above session maxAmount rejected
+    - Reserve with min > max rejected
     - Cancel session releases funds
-    - Expired session auto-released on next validate/reserve
+    - Cron auto-releases expired session within ~1 min of expires_at
     - Missing/invalid amount on finalize rejected with clear message
+  - Admin Recovery
+    - GET vending-sessions lists active sessions
+    - POST release returns funds and stamps audit metadata
+    - Admin UI panel appears only when sessions are active
   - Database Consistency
-    - No orphaned reserved balances
-    - All sessions properly closed
+    - No orphaned reserved balances after cron sweep
+    - All sessions properly closed (status != 'active' once ended)
+    - reserved_balance never goes negative
     - Transactions match wallet balances
 
   ---
   🎉 Success Criteria
 
-  ✅ All happy path tests pass✅ All error scenarios handled correctly✅ Database state is
-  consistent✅ Vending info appears in QR validation (Universal QR working!)
+  ✅ Happy path: Generate → Validate → Reserve(min,max) → Finalize works
+  ✅ Bounded reserve protects user from abandoned sessions stranding wallet
+  ✅ Finalize price-band check rejects charges outside [minAmount, maxAmount]
+  ✅ Cross-flow integrity: store payment respects beer-machine reserved funds
+  ✅ Cron sweeps abandoned sessions within ~1 min of 5-min timeout
+  ✅ Admin force-release returns funds and writes audit metadata
+  ✅ payment QR validate has no vending block (purpose=payment / store_payment)
+  ✅ All error scenarios return clear, actionable messages
 
 
 
@@ -906,8 +1151,13 @@
   2. Validate the QR
   POST /wallet/payment-qr/validate
   Body: { "token": "scanned_token" }
-    - Check if valid: true
-    - Check if vending.canProceed: true
+    - Check valid: true
+    - Check the QR is for vending: response.purpose === "beer_machine".
+      If purpose is "payment" or "store_payment", refuse to proceed —
+      the customer scanned a wallet QR meant for the POS, not the
+      vending machine.
+    - Check vending.canProceed: true (only attached when
+      purpose=beer_machine; absent for other purposes)
     - Extract the nonce from response
   3. Reserve Balance
   POST /wallet/vending/reserve
@@ -945,6 +1195,7 @@
     "volumeDispensed": actual_ml,
     "amount": total_in_baht,
     "machineId": "YOUR_MACHINE_ID",
+    "beerName": "<human-readable beer name>",
     "metadata": { "pourDuration": ..., "temperature": ... }
   }
     - amount is required; it is the total to charge the user.
@@ -954,6 +1205,59 @@
       VENDING_ERROR "below session minimum" or "exceeds session maximum".
     - volumeDispensed is required (recorded for analytics; does not
       drive the charge).
+    - beerName is OPTIONAL (max 120 chars) but strongly recommended.
+      Customer pours one beer per transaction, so send the name of the
+      single beer dispensed. The wallet admin filters transactions by
+      this string. If your machine only ever sells one product, you may
+      hardcode it.
+
+  6. End Session Proactively (cooperative cancel)
+  POST /wallet/vending/end-session
+  Body: {
+    "sessionId": "from_step_3",
+    "machineId": "YOUR_MACHINE_ID",
+    "reason": "user_finished" | "cancelled" | "machine_idle"
+  }
+    - Call this whenever you know the customer will not finalize:
+      * user pressed Cancel on the touchscreen
+      * machine has been idle past your local "abandon" threshold
+        (e.g. 30 seconds with no UI interaction)
+      * machine is rebooting and finds an active session in its local
+        state for which it cannot reconcile
+    - Releases reserved_balance immediately instead of making the user
+      wait for the cron sweeper.
+    - Idempotent: calling on an already-ended session returns success
+      with status field reflecting the existing terminal state.
+
+  Failure & Recovery Patterns:
+
+  - Network drop after reserve, before dispense:
+    Worst case the cron sweeps the session ~6 minutes after reserve.
+    If the machine recovers and still has the customer on-screen,
+    just call end-session and have them re-scan.
+
+  - Network drop mid-dispense:
+    Save volumeDispensed locally as a checkpoint. On reconnect, finalize
+    with the actual volume and your computed amount. Backend won't
+    double-charge: a session can only finalize once.
+
+  - finalize returns 4xx after a successful dispense:
+    Inspect the error code:
+      * "Charge amount exceeds reserved amount" → your maxAmount was
+        too low for this session. Call end-session and ask the user
+        to re-scan with a higher price band.
+      * "below session minimum" / "exceeds session maximum" → bug in
+        your local pricing. Adjust and retry within the session window.
+      * "Session has expired" → too slow. Customer must re-scan.
+    For all 4xx, the user has not been charged; you can safely retry
+    or end-session.
+
+  - finalize times out (network error, no response received):
+    Treat as ambiguous. Call GET /wallet/vending/session/:sessionId.
+    If status='completed', finalize succeeded — show success and stop.
+    If status='active', call finalize again with the same parameters.
+    If status='expired'/'cancelled', the funds were released; the
+    customer was not charged for this dispense.
 
   Key Points:
 
@@ -965,3 +1269,7 @@
   - Handle dispense failures (call finalize with actual volume, even if 0)
   - Pass minAmount/maxAmount on reserve so an abandoned session only
     locks the machine's price ceiling, not the user's whole wallet
+  - Always call end-session when you know the customer is gone — it
+    shrinks the worst-case lock from 6 minutes to near-zero
+  - On any ambiguous failure, query GET /wallet/vending/session/:id
+    instead of blindly retrying — it tells you the authoritative state

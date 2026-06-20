@@ -274,12 +274,30 @@ module.exports = {
         volumeDispensed, // in ml
         amount: rawAmount, // total charge in baht — machine computes from beer prices
         machineId,
+        beerName: rawBeerName, // optional: name of the beer dispensed for admin reporting
         metadata = {},
       } = ctx.request.body;
 
       // Validate inputs
       if (!sessionId || volumeDispensed === undefined || !machineId) {
         return ctx.badRequest(utils.errorResponse('VENDING_ERROR', 'SessionId, volumeDispensed, and machineId are required'));
+      }
+
+      // Validate beerName if provided. The machine sends one beer per
+      // finalize call (customer can only pour one beer per transaction),
+      // so this is a simple scalar. Trim and cap to the column width.
+      let beerName = null;
+      if (rawBeerName !== undefined && rawBeerName !== null && rawBeerName !== '') {
+        if (typeof rawBeerName !== 'string') {
+          return ctx.badRequest(utils.errorResponse('VENDING_ERROR', 'beerName must be a string'));
+        }
+        const trimmed = rawBeerName.trim();
+        if (trimmed.length > 120) {
+          return ctx.badRequest(utils.errorResponse('VENDING_ERROR', 'beerName must be 120 characters or fewer'));
+        }
+        if (trimmed.length > 0) {
+          beerName = trimmed;
+        }
       }
 
       const volume = parseInt(volumeDispensed);
@@ -424,7 +442,10 @@ module.exports = {
           branch = branchResult?.name || null;
         }
 
-        // Create transaction record
+        // Create transaction record.
+        // beer_name is stored in a dedicated column so the admin transactions
+        // list can filter on it via an index instead of JSON_EXTRACT. We also
+        // mirror it inside metadata for audit / older consumers.
         await trx('wallet_transactions').insert({
           id: transactionId,
           user_id: userId,
@@ -433,15 +454,19 @@ module.exports = {
           balance_before: currentBalance.toFixed(2),
           balance_after: newBalance.toFixed(2),
           status: 'completed',
-          description: `Beer vending: ${volume}ml`,
+          description: beerName
+            ? `Beer vending: ${beerName} (${volume}ml)`
+            : `Beer vending: ${volume}ml`,
           branch: branch,
           vending_session_id: sessionId,
           volume_dispensed: volume,
+          beer_name: beerName,
           metadata: JSON.stringify({
             ...metadata,
             machineId,
             volumeDispensed: volume,
             sessionId,
+            ...(beerName ? { beerName } : {}),
           }),
           created_at: new Date(),
         });
@@ -474,7 +499,9 @@ module.exports = {
         // Send push notification
         try {
           await sendPushNotification({
-            content: `฿${chargeAmount.toFixed(2)} - Beer Vending (${volume}ml)`,
+            content: beerName
+              ? `฿${chargeAmount.toFixed(2)} - ${beerName} (${volume}ml)`
+              : `฿${chargeAmount.toFixed(2)} - Beer Vending (${volume}ml)`,
             heading: 'Payment Successful',
             external_ids: [userId.toString()],
             additionalData: {
@@ -483,6 +510,7 @@ module.exports = {
               sessionId,
               amount: parseFloat(chargeAmount.toFixed(2)),
               volume,
+              ...(beerName ? { beerName } : {}),
               newBalance: parseFloat(newBalance.toFixed(2)),
               timestamp: new Date().toISOString(),
             },
@@ -497,6 +525,7 @@ module.exports = {
           sessionId,
           volumeDispensed: volume,
           amount: parseFloat(chargeAmount.toFixed(2)),
+          ...(beerName ? { beerName } : {}),
           balanceBefore: parseFloat(currentBalance.toFixed(2)),
           balanceAfter: parseFloat(newBalance.toFixed(2)),
           totalDispensed,

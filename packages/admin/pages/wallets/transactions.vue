@@ -139,6 +139,17 @@
               @change="loadTransactions"
             >
           </div>
+
+          <div class="filter-item">
+            <label>Beer Name</label>
+            <input
+              v-model="filters.beerName"
+              type="text"
+              placeholder="e.g. IPA, Lager"
+              class="filter-input"
+              @change="loadTransactions"
+            >
+          </div>
         </div>
 
         <div class="filter-actions">
@@ -192,6 +203,10 @@
             <td class="td-transaction">
               <div class="transaction-id">#{{ transaction.id }}</div>
               <div class="transaction-description">{{ transaction.description }}</div>
+              <div v-if="transaction.beerName" class="transaction-beer">
+                <i class="fas fa-beer"></i>
+                {{ transaction.beerName }}
+              </div>
             </td>
 
             <td class="td-user">
@@ -401,6 +416,25 @@
             </div>
           </div>
 
+          <div v-if="selectedTransaction.beerName || selectedTransaction.volumeDispensed" class="detail-section">
+            <h4>Beer Vending</h4>
+            <div class="detail-grid">
+              <div v-if="selectedTransaction.beerName" class="detail-item">
+                <label>Beer</label>
+                <div class="value">
+                  <span class="branch-tag">
+                    <i class="fas fa-beer"></i>
+                    {{ selectedTransaction.beerName }}
+                  </span>
+                </div>
+              </div>
+              <div v-if="selectedTransaction.volumeDispensed" class="detail-item">
+                <label>Volume</label>
+                <div class="value">{{ selectedTransaction.volumeDispensed }} ml</div>
+              </div>
+            </div>
+          </div>
+
           <div v-if="selectedTransaction.description" class="detail-section">
             <h4>Description</h4>
             <p class="description-text">{{ selectedTransaction.description }}</p>
@@ -475,6 +509,7 @@ export default {
         branchMissing: '',
         staffId: '',
         machineId: '',
+        beerName: '',
         minAmount: '',
         maxAmount: '',
         fromDate: '',
@@ -679,6 +714,7 @@ export default {
         branch: '',
         staffId: '',
         machineId: '',
+        beerName: '',
         minAmount: '',
         maxAmount: '',
       };
@@ -1343,6 +1379,23 @@ export default {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.transaction-beer {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.transaction-beer i {
+  font-size: 11px;
 }
 
 /* User Info */

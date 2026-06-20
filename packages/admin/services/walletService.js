@@ -220,11 +220,78 @@ export default ($axios) => ({
       const response = await $axios.get('/api/wallet-admin/transactions', {
         params: { ...params, limit: 10000 },
       });
-      return this.convertToCSV(response.data.data.transactions);
+      return this.convertTransactionsToCSV(response.data.data.transactions);
     } catch (error) {
       console.error('[WalletService] exportTransactions error:', error);
       throw error;
     }
+  },
+
+  /**
+   * Convert a transaction list to a curated, human-readable CSV.
+   * Columns are explicit (no generic Object.keys walk) so the file opens
+   * cleanly in Excel and Beer Name + Volume are first-class columns.
+   * @param {Array} transactions
+   * @returns {string} CSV string
+   */
+  convertTransactionsToCSV(transactions) {
+    if (!transactions || transactions.length === 0) return '';
+
+    const columns = [
+      { key: 'id', label: 'Transaction ID' },
+      { key: 'createdAt', label: 'Created At' },
+      { key: 'type', label: 'Type' },
+      { key: 'status', label: 'Status' },
+      { key: 'amount', label: 'Amount' },
+      { key: 'balanceBefore', label: 'Balance Before' },
+      { key: 'balanceAfter', label: 'Balance After' },
+      { key: 'beerName', label: 'Beer Name' },
+      { key: 'volumeDispensed', label: 'Volume (ml)' },
+      { key: 'branch', label: 'Branch' },
+      { key: 'description', label: 'Description' },
+      { key: 'paymentMethod', label: 'Payment Method' },
+      { key: 'referenceId', label: 'Reference ID' },
+      {
+        key: 'user',
+        label: 'Customer Name',
+        get: (row) => row.user
+          ? `${row.user.firstName || ''} ${row.user.lastName || ''}`.trim()
+          : '',
+      },
+      {
+        key: 'userEmail',
+        label: 'Customer Email',
+        get: (row) => (row.user && row.user.email) || '',
+      },
+      {
+        key: 'processedBy',
+        label: 'Processed By',
+        get: (row) => {
+          if (!row.processedBy) return '';
+          if (row.processedBy.type === 'staff') {
+            return `Staff: ${row.processedBy.staff?.name || row.processedBy.staffId || ''}`;
+          }
+          if (row.processedBy.type === 'machine') {
+            return `Machine: ${row.processedBy.machineName || row.processedBy.machineId || ''}`;
+          }
+          return '';
+        },
+      },
+    ];
+
+    const escape = (value) => {
+      if (value === null || value === undefined) return '""';
+      return `"${String(value).replace(/"/g, '""')}"`;
+    };
+
+    const header = columns.map((c) => escape(c.label)).join(',');
+    const rows = transactions.map((row) =>
+      columns
+        .map((c) => escape(c.get ? c.get(row) : row[c.key]))
+        .join(',')
+    );
+
+    return [header, ...rows].join('\n');
   },
 
   /**

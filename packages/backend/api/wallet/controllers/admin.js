@@ -368,6 +368,7 @@ module.exports = {
         referenceId,
         staffId,
         machineId,
+        beerName,
         branch,
         branchMissing,
       } = ctx.query;
@@ -448,6 +449,15 @@ module.exports = {
       if (machineId) {
         query += ` AND JSON_UNQUOTE(JSON_EXTRACT(t.metadata, '$.machineId')) LIKE ?`;
         params.push(`%${machineId}%`);
+      }
+
+      // beer_name has a dedicated indexed column (see migration
+      // add_beer_name_to_wallet_transactions.sql), so filter against it
+      // directly. Only beer_machine_payment rows ever set this column, so
+      // a non-empty filter naturally restricts to that type.
+      if (beerName) {
+        query += ` AND t.beer_name LIKE ?`;
+        params.push(`%${beerName}%`);
       }
 
       // Filter by branch
@@ -559,6 +569,8 @@ module.exports = {
           description: t.description,
           metadata,
           branch: t.branch,
+          beerName: t.beer_name,
+          volumeDispensed: t.volume_dispensed,
           processedBy,
           createdAt: t.created_at,
           completedAt: t.completed_at,
