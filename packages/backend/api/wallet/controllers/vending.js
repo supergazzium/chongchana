@@ -18,7 +18,7 @@ const { sendPushNotification } = require('../../helpers');
 
 // Configuration
 const VENDING_MINIMUM_BALANCE = 500; // ฿500 minimum
-const VENDING_SESSION_TIMEOUT = 300000; // 5 minutes in ms
+const VENDING_SESSION_TIMEOUT = 180000; // 3 minutes in ms
 const VENDING_MAX_AMOUNT_PER_DISPENSE = 10000; // ฿10,000 ceiling per single finalize call
 
 module.exports = {

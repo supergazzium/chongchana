@@ -11,6 +11,13 @@
   ---
   What Changed Recently (June 2026)
 
+  Session timeout dropped from 5 minutes to 3 minutes.
+  - Reserve responses now return `expiresIn: 180`.
+  - Worst-case strand: ~4 minutes total (3 min timeout + ≤1 min cron lag).
+  - Cron and lazy-cleanup logic are dynamic on `expires_at < NOW()`, so
+    no other code changes are required for the new timeout — the single
+    source of truth is `VENDING_SESSION_TIMEOUT` in vending.js.
+
   Beer name capture on finalize:
   - /wallet/vending/finalize now accepts an optional `beerName` string
     (max 120 chars). The customer can only pour ONE beer per transaction,
@@ -41,13 +48,14 @@
      - Both are optional. Omitting them keeps legacy behavior.
      See Step 2.3 and 3.5c–3.5d.
 
-  2. Session timeout dropped from 10 minutes to 5 minutes.
-     Reserve responses now return expiresIn: 300.
+  2. Session timeout was dropped from 10 minutes to 5 minutes in May 2026,
+     then further reduced to 3 minutes in June 2026.
+     Reserve responses now return expiresIn: 180.
 
   3. A periodic cron sweeper runs every minute. Any active session whose
      expires_at has passed is automatically marked expired and its
      reserved funds returned to the user, without requiring the customer
-     to come back. Worst-case stranding: ~6 minutes total (5 min timeout
+     to come back. Worst-case stranding: ~4 minutes total (3 min timeout
      + ≤1 min cron lag).
 
   4. Admin escape hatch for support staff:
@@ -120,10 +128,10 @@
   Manual recovery is no longer required for expired sessions. A periodic
   cron job (every 1 minute) also sweeps any abandoned active session whose
   expires_at has passed across all users — so a stranded customer's locked
-  funds are returned automatically within ~1 minute of the 5-minute
+  funds are returned automatically within ~1 minute of the 3-minute
   session timeout, even if they never reopen the app.
 
-  For sessions that are still within their 5-minute window but you want
+  For sessions that are still within their 3-minute window but you want
   to abandon, use POST /wallet/vending/end-session (Step 3.6).
 
   ---
@@ -293,7 +301,7 @@
       "minAmount": 80.00,
       "maxAmount": 500.00,
       "expiresAt": "2026-04-15T10:05:00.000Z",
-      "expiresIn": 300
+      "expiresIn": 180
     }
   }
 
@@ -302,7 +310,7 @@
   - sessionId exists
   - reservedAmount = min(maxAmount, availableBalance) = 500.00
   - minAmount and maxAmount echoed back
-  - expiresIn = 300 (5 minutes)
+  - expiresIn = 180 (3 minutes)
 
   Legacy form (no bounds — locks full balance):
 
@@ -324,7 +332,7 @@
       "balance": 1500.00,
       "availableBalance": 1500.00,
       "expiresAt": "2026-04-15T10:05:00.000Z",
-      "expiresIn": 300
+      "expiresIn": 180
     }
   }
 
@@ -941,13 +949,13 @@
   Setup:
   1. Steps 2.1 → 2.3 to create a session with reservedAmount, e.g. ฿150
   2. Note the sessionId — DO NOT call finalize or end-session
-  3. Wait 5 minutes (the session timeout) + up to 1 minute (cron lag)
+  3. Wait 3 minutes (the session timeout) + up to 1 minute (cron lag)
 
   Verify session state moves from active → expired automatically:
 
   curl -s https://wallet-backend-test-pc-ndd56.ondigitalocean.app/wallet/vending/session/YOUR_SESSION_ID
 
-  Expected within 6 minutes of reserve:
+  Expected within 4 minutes of reserve:
   {
     "success": true,
     "data": {
@@ -1134,7 +1142,7 @@
   ✅ Bounded reserve protects user from abandoned sessions stranding wallet
   ✅ Finalize price-band check rejects charges outside [minAmount, maxAmount]
   ✅ Cross-flow integrity: store payment respects beer-machine reserved funds
-  ✅ Cron sweeps abandoned sessions within ~1 min of 5-min timeout
+  ✅ Cron sweeps abandoned sessions within ~1 min of 3-min timeout
   ✅ Admin force-release returns funds and writes audit metadata
   ✅ payment QR validate has no vending block (purpose=payment / store_payment)
   ✅ All error scenarios return clear, actionable messages
@@ -1232,7 +1240,7 @@
   Failure & Recovery Patterns:
 
   - Network drop after reserve, before dispense:
-    Worst case the cron sweeps the session ~6 minutes after reserve.
+    Worst case the cron sweeps the session ~4 minutes after reserve.
     If the machine recovers and still has the customer on-screen,
     just call end-session and have them re-scan.
 
@@ -1263,13 +1271,13 @@
 
   - Machine needs QR scanner hardware
   - Machine needs API credentials (not user JWT)
-  - Handle timeout errors (sessions expire in 5 minutes; abandoned
+  - Handle timeout errors (sessions expire in 3 minutes; abandoned
     sessions are also auto-released by a backend cron job within ~1
     minute of expiry)
   - Handle dispense failures (call finalize with actual volume, even if 0)
   - Pass minAmount/maxAmount on reserve so an abandoned session only
     locks the machine's price ceiling, not the user's whole wallet
   - Always call end-session when you know the customer is gone — it
-    shrinks the worst-case lock from 6 minutes to near-zero
+    shrinks the worst-case lock from 4 minutes to near-zero
   - On any ambiguous failure, query GET /wallet/vending/session/:id
     instead of blindly retrying — it tells you the authoritative state

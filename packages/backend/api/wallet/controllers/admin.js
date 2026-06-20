@@ -1063,7 +1063,7 @@ module.exports = {
         LIMIT 100
       `, [from, to]);
 
-      // 5. Stuck vending sessions: status='active' older than 5 minutes.
+      // 5. Stuck vending sessions: status='active' older than 3 minutes.
       // The cron job auto-releases these but the operator should see them
       // while they wait, with a one-click manual override. NOT period-
       // bound — these are point-in-time problems.
